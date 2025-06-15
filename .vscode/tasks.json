@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "shell",
+      "label": "Initialize TypeScript",
+      "command": "npx tsc --init",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    }
+  ]
+}
