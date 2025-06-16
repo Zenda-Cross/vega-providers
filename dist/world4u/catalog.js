@@ -1,29 +1,29 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.world4uGenresList = exports.world4uCatalogList = void 0;
-exports.world4uCatalogList = [
+exports.genres = exports.catalog = void 0;
+exports.catalog = [
     {
-        title: 'Latest',
-        filter: '',
+        title: "Latest",
+        filter: "",
     },
     {
-        title: 'Hollywood',
-        filter: '/category/hollywood',
+        title: "Hollywood",
+        filter: "/category/hollywood",
     },
     {
-        title: 'Bollywood',
-        filter: '/category/bollywood',
+        title: "Bollywood",
+        filter: "/category/bollywood",
     },
     {
-        title: 'Web Series',
-        filter: '/category/web-series',
+        title: "Web Series",
+        filter: "/category/web-series",
     },
 ];
-exports.world4uGenresList = [
-    { title: 'South', filter: '/category/hindi-dubbed-movies/south-indian' },
-    { title: 'Punjabi', filter: '/category/punjabi' },
-    { title: 'Marathi', filter: '/category/bollywood/marathi' },
-    { title: 'Gujarati', filter: '/category/gujarati' },
-    { title: 'Bollywood', filter: '/category/bollywood' },
-    { title: 'Hollywood', filter: '/category/hollywood' },
+exports.genres = [
+    { title: "South", filter: "/category/hindi-dubbed-movies/south-indian" },
+    { title: "Punjabi", filter: "/category/punjabi" },
+    { title: "Marathi", filter: "/category/bollywood/marathi" },
+    { title: "Gujarati", filter: "/category/gujarati" },
+    { title: "Bollywood", filter: "/category/bollywood" },
+    { title: "Hollywood", filter: "/category/hollywood" },
 ];

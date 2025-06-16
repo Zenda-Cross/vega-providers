@@ -1,15 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.moviesApi = void 0;
-const allCatalog_1 = require("../autoEmbed/allCatalog");
-const allGetInfo_1 = require("../autoEmbed/allGetInfo");
-const allGetPost_1 = require("../autoEmbed/allGetPost");
-const mpGetStream_1 = require("./mpGetStream");
+const catalog_1 = require("../autoEmbed/catalog");
+const module_1 = require();
+";;
+const posts_1 = require("../autoEmbed/posts");
+const stream_1 = require("./stream");
 exports.moviesApi = {
-    catalog: allCatalog_1.allCatalog,
-    genres: allCatalog_1.allGenresList,
-    GetMetaData: allGetInfo_1.allGetInfo,
-    GetHomePosts: allGetPost_1.allGetPost,
-    GetStream: mpGetStream_1.mpGetStream,
-    GetSearchPosts: allGetPost_1.allGetSearchPosts,
+    catalog: catalog_1.allCatalog,
+    genres: catalog_1.allGenresList,
+    GetMetaData: module_1.allGetInfo,
+    GetHomePosts: posts_1.allGetPost,
+    GetStream: stream_1.mpGetStream,
+    GetSearchPosts: posts_1.allGetSearchPosts,
 };

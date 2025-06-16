@@ -3,12 +3,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.genres = exports.catalog = void 0;
 exports.catalog = [
     {
-        title: "Top Anime",
-        filter: "anime/search?r=5",
+        title: "Movies",
+        filter: "MOVIES",
     },
     {
-        title: "Popular Anime",
-        filter: "anime/",
+        title: "TV Shows",
+        filter: "SERIES",
+    },
+    {
+        title: "Anime",
+        filter: "ANIME",
     },
 ];
 exports.genres = [];

@@ -8,15 +8,15 @@ exports.catalog = [
     },
     {
         title: "Netflix",
-        filter: "/ott/netflix",
+        filter: "/web-series/tv-shows-by-network/netflix",
     },
     {
-        title: "HBO Max",
-        filter: "/ott/hbo-max",
+        title: "Hotstar",
+        filter: "/web-series/tv-shows-by-network/hotstar",
     },
     {
         title: "Amazon Prime",
-        filter: "/ott/amazon-prime-video",
+        filter: "/web-series/tv-shows-by-network/amazon-prime-video",
     },
 ];
 exports.genres = [
