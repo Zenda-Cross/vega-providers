@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "es2021",
     "module": "commonjs",
     "rootDir": "./providers",
     "outDir": "./dist",
