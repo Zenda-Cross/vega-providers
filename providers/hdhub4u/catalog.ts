@@ -4,16 +4,16 @@ export const catalog = [
     filter: "",
   },
   {
-    title: "Anime",
-    filter: "category/anime/",
+    title: "Web Series",
+    filter: "/category/web-series",
   },
   {
-    title: "Netflix",
-    filter: "category/netflix/",
+    title: "Hollywood ",
+    filter: "/category/hollywood-movies",
   },
   {
-    title: "4K",
-    filter: "category/2160p-4k/",
+    title: "South Movies",
+    filter: "/category/south-hindi-movies",
   },
 ];
 

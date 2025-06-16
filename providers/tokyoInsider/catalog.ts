@@ -1,12 +1,12 @@
-export const tokyoCatalogList = [
+export const catalog = [
   {
-    title: 'Top Anime',
-    filter: 'anime/search?r=5',
+    title: "Top Anime",
+    filter: "anime/search?r=5",
   },
   {
-    title: 'Popular Anime',
-    filter: 'anime/',
+    title: "Popular Anime",
+    filter: "anime/",
   },
 ];
 
-export const tokyoGenresList = [];
+export const genres = [];

@@ -1,8 +1,8 @@
-import {allCatalog, allGenresList} from '../autoEmbed/allCatalog';
-import {allGetInfo} from '../autoEmbed/allGetInfo';
-import {allGetPost, allGetSearchPosts} from '../autoEmbed/allGetPost';
-import {ProviderType} from '../types';
-import {mpGetStream} from './mpGetStream';
+import { allCatalog, allGenresList } from "../autoEmbed/catalog";
+import { allGetInfo } from../autoEmbed/metafo";
+import { allGetPost, allGetSearchPosts } from "../autoEmbed/posts";
+import { ProviderType } from "../types";
+import { mpGetStream } from "./stream";
 
 export const moviesApi: ProviderType = {
   catalog: allCatalog,

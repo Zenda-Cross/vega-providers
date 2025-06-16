@@ -1,101 +1,101 @@
-export const homeList = [
+export const catalog = [
   {
-    title: 'New',
-    filter: '',
+    title: "New",
+    filter: "",
   },
   {
-    title: 'Netflix',
-    filter: 'web-series/netflix',
+    title: "Netflix",
+    filter: "web-series/netflix",
   },
   {
-    title: 'Amazon Prime',
-    filter: 'web-series/amazon-prime-video',
+    title: "Amazon Prime",
+    filter: "web-series/amazon-prime-video",
   },
   {
-    title: '4K Movies',
-    filter: 'movies-by-quality/2160p',
+    title: "4K Movies",
+    filter: "movies-by-quality/2160p",
   },
 ];
 
-export const genresList = [
+export const genres = [
   {
-    title: 'Action',
-    filter: 'category/movies-by-genres/action',
+    title: "Action",
+    filter: "category/movies-by-genres/action",
   },
   {
-    title: 'Adventure',
-    filter: 'category/movies-by-genres/adventure',
+    title: "Adventure",
+    filter: "category/movies-by-genres/adventure",
   },
   {
-    title: 'Animation',
-    filter: 'category/movies-by-genres/animation',
+    title: "Animation",
+    filter: "category/movies-by-genres/animation",
   },
   {
-    title: 'Biography',
-    filter: 'category/movies-by-genres/biography',
+    title: "Biography",
+    filter: "category/movies-by-genres/biography",
   },
   {
-    title: 'Comedy',
-    filter: 'category/movies-by-genres/comedy',
+    title: "Comedy",
+    filter: "category/movies-by-genres/comedy",
   },
   {
-    title: 'Crime',
-    filter: 'category/movies-by-genres/crime',
+    title: "Crime",
+    filter: "category/movies-by-genres/crime",
   },
   {
-    title: 'Documentary',
-    filter: 'category/movies-by-genres/documentary',
+    title: "Documentary",
+    filter: "category/movies-by-genres/documentary",
   },
   {
-    title: 'Drama',
-    filter: 'category/movies-by-genres/drama',
+    title: "Drama",
+    filter: "category/movies-by-genres/drama",
   },
   {
-    title: 'Family',
-    filter: 'category/movies-by-genres/family',
+    title: "Family",
+    filter: "category/movies-by-genres/family",
   },
   {
-    title: 'Fantasy',
-    filter: 'category/movies-by-genres/fantasy',
+    title: "Fantasy",
+    filter: "category/movies-by-genres/fantasy",
   },
   {
-    title: 'History',
-    filter: 'category/movies-by-genres/history',
+    title: "History",
+    filter: "category/movies-by-genres/history",
   },
   {
-    title: 'Horror',
-    filter: 'category/movies-by-genres/horror',
+    title: "Horror",
+    filter: "category/movies-by-genres/horror",
   },
   {
-    title: 'Music',
-    filter: 'category/movies-by-genres/music',
+    title: "Music",
+    filter: "category/movies-by-genres/music",
   },
   {
-    title: 'Mystery',
-    filter: 'category/movies-by-genres/mystery',
+    title: "Mystery",
+    filter: "category/movies-by-genres/mystery",
   },
   {
-    title: 'Romance',
-    filter: 'category/movies-by-genres/romance',
+    title: "Romance",
+    filter: "category/movies-by-genres/romance",
   },
   {
-    title: 'Sci-Fi',
-    filter: 'category/movies-by-genres/sci-fi',
+    title: "Sci-Fi",
+    filter: "category/movies-by-genres/sci-fi",
   },
   {
-    title: 'Sport',
-    filter: 'category/movies-by-genres/sport',
+    title: "Sport",
+    filter: "category/movies-by-genres/sport",
   },
   {
-    title: 'Thriller',
-    filter: 'category/movies-by-genres/thriller',
+    title: "Thriller",
+    filter: "category/movies-by-genres/thriller",
   },
   {
-    title: 'War',
-    filter: 'category/movies-by-genres/war',
+    title: "War",
+    filter: "category/movies-by-genres/war",
   },
   {
-    title: 'Western',
-    filter: 'category/movies-by-genres/western',
+    title: "Western",
+    filter: "category/movies-by-genres/western",
   },
 ];
