@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.genres = exports.catalog = void 0;
+exports.catalog = [
+    {
+        title: "Popular Movies",
+        filter: "/top/catalog/movie/top.json",
+    },
+    {
+        title: "Featured Movies",
+        filter: "/imdbRating/catalog/movie/imdbRating.json",
+    },
+];
+exports.genres = [];
