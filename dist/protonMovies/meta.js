@@ -15,8 +15,9 @@ const getMeta = function (_a) {
         var _b, _c, _d, _e, _f;
         try {
             const { axios, cheerio, getBaseUrl } = providerContext;
+            const baseUrl = yield getBaseUrl("protonMovies");
             console.log("all", link);
-            const res = yield axios.get(link);
+            const res = yield axios.get(`${baseUrl}${link}`);
             const data = res.data;
             function decodeHtml(encodedArray) {
                 // Join array elements into a single string
@@ -54,7 +55,6 @@ const getMeta = function (_a) {
                 .map((i, el) => $(el).text())
                 .slice(0, 3)
                 .get();
-            const baseUrl = yield getBaseUrl("protonMovies");
             const links = [];
             if (type === "movie") {
                 const directLinks = [];

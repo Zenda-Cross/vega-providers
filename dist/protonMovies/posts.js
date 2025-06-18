@@ -30,25 +30,25 @@ const getSearchPosts = function (_a) {
 exports.getSearchPosts = getSearchPosts;
 function posts(_a) {
     return __awaiter(this, arguments, void 0, function* ({ url, baseUrl, signal, axios, cheerio, }) {
-        function decodeHtml(encodedArray) {
-            // Join array elements into a single string
-            const joined = encodedArray.join("");
-            // Replace escaped quotes
-            const unescaped = joined.replace(/\\"/g, '"').replace(/\\'/g, "'");
-            // Remove remaining escape characters
-            const cleaned = unescaped
-                .replace(/\\n/g, "\n")
-                .replace(/\\t/g, "\t")
-                .replace(/\\r/g, "\r");
-            // Convert literal string representations back to characters
-            const decoded = cleaned
-                .replace(/&quot;/g, '"')
-                .replace(/&lt;/g, "<")
-                .replace(/&gt;/g, ">")
-                .replace(/&amp;/g, "&");
-            return decoded;
-        }
         try {
+            function decodeHtml(encodedArray) {
+                // Join array elements into a single string
+                const joined = encodedArray.join("");
+                // Replace escaped quotes
+                const unescaped = joined.replace(/\\"/g, '"').replace(/\\'/g, "'");
+                // Remove remaining escape characters
+                const cleaned = unescaped
+                    .replace(/\\n/g, "\n")
+                    .replace(/\\t/g, "\t")
+                    .replace(/\\r/g, "\r");
+                // Convert literal string representations back to characters
+                const decoded = cleaned
+                    .replace(/&quot;/g, '"')
+                    .replace(/&lt;/g, "<")
+                    .replace(/&gt;/g, ">")
+                    .replace(/&amp;/g, "&");
+                return decoded;
+            }
             const res = yield axios.get(url, {
                 headers: {
                     referer: baseUrl,
