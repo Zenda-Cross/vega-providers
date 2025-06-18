@@ -1,91 +1,104 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getStream = void 0;
 exports.getRiveStream = getRiveStream;
 const types_1 = require("../types");
-const getStream = async ({ link: id, type, providerContext, }) => {
+const getStream = (_a) => __awaiter(void 0, [_a], void 0, function* ({ link: id, type, providerContext, }) {
     try {
         const streams = [];
         const { imdbId, season, episode, title, tmdbId, year } = JSON.parse(id);
-        await getRiveStream(tmdbId, episode, season, type, streams, providerContext);
+        yield getRiveStream(tmdbId, episode, season, type, streams, providerContext);
         return streams;
     }
     catch (err) {
         console.error(err);
         return [];
     }
-};
+});
 exports.getStream = getStream;
-async function getRiveStream(tmdId, episode, season, type, Streams, providerContext) {
-    const secret = generateSecretKey(Number(tmdId));
-    const servers = [
-        "flowcast",
-        "shadow",
-        "asiacloud",
-        "hindicast",
-        "anime",
-        "animez",
-        "guard",
-        "curve",
-        "hq",
-        "ninja",
-        "alpha",
-        "kaze",
-        "zenesis",
-        "genesis",
-        "zenith",
-        "ghost",
-        "halo",
-        "kinoecho",
-        "ee3",
-        "volt",
-        "putafilme",
-        "ophim",
-        "kage",
-    ];
-    const baseUrl = await providerContext.getBaseUrl("rive");
-    const cors = process.env.CORS_PRXY ? process.env.CORS_PRXY + "?url=" : "";
-    console.log("CORS: " + cors);
-    const route = type === "series"
-        ? `/api/backendfetch?requestID=tvVideoProvider&id=${tmdId}&season=${season}&episode=${episode}&secretKey=${secret}&service=`
-        : `/api/backendfetch?requestID=movieVideoProvider&id=${tmdId}&secretKey=${secret}&service=`;
-    const url = cors
-        ? cors + encodeURIComponent(baseUrl + route)
-        : baseUrl + route;
-    await Promise.all(servers.map(async (server) => {
-        console.log("Rive: " + url + server);
-        try {
-            const res = await providerContext.axios.get(url + server, {
-                timeout: 4000,
-                headers: providerContext.commonHeaders,
-            });
-            const subtitles = [];
-            if (res.data?.data?.captions) {
-                res.data?.data?.captions.forEach((sub) => {
-                    subtitles.push({
-                        language: sub?.label?.slice(0, 2) || "Und",
-                        uri: sub?.file,
-                        title: sub?.label || "Undefined",
-                        type: sub?.file?.endsWith(".vtt")
-                            ? types_1.TextTrackType.VTT
-                            : types_1.TextTrackType.SUBRIP,
+function getRiveStream(tmdId, episode, season, type, Streams, providerContext) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const secret = generateSecretKey(Number(tmdId));
+        const servers = [
+            "flowcast",
+            "shadow",
+            "asiacloud",
+            "hindicast",
+            "anime",
+            "animez",
+            "guard",
+            "curve",
+            "hq",
+            "ninja",
+            "alpha",
+            "kaze",
+            "zenesis",
+            "genesis",
+            "zenith",
+            "ghost",
+            "halo",
+            "kinoecho",
+            "ee3",
+            "volt",
+            "putafilme",
+            "ophim",
+            "kage",
+        ];
+        const baseUrl = yield providerContext.getBaseUrl("rive");
+        const cors = process.env.CORS_PRXY ? process.env.CORS_PRXY + "?url=" : "";
+        console.log("CORS: " + cors);
+        const route = type === "series"
+            ? `/api/backendfetch?requestID=tvVideoProvider&id=${tmdId}&season=${season}&episode=${episode}&secretKey=${secret}&service=`
+            : `/api/backendfetch?requestID=movieVideoProvider&id=${tmdId}&secretKey=${secret}&service=`;
+        const url = cors
+            ? cors + encodeURIComponent(baseUrl + route)
+            : baseUrl + route;
+        yield Promise.all(servers.map((server) => __awaiter(this, void 0, void 0, function* () {
+            var _a, _b, _c, _d, _e, _f;
+            console.log("Rive: " + url + server);
+            try {
+                const res = yield providerContext.axios.get(url + server, {
+                    timeout: 4000,
+                    headers: providerContext.commonHeaders,
+                });
+                const subtitles = [];
+                if ((_b = (_a = res.data) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.captions) {
+                    (_d = (_c = res.data) === null || _c === void 0 ? void 0 : _c.data) === null || _d === void 0 ? void 0 : _d.captions.forEach((sub) => {
+                        var _a, _b;
+                        subtitles.push({
+                            language: ((_a = sub === null || sub === void 0 ? void 0 : sub.label) === null || _a === void 0 ? void 0 : _a.slice(0, 2)) || "Und",
+                            uri: sub === null || sub === void 0 ? void 0 : sub.file,
+                            title: (sub === null || sub === void 0 ? void 0 : sub.label) || "Undefined",
+                            type: ((_b = sub === null || sub === void 0 ? void 0 : sub.file) === null || _b === void 0 ? void 0 : _b.endsWith(".vtt"))
+                                ? types_1.TextTrackType.VTT
+                                : types_1.TextTrackType.SUBRIP,
+                        });
+                    });
+                }
+                (_f = (_e = res.data) === null || _e === void 0 ? void 0 : _e.data) === null || _f === void 0 ? void 0 : _f.sources.forEach((source) => {
+                    Streams.push({
+                        server: (source === null || source === void 0 ? void 0 : source.source) + "-" + (source === null || source === void 0 ? void 0 : source.quality),
+                        link: source === null || source === void 0 ? void 0 : source.url,
+                        type: (source === null || source === void 0 ? void 0 : source.format) === "hls" ? "m3u8" : "mp4",
+                        quality: source === null || source === void 0 ? void 0 : source.quality,
+                        subtitles: subtitles,
                     });
                 });
             }
-            res.data?.data?.sources.forEach((source) => {
-                Streams.push({
-                    server: source?.source + "-" + source?.quality,
-                    link: source?.url,
-                    type: source?.format === "hls" ? "m3u8" : "mp4",
-                    quality: source?.quality,
-                    subtitles: subtitles,
-                });
-            });
-        }
-        catch (e) {
-            console.log(e);
-        }
-    }));
+            catch (e) {
+                console.log(e);
+            }
+        })));
+    });
 }
 function generateSecretKey(id) {
     // Array of secret key fragments - updated array from the new implementation

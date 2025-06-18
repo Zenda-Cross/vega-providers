@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getSearchPosts = exports.getPosts = void 0;
 const headers = {
@@ -16,50 +25,52 @@ const headers = {
     "Upgrade-Insecure-Requests": "1",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
 };
-const getPosts = async ({ filter, page, 
+const getPosts = (_a) => __awaiter(void 0, [_a], void 0, function* ({ filter, page, 
 // providerValue,
-signal, providerContext, }) => {
+signal, providerContext, }) {
     const { getBaseUrl } = providerContext;
-    const baseUrl = await getBaseUrl("UhdMovies");
+    const baseUrl = yield getBaseUrl("UhdMovies");
     const url = page === 1 ? `${baseUrl}/${filter}/` : `${baseUrl + filter}/page/${page}/`;
     console.log("url", url);
     return posts(baseUrl, url, signal, providerContext);
-};
+});
 exports.getPosts = getPosts;
-const getSearchPosts = async ({ searchQuery, page, 
+const getSearchPosts = (_a) => __awaiter(void 0, [_a], void 0, function* ({ searchQuery, page, 
 // providerValue,
-signal, providerContext, }) => {
+signal, providerContext, }) {
     const { getBaseUrl } = providerContext;
-    const baseUrl = await getBaseUrl("UhdMovies");
+    const baseUrl = yield getBaseUrl("UhdMovies");
     const url = `${baseUrl}/search/${searchQuery}/page/${page}/`;
     return posts(baseUrl, url, signal, providerContext);
-};
+});
 exports.getSearchPosts = getSearchPosts;
-async function posts(baseURL, url, signal, providerContext) {
-    try {
-        const { axios, cheerio } = providerContext;
-        const res = await axios.get(url, { headers, signal });
-        const html = res.data;
-        const $ = cheerio.load(html);
-        const uhdCatalog = [];
-        $(".gridlove-posts")
-            .find(".layout-masonry")
-            .each((index, element) => {
-            const title = $(element).find("a").attr("title");
-            const link = $(element).find("a").attr("href");
-            const image = $(element).find("a").find("img").attr("src");
-            if (title && link && image) {
-                uhdCatalog.push({
-                    title: title.replace("Download", "").trim(),
-                    link: link,
-                    image: image,
-                });
-            }
-        });
-        return uhdCatalog;
-    }
-    catch (err) {
-        console.error("uhd error ", err);
-        return [];
-    }
+function posts(baseURL, url, signal, providerContext) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { axios, cheerio } = providerContext;
+            const res = yield axios.get(url, { headers, signal });
+            const html = res.data;
+            const $ = cheerio.load(html);
+            const uhdCatalog = [];
+            $(".gridlove-posts")
+                .find(".layout-masonry")
+                .each((index, element) => {
+                const title = $(element).find("a").attr("title");
+                const link = $(element).find("a").attr("href");
+                const image = $(element).find("a").find("img").attr("src");
+                if (title && link && image) {
+                    uhdCatalog.push({
+                        title: title.replace("Download", "").trim(),
+                        link: link,
+                        image: image,
+                    });
+                }
+            });
+            return uhdCatalog;
+        }
+        catch (err) {
+            console.error("uhd error ", err);
+            return [];
+        }
+    });
 }

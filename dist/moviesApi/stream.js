@@ -1,85 +1,100 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.mpGetStream = void 0;
 const types_1 = require("../types");
-const mpGetStream = async function ({ link: id, type, providerContext, }) {
-    try {
-        const { getBaseUrl, cheerio } = providerContext;
-        const streams = [];
-        const { season, episode, tmdbId } = JSON.parse(id);
-        const baseUrl = await getBaseUrl('moviesapi');
-        const link = type === 'movie'
-            ? `${baseUrl}/movie/${tmdbId}`
-            : `${baseUrl}/tv/${tmdbId}-${season}-${episode}`;
-        const res = await fetch(link, {
-            headers: {
-                referer: baseUrl,
-            },
-        });
-        const baseData = await res.text();
-        const $ = cheerio.load(baseData);
-        const embededUrl = $('iframe').attr('src') || '';
-        const response = await fetch(embededUrl, {
-            credentials: 'omit',
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0',
-                Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Alt-Used': 'w1.moviesapi.club',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Sec-Fetch-User': '?1',
-                Pragma: 'no-cache',
-                'Cache-Control': 'no-cache',
-                referer: baseUrl,
-            },
-            referrer: baseUrl,
-            method: 'GET',
-            mode: 'cors',
-        });
-        const data2 = await response.text();
-        // Extract the encrypted content
-        const contents = data2.match(/const\s+Encrypted\s*=\s*['"]({.*})['"]/)?.[1] || '';
-        if (embededUrl) {
-            const res2 = await fetch('https://ext.8man.me/api/decrypt?passphrase==JV[t}{trEV=Ilh5', {
-                method: 'POST',
-                body: contents,
-            });
-            const finalData = await res2.json();
-            const subtitle = finalData?.subtitles?.map((sub) => ({
-                title: sub?.label || 'Unknown',
-                language: sub?.label,
-                type: sub?.file?.includes('.vtt')
-                    ? types_1.TextTrackType.VTT
-                    : types_1.TextTrackType.SUBRIP,
-                uri: sub?.file,
-            }));
-            streams.push({
-                server: 'vidstreaming ',
-                type: 'm3u8',
-                subtitles: subtitle,
-                link: finalData?.videoUrl,
+const mpGetStream = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link: id, type, providerContext, }) {
+        var _b, _c;
+        try {
+            const { getBaseUrl, cheerio } = providerContext;
+            const streams = [];
+            const { season, episode, tmdbId } = JSON.parse(id);
+            const baseUrl = yield getBaseUrl('moviesapi');
+            const link = type === 'movie'
+                ? `${baseUrl}/movie/${tmdbId}`
+                : `${baseUrl}/tv/${tmdbId}-${season}-${episode}`;
+            const res = yield fetch(link, {
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0',
-                    Referer: baseUrl,
-                    Origin: baseUrl,
-                    Accept: '*/*',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                    'Sec-Fetch-Dest': 'empty',
-                    'Sec-Fetch-Mode': 'cors',
-                    'Sec-Fetch-Site': 'cross-site',
-                    Pragma: 'no-cache',
-                    'Cache-Control': 'no-cache',
+                    referer: baseUrl,
                 },
             });
+            const baseData = yield res.text();
+            const $ = cheerio.load(baseData);
+            const embededUrl = $('iframe').attr('src') || '';
+            const response = yield fetch(embededUrl, {
+                credentials: 'omit',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0',
+                    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Alt-Used': 'w1.moviesapi.club',
+                    'Upgrade-Insecure-Requests': '1',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
+                    Pragma: 'no-cache',
+                    'Cache-Control': 'no-cache',
+                    referer: baseUrl,
+                },
+                referrer: baseUrl,
+                method: 'GET',
+                mode: 'cors',
+            });
+            const data2 = yield response.text();
+            // Extract the encrypted content
+            const contents = ((_b = data2.match(/const\s+Encrypted\s*=\s*['"]({.*})['"]/)) === null || _b === void 0 ? void 0 : _b[1]) || '';
+            if (embededUrl) {
+                const res2 = yield fetch('https://ext.8man.me/api/decrypt?passphrase==JV[t}{trEV=Ilh5', {
+                    method: 'POST',
+                    body: contents,
+                });
+                const finalData = yield res2.json();
+                const subtitle = (_c = finalData === null || finalData === void 0 ? void 0 : finalData.subtitles) === null || _c === void 0 ? void 0 : _c.map((sub) => {
+                    var _a;
+                    return ({
+                        title: (sub === null || sub === void 0 ? void 0 : sub.label) || 'Unknown',
+                        language: sub === null || sub === void 0 ? void 0 : sub.label,
+                        type: ((_a = sub === null || sub === void 0 ? void 0 : sub.file) === null || _a === void 0 ? void 0 : _a.includes('.vtt'))
+                            ? types_1.TextTrackType.VTT
+                            : types_1.TextTrackType.SUBRIP,
+                        uri: sub === null || sub === void 0 ? void 0 : sub.file,
+                    });
+                });
+                streams.push({
+                    server: 'vidstreaming ',
+                    type: 'm3u8',
+                    subtitles: subtitle,
+                    link: finalData === null || finalData === void 0 ? void 0 : finalData.videoUrl,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0',
+                        Referer: baseUrl,
+                        Origin: baseUrl,
+                        Accept: '*/*',
+                        'Accept-Language': 'en-US,en;q=0.5',
+                        'Sec-Fetch-Dest': 'empty',
+                        'Sec-Fetch-Mode': 'cors',
+                        'Sec-Fetch-Site': 'cross-site',
+                        Pragma: 'no-cache',
+                        'Cache-Control': 'no-cache',
+                    },
+                });
+            }
+            return streams;
         }
-        return streams;
-    }
-    catch (err) {
-        console.error(err);
-        return [];
-    }
+        catch (err) {
+            console.error(err);
+            return [];
+        }
+    });
 };
 exports.mpGetStream = mpGetStream;

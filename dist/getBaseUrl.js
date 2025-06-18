@@ -1,10 +1,19 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getBaseUrl = void 0;
 const storage_1 = require("../storage");
 // 1 hour
 const expireTime = 60 * 60 * 1000;
-const getBaseUrl = async (providerValue) => {
+const getBaseUrl = (providerValue) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let baseUrl = '';
         const cacheKey = 'CacheBaseUrl' + providerValue;
@@ -17,8 +26,8 @@ const getBaseUrl = async (providerValue) => {
             baseUrl = cachedUrl;
         }
         else {
-            const baseUrlRes = await fetch('https://himanshu8443.github.io/providers/modflix.json');
-            const baseUrlData = await baseUrlRes.json();
+            const baseUrlRes = yield fetch('https://himanshu8443.github.io/providers/modflix.json');
+            const baseUrlData = yield baseUrlRes.json();
             baseUrl = baseUrlData[providerValue].url;
             storage_1.cacheStorageService.setString(cacheKey, baseUrl);
             storage_1.cacheStorageService.setObject(timeKey, Date.now());
@@ -29,5 +38,5 @@ const getBaseUrl = async (providerValue) => {
         console.error(`Error fetching baseUrl: ${providerValue}`, error);
         return '';
     }
-};
+});
 exports.getBaseUrl = getBaseUrl;
