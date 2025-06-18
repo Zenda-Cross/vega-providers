@@ -10,33 +10,29 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getBaseUrl = void 0;
-const storage_1 = require("../storage");
 // 1 hour
 const expireTime = 60 * 60 * 1000;
 const getBaseUrl = (providerValue) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        let baseUrl = '';
-        const cacheKey = 'CacheBaseUrl' + providerValue;
-        const timeKey = 'baseUrlTime' + providerValue;
-        const cachedUrl = storage_1.cacheStorageService.getString(cacheKey);
-        const cachedTime = storage_1.cacheStorageService.getObject(timeKey);
-        if (cachedUrl &&
-            cachedTime &&
-            Date.now() - cachedTime < expireTime) {
-            baseUrl = cachedUrl;
-        }
-        else {
-            const baseUrlRes = yield fetch('https://himanshu8443.github.io/providers/modflix.json');
-            const baseUrlData = yield baseUrlRes.json();
-            baseUrl = baseUrlData[providerValue].url;
-            storage_1.cacheStorageService.setString(cacheKey, baseUrl);
-            storage_1.cacheStorageService.setObject(timeKey, Date.now());
-        }
+        let baseUrl = "";
+        const cacheKey = "CacheBaseUrl" + providerValue;
+        const timeKey = "baseUrlTime" + providerValue;
+        // const cachedUrl = cacheStorageService.getString(cacheKey);
+        // const cachedTime = cacheStorageService.getObject<number>(timeKey);
+        // if (cachedUrl && cachedTime && Date.now() - cachedTime < expireTime) {
+        //   baseUrl = cachedUrl;
+        // } else {
+        const baseUrlRes = yield fetch("https://himanshu8443.github.io/providers/modflix.json");
+        const baseUrlData = yield baseUrlRes.json();
+        baseUrl = baseUrlData[providerValue].url;
+        // cacheStorageService.setString(cacheKey, baseUrl);
+        // cacheStorageService.setObject(timeKey, Date.now());
+        // }
         return baseUrl;
     }
     catch (error) {
         console.error(`Error fetching baseUrl: ${providerValue}`, error);
-        return '';
+        return "";
     }
 });
 exports.getBaseUrl = getBaseUrl;

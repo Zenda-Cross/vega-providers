@@ -11,7 +11,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getStream = void 0;
 exports.getRiveStream = getRiveStream;
-const types_1 = require("../types");
 const getStream = (_a) => __awaiter(void 0, [_a], void 0, function* ({ link: id, type, providerContext, }) {
     try {
         const streams = [];
@@ -79,8 +78,8 @@ function getRiveStream(tmdId, episode, season, type, Streams, providerContext) {
                             uri: sub === null || sub === void 0 ? void 0 : sub.file,
                             title: (sub === null || sub === void 0 ? void 0 : sub.label) || "Undefined",
                             type: ((_b = sub === null || sub === void 0 ? void 0 : sub.file) === null || _b === void 0 ? void 0 : _b.endsWith(".vtt"))
-                                ? types_1.TextTrackType.VTT
-                                : types_1.TextTrackType.SUBRIP,
+                                ? "text/vtt"
+                                : "application/x-subrip",
                         });
                     });
                 }

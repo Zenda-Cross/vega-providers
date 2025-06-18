@@ -10,7 +10,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getStream = void 0;
-const types_1 = require("../types");
 const getStream = function (_a) {
     return __awaiter(this, arguments, void 0, function* ({ link: id, providerContext, }) {
         try {
@@ -34,8 +33,8 @@ const getStream = function (_a) {
                                 uri: sub === null || sub === void 0 ? void 0 : sub.url,
                                 title: (sub === null || sub === void 0 ? void 0 : sub.lang) || "Undefined",
                                 type: ((_b = sub === null || sub === void 0 ? void 0 : sub.url) === null || _b === void 0 ? void 0 : _b.endsWith(".vtt"))
-                                    ? types_1.TextTrackType.VTT
-                                    : types_1.TextTrackType.SUBRIP,
+                                    ? "text/vtt"
+                                    : "application/x-subrip",
                             });
                         });
                         (_b = res.data) === null || _b === void 0 ? void 0 : _b.sources.forEach((source) => {

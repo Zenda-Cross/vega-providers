@@ -10,7 +10,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getStream = void 0;
-const types_1 = require("../types");
 const getStream = function (_a) {
     return __awaiter(this, arguments, void 0, function* ({ link: url, providerContext, }) {
         var _b, _c, _d, _e, _f, _g, _h, _j, _k;
@@ -114,7 +113,7 @@ const getStream = function (_a) {
                     subtitles.push({
                         language: lang,
                         uri: sub,
-                        type: types_1.TextTrackType.VTT,
+                        type: "text/vtt",
                         title: lang,
                     });
                 });

@@ -22,7 +22,7 @@ const getEpisodes = function (_a) {
             const episodes = [];
             container.find("h4").each((index, element) => {
                 const el = $(element);
-                const title = el.text().replaceAll("-", "").replaceAll(":", "");
+                const title = el.text().replace(/-/g, "").replace(/:/g, "");
                 const link = el
                     .next("p")
                     .find('.btn-outline[style="background:linear-gradient(135deg,#ed0b0b,#f2d152); color: white;"]')
