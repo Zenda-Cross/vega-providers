@@ -1,4 +1,4 @@
-import { Stream, ProviderContext, TextTracks, TextTrackType } from "../types";
+import { Stream, ProviderContext, TextTracks } from "../types";
 
 export const getStream = async function ({
   link: id,
@@ -26,8 +26,8 @@ export const getStream = async function ({
                 uri: sub?.url,
                 title: sub?.lang || "Undefined",
                 type: sub?.url?.endsWith(".vtt")
-                  ? TextTrackType.VTT
-                  : TextTrackType.SUBRIP,
+                  ? "text/vtt"
+                  : "application/x-subrip",
               });
             });
             res.data?.sources.forEach((source: any) => {

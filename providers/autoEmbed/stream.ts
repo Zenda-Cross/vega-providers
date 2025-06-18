@@ -1,4 +1,4 @@
-import { Stream, ProviderContext, TextTrackType, TextTracks } from "../types";
+import { Stream, ProviderContext, TextTracks } from "../types";
 
 export const getStream = async ({
   link: id,
@@ -87,8 +87,8 @@ export async function getRiveStream(
               uri: sub?.file,
               title: sub?.label || "Undefined",
               type: sub?.file?.endsWith(".vtt")
-                ? TextTrackType.VTT
-                : TextTrackType.SUBRIP,
+                ? "text/vtt"
+                : "application/x-subrip",
             });
           });
         }

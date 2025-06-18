@@ -17,7 +17,7 @@ export const getEpisodes = async function ({
     const episodes: EpisodeLink[] = [];
     container.find("h4").each((index, element) => {
       const el = $(element);
-      const title = el.text().replaceAll("-", "").replaceAll(":", "");
+      const title = el.text().replace(/-/g, "").replace(/:/g, "");
       const link = el
         .next("p")
         .find(

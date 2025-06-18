@@ -1,4 +1,4 @@
-import { Stream, ProviderContext, TextTrackType, TextTracks } from "../types";
+import { Stream, ProviderContext, TextTracks } from "../types";
 
 export const getStream = async function ({
   link: id,
@@ -22,9 +22,7 @@ export const getStream = async function ({
       subtitles.push({
         title: sub?.label,
         language: sub?.land,
-        type: sub?.src?.includes(".vtt")
-          ? TextTrackType.VTT
-          : TextTrackType.SUBRIP,
+        type: sub?.src?.includes(".vtt") ? "text/vtt" : "application/x-subrip",
         uri: sub?.src,
       });
     });
