@@ -9,8 +9,10 @@ export const getMeta = async function ({
 }): Promise<Info> {
   try {
     const { axios, cheerio, getBaseUrl } = providerContext;
+    const baseUrl = await getBaseUrl("protonMovies");
+
     console.log("all", link);
-    const res = await axios.get(link);
+    const res = await axios.get(`${baseUrl}${link}`);
     const data = res.data;
 
     function decodeHtml(encodedArray: string[]): string {
@@ -62,7 +64,6 @@ export const getMeta = async function ({
       .slice(0, 3)
       .get();
 
-    const baseUrl = await getBaseUrl("protonMovies");
     const links: Link[] = [];
 
     if (type === "movie") {

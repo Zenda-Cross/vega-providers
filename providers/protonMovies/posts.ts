@@ -49,29 +49,29 @@ async function posts({
   axios: ProviderContext["axios"];
   cheerio: ProviderContext["cheerio"];
 }): Promise<Post[]> {
-  function decodeHtml(encodedArray: string[]): string {
-    // Join array elements into a single string
-    const joined = encodedArray.join("");
-
-    // Replace escaped quotes
-    const unescaped = joined.replace(/\\"/g, '"').replace(/\\'/g, "'");
-
-    // Remove remaining escape characters
-    const cleaned = unescaped
-      .replace(/\\n/g, "\n")
-      .replace(/\\t/g, "\t")
-      .replace(/\\r/g, "\r");
-
-    // Convert literal string representations back to characters
-    const decoded = cleaned
-      .replace(/&quot;/g, '"')
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&amp;/g, "&");
-
-    return decoded;
-  }
   try {
+    function decodeHtml(encodedArray: string[]): string {
+      // Join array elements into a single string
+      const joined = encodedArray.join("");
+
+      // Replace escaped quotes
+      const unescaped = joined.replace(/\\"/g, '"').replace(/\\'/g, "'");
+
+      // Remove remaining escape characters
+      const cleaned = unescaped
+        .replace(/\\n/g, "\n")
+        .replace(/\\t/g, "\t")
+        .replace(/\\r/g, "\r");
+
+      // Convert literal string representations back to characters
+      const decoded = cleaned
+        .replace(/&quot;/g, '"')
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&amp;/g, "&");
+
+      return decoded;
+    }
     const res = await axios.get(url, {
       headers: {
         referer: baseUrl,
