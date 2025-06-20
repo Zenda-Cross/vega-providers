@@ -1,0 +1,226 @@
+[
+  {
+    "value": "autoEmbed",
+    "display_name": "AutoEmbed",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "cinemaLuxe",
+    "display_name": "CinemaLuxe",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "dooflix",
+    "display_name": "Dooflix",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "drive",
+    "display_name": "Drive",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "filmyfly",
+    "display_name": "Filmyfly",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "flixhq",
+    "display_name": "Flixhq",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "guardahd",
+    "display_name": "Guardahd",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "hdhub4u",
+    "display_name": "Hdhub4u",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "hiAnime",
+    "display_name": "HiAnime",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "katmovies",
+    "display_name": "Katmovies",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "kissKh",
+    "display_name": "KissKh",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "luxMovies",
+    "display_name": "LuxMovies",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "mod",
+    "display_name": "Mod",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "moviesApi",
+    "display_name": "MoviesApi",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": true
+  },
+  {
+    "value": "multi",
+    "display_name": "Multi",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "netflixMirror",
+    "display_name": "NetflixMirror",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "primeMirror",
+    "display_name": "PrimeMirror",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "primewire",
+    "display_name": "Primewire",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "protonMovies",
+    "display_name": "ProtonMovies",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "ridoMovies",
+    "display_name": "RidoMovies",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "ringz",
+    "display_name": "Ringz",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "showbox",
+    "display_name": "Showbox",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "tokyoInsider",
+    "display_name": "TokyoInsider",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "topmovies",
+    "display_name": "Topmovies",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "uhd",
+    "display_name": "Uhd",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "vadapav",
+    "display_name": "Vadapav",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "vega",
+    "display_name": "Vega",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "value": "world4u",
+    "display_name": "World4u",
+    "version": "1.0.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  }
+]
