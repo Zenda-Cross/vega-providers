@@ -12,6 +12,7 @@ class DevServer {
     this.app = express();
     this.port = 3001;
     this.distDir = path.join(__dirname, "dist");
+    this.currentDir = path.join(__dirname);
 
     this.setupMiddleware();
     this.setupRoutes();
@@ -43,7 +44,8 @@ class DevServer {
   setupRoutes() {
     // Serve manifest.json
     this.app.get("/manifest.json", (req, res) => {
-      const manifestPath = path.join(this.distDir, "manifest.json");
+      const manifestPath = path.join(this.currentDir, "manifest.json");
+      console.log(`Serving manifest from: ${manifestPath}`);
 
       if (fs.existsSync(manifestPath)) {
         res.sendFile(manifestPath);
@@ -133,7 +135,7 @@ class DevServer {
   }
 
   getBuildTime() {
-    const manifestPath = path.join(this.distDir, "manifest.json");
+    const manifestPath = path.join(this.rootDir, "manifest.json");
     if (fs.existsSync(manifestPath)) {
       const stats = fs.statSync(manifestPath);
       return stats.mtime.toISOString();
