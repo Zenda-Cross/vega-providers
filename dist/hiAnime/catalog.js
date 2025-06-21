@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.genres = exports.catalogs = void 0;
-exports.catalogs = [
+exports.genres = exports.catalog = void 0;
+exports.catalog = [
     {
         title: "Recent",
         filter: "/anime/zoro/recent-episodes",

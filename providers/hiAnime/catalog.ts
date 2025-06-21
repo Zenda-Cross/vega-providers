@@ -1,4 +1,4 @@
-export const catalogs = [
+export const catalog = [
   {
     title: "Recent",
     filter: "/anime/zoro/recent-episodes",
