@@ -32,6 +32,14 @@
     "disabled": false
   },
   {
+    "display_name": "4khdHub",
+    "value": "4khdhub",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
     "display_name": "World4uFree",
     "value": "world4u",
     "version": "1.0",
