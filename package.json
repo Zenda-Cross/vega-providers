@@ -7,12 +7,23 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "rimraf dist && tsc"
+    "test": "node test-providers.js",
+    "build": "node build-simple.js",
+    "dev": "node dev-server.js",
+    "dev:build": "npm run build && npm run dev",
+    "watch": "nodemon",
+    "watch:dev": "nodemon --watch providers --ext ts --exec \"npm run build\" & npm run dev",
+    "dev:auto": "concurrently \"npm run watch\" \"npm run dev\"",
+    "auto": "node auto-dev.js",
+    "start": "npm run build && npm run dev"
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.35",
     "@types/node": "^24.0.1",
+    "concurrently": "^8.2.2",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "nodemon": "^3.1.10",
     "typescript": "^5.8.3"
   },
   "dependencies": {
