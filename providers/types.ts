@@ -1,6 +1,11 @@
 import { AxiosStatic } from "axios";
 import * as cheerio from "cheerio";
-import { Content } from "../zustand/contentStore";
+
+// Content type for providers (replaces zustand import)
+export interface Content {
+  provider: string;
+  [key: string]: any;
+}
 
 // getPosts
 export interface Post {
