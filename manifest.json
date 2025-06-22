@@ -50,7 +50,7 @@
   {
     "display_name": "KatMoviesHd",
     "value": "katmovies",
-    "version": "1.0",
+    "version": "1.1",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -74,7 +74,7 @@
   {
     "display_name": "ProtonMovies",
     "value": "protonMovies",
-    "version": "1.1",
+    "version": "1.2",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -205,7 +205,7 @@
     "version": "1.0",
     "icon": "",
     "type": "india",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "RogMovies",
