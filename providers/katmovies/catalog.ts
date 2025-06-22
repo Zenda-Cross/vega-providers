@@ -1,61 +1,61 @@
-export const katCatalog = [
+export const catalog = [
   {
-    title: 'Latest',
-    filter: '',
+    title: "Latest",
+    filter: "",
   },
   {
-    title: 'Netflix',
-    filter: '/category/netflix',
+    title: "Netflix",
+    filter: "/category/netflix",
   },
   {
-    title: 'Animated',
-    filter: '/category/animated',
+    title: "Animated",
+    filter: "/category/animated",
   },
   {
-    title: 'Amazon Prime',
-    filter: '/category/amazon-prime',
+    title: "Amazon Prime",
+    filter: "/category/amazon-prime",
   },
 ];
 
-export const katGenresList = [
+export const genres = [
   {
-    title: 'Action',
-    filter: '/category/action',
+    title: "Action",
+    filter: "/category/action",
   },
   {
-    title: 'Crime',
-    filter: '/category/crime',
+    title: "Crime",
+    filter: "/category/crime",
   },
   {
-    title: 'Comedy',
-    filter: '/category/comedy',
+    title: "Comedy",
+    filter: "/category/comedy",
   },
   {
-    title: 'Drama',
-    filter: '/category/drama',
+    title: "Drama",
+    filter: "/category/drama",
   },
   {
-    title: 'Horror',
-    filter: '/category/horror',
+    title: "Horror",
+    filter: "/category/horror",
   },
   {
-    title: 'Family',
-    filter: '/category/family',
+    title: "Family",
+    filter: "/category/family",
   },
   {
-    title: 'Sci-Fi',
-    filter: '/category/sifi',
+    title: "Sci-Fi",
+    filter: "/category/sifi",
   },
   {
-    title: 'Thriller',
-    filter: '/category/triller',
+    title: "Thriller",
+    filter: "/category/triller",
   },
   {
-    title: 'Romance',
-    filter: '/category/romance',
+    title: "Romance",
+    filter: "/category/romance",
   },
   {
-    title: 'Fight',
-    filter: '/category/fight',
+    title: "Fight",
+    filter: "/category/fight",
   },
 ];
