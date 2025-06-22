@@ -68,7 +68,7 @@ export const getMeta = async function ({
 
     if (type === "movie") {
       const directLinks: EpisodeLink[] = [];
-      directLinks.push({ title: "Movie", link: link });
+      directLinks.push({ title: "Movie", link: baseUrl + link });
       links.push({ title: "Movie", directLinks: directLinks });
     } else {
       $("#episodes")

@@ -58,7 +58,7 @@ const getMeta = function (_a) {
             const links = [];
             if (type === "movie") {
                 const directLinks = [];
-                directLinks.push({ title: "Movie", link: link });
+                directLinks.push({ title: "Movie", link: baseUrl + link });
                 links.push({ title: "Movie", directLinks: directLinks });
             }
             else {
