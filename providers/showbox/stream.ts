@@ -1,5 +1,4 @@
 import { Stream, ProviderContext } from "../types";
-import * as cheerio from "cheerio";
 
 export const getStream = async function ({
   link: id,
@@ -13,7 +12,7 @@ export const getStream = async function ({
   providerContext: ProviderContext;
 }): Promise<Stream[]> {
   try {
-    const { axios } = providerContext;
+    const { axios, cheerio } = providerContext;
     const stream: Stream[] = [];
     const [, epId] = id.split("&");
     const url = `https://febbox.vercel.app/api/video-quality?fid=${epId}`;

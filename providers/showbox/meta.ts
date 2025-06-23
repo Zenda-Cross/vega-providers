@@ -8,8 +8,9 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { axios, cheerio } = providerContext;
-    const url = link;
+    const { axios, cheerio, getBaseUrl } = providerContext;
+    const baseUrlShowbox = await getBaseUrl("showbox");
+    const url = baseUrlShowbox + link;
     const res = await axios.get(url);
     const data = res.data;
     const $ = cheerio.load(data);
@@ -59,6 +60,7 @@ export const getMeta = async function ({
       linkList: links,
     };
   } catch (err) {
+    console.error("Error fetching metadata:", err);
     return {
       title: "",
       rating: "",

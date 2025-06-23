@@ -41,8 +41,8 @@ function posts(_a) {
             const data = res.data;
             const $ = cheerio.load(data);
             const catalog = [];
-            $(".movie-item").map((i, element) => {
-                const title = $(element).find(".movie-title").text();
+            $(".movie-item,.flw-item").map((i, element) => {
+                const title = $(element).find(".film-name").text().trim();
                 const link = $(element).find("a").attr("href");
                 const image = $(element).find("img").attr("src");
                 if (title && link && image) {

@@ -14,8 +14,9 @@ const getMeta = function (_a) {
     return __awaiter(this, arguments, void 0, function* ({ link, providerContext, }) {
         var _b, _c, _d, _e, _f, _g, _h, _j, _k;
         try {
-            const { axios, cheerio } = providerContext;
-            const url = link;
+            const { axios, cheerio, getBaseUrl } = providerContext;
+            const baseUrlShowbox = yield getBaseUrl("showbox");
+            const url = baseUrlShowbox + link;
             const res = yield axios.get(url);
             const data = res.data;
             const $ = cheerio.load(data);
@@ -59,6 +60,7 @@ const getMeta = function (_a) {
             };
         }
         catch (err) {
+            console.error("Error fetching metadata:", err);
             return {
                 title: "",
                 rating: "",
