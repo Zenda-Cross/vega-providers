@@ -8,6 +8,7 @@ export const getStream = async function ({
   try {
     const streams: Stream[] = [];
     const response = await fetch(link, {
+      redirect: "manual",
       headers: {
         Connection: "Keep-Alive",
         "User-Agent":

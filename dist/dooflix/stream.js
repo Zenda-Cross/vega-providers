@@ -15,6 +15,7 @@ const getStream = function (_a) {
         try {
             const streams = [];
             const response = yield fetch(link, {
+                redirect: "manual",
                 headers: {
                     Connection: "Keep-Alive",
                     "User-Agent": "Mozilla/5.0 (WindowsNT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.37",
