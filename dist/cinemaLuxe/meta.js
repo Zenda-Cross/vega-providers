@@ -33,7 +33,9 @@ const getMeta = function (_a) {
                 .toFixed(1)
                 .toString();
             const links = [];
-            $(".mb-center.maxbutton-5-center,.ep-button-container").map((i, element) => {
+            $(".custom-links")
+                .find(".ep-button-container")
+                .map((i, element) => {
                 var _a;
                 const title = $(element)
                     .text()
@@ -49,6 +51,34 @@ const getMeta = function (_a) {
                     });
                 }
             });
+            if (links.length === 0) {
+                $(".ep-button-container:not(:has(a:contains('Click Here To Visit')))").map((i, element) => {
+                    var _a;
+                    let title = $(element)
+                        .find("a")
+                        .text()
+                        .replace("\u2b07Download", "")
+                        .replace("\u2b07 Download", "")
+                        .trim();
+                    if (title.includes("Download Now")) {
+                        title = $(element)
+                            .parent()
+                            .find("h3")
+                            .text()
+                            .trim()
+                            .replace("\u2b07Download", "")
+                            .replace("\u2b07 Download", "");
+                    }
+                    const link = $(element).find("a").attr("href");
+                    if (title && link) {
+                        links.push({
+                            title,
+                            episodesLink: link,
+                            quality: ((_a = title === null || title === void 0 ? void 0 : title.match(/\d+P\b/)) === null || _a === void 0 ? void 0 : _a[0].replace("P", "p")) || "",
+                        });
+                    }
+                });
+            }
             return {
                 title,
                 tags,

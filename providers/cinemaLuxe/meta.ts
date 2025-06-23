@@ -28,8 +28,9 @@ export const getMeta = async function ({
       .toFixed(1)
       .toString();
     const links: Link[] = [];
-    $(".mb-center.maxbutton-5-center,.ep-button-container").map(
-      (i, element) => {
+    $(".custom-links")
+      .find(".ep-button-container")
+      .map((i, element) => {
         const title = $(element)
           .text()
           .replace("\u2b07Download", "")
@@ -43,8 +44,36 @@ export const getMeta = async function ({
             quality: title?.match(/\d+P\b/)?.[0].replace("P", "p") || "",
           });
         }
-      }
-    );
+      });
+    if (links.length === 0) {
+      $(
+        ".ep-button-container:not(:has(a:contains('Click Here To Visit')))"
+      ).map((i, element) => {
+        let title = $(element)
+          .find("a")
+          .text()
+          .replace("\u2b07Download", "")
+          .replace("\u2b07 Download", "")
+          .trim();
+        if (title.includes("Download Now")) {
+          title = $(element)
+            .parent()
+            .find("h3")
+            .text()
+            .trim()
+            .replace("\u2b07Download", "")
+            .replace("\u2b07 Download", "");
+        }
+        const link = $(element).find("a").attr("href");
+        if (title && link) {
+          links.push({
+            title,
+            episodesLink: link,
+            quality: title?.match(/\d+P\b/)?.[0].replace("P", "p") || "",
+          });
+        }
+      });
+    }
     return {
       title,
       tags,
