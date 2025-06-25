@@ -24,7 +24,7 @@ const getSearchPosts = function (_a) {
     return __awaiter(this, arguments, void 0, function* ({ searchQuery, page, signal, providerContext, }) {
         const { getBaseUrl, cheerio } = providerContext;
         const baseUrl = yield getBaseUrl("4khdhub");
-        const url = `${baseUrl}/page/${page}.html?s=hin${searchQuery}`;
+        const url = `${baseUrl}/page/${page}.html?s=${searchQuery}`;
         return posts({ url, signal, cheerio });
     });
 };
