@@ -45,7 +45,7 @@ class ProviderBuilder {
       fs.rmSync(DIST_DIR, { recursive: true, force: true });
     }
     fs.mkdirSync(DIST_DIR, { recursive: true });
-    log.success("Cleaned dist directory");
+    // log.success("Cleaned dist directory");
   }
 
   /**
@@ -77,7 +77,7 @@ class ProviderBuilder {
         encoding: "utf8",
       });
 
-      log.success("TypeScript compilation completed");
+      // log.success("TypeScript compilation completed");
       return true;
     } catch (error) {
       log.error("TypeScript compilation failed:");
@@ -127,7 +127,7 @@ class ProviderBuilder {
       }
 
       if (fileCount > 0) {
-        log.success(`  ${provider}: ${fileCount} modules ready`);
+        // log.success(`  ${provider}: ${fileCount} modules ready`);
       } else {
         log.warning(`  ${provider}: No modules found`);
       }
