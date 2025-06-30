@@ -15,16 +15,16 @@ export const getMeta = async function ({
     const data = res.data;
     const $ = cheerio.load(data);
 
-    // 1. Poster image
-    let image = "";
-    // Try to find the poster image (adjust selector as needed)
-    image =
-      $('td:contains("Movie Poster")').next().find("img").attr("src") ||
-      $('img[alt*="Poster"], img[alt*="poster"]').attr("src") ||
-      "";
+    // 1. Poster image find  image with width 260
+    let image = $('img[width="260"]').attr("src") || "";
     if (image && !image.startsWith("http")) {
       image = baseUrl + image;
     }
+
+    const tags = $("font[color='steelblue']")
+      .map((i, el) => $(el).text().trim())
+      .get()
+      .slice(0, 2);
 
     // 2. Title
     const title = $("title").text().replace(" - MoviezWap", "").trim() || "";
@@ -54,14 +54,29 @@ export const getMeta = async function ({
 
     // 4. Download links (multiple qualities)
     const links: Link[] = [];
-    $('a[href*="download.php?file="]').each((i, el) => {
-      const downloadPage = $(el).attr("href");
-      const text = $(el).text().trim();
-      if (downloadPage && /\d+p/i.test(text)) {
-        // Only add links with quality in text
+    $('a[href*="download.php?file="], a[href*="dwload.php?file="]').each(
+      (i, el) => {
+        const downloadPage =
+          $(el).attr("href")?.replace("dwload.php", "download.php") || "";
+        const text = $(el).text().trim();
+        if (downloadPage && /\d+p/i.test(text)) {
+          // Only add links with quality in text
+          links.push({
+            title: text,
+            directLinks: [{ title: "Movie", link: baseUrl + downloadPage }],
+          });
+        }
+      }
+    );
+
+    $("img[src*='/images/play.png']").each((i, el) => {
+      const downloadPage = $(el).siblings("a").attr("href");
+      const text = $(el).siblings("a").text().trim();
+      console.log("Found link:🔥🔥", text, downloadPage);
+      if (downloadPage && text) {
         links.push({
           title: text,
-          directLinks: [{ title: text, link: downloadPage }],
+          episodesLink: baseUrl + downloadPage,
         });
       }
     });
@@ -71,6 +86,7 @@ export const getMeta = async function ({
       synopsis,
       image,
       imdbId,
+      tags,
       type,
       linkList: links,
       //info: infoRows.join("\n"),

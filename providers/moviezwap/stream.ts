@@ -1,4 +1,4 @@
-import { ProviderContext } from "../types";
+import { ProviderContext, Stream } from "../types";
 
 export async function getStream({
   link,
@@ -14,16 +14,21 @@ export async function getStream({
   const res = await axios.get(link, { headers, signal });
   const html = res.data;
   const $ = cheerio.load(html);
+  const Streams: Stream[] = [];
 
   // Find the actual .mp4 download link
   let downloadLink = null;
-  $('a[href$=".mp4"]').each((i, el) => {
+  $('a:contains("Fast Download Server")').each((i, el) => {
     const href = $(el).attr("href");
-    if (href && href.endsWith(".mp4")) {
-      downloadLink = href;
-      return false;
+    if (href && href.toLocaleLowerCase().includes(".mp4")) {
+      Streams.push({
+        link: href,
+        type: "mp4",
+        server: "Fast Download",
+        headers: headers,
+      });
     }
   });
 
-  return downloadLink ? [{ url: downloadLink }] : [];
+  return Streams;
 }
