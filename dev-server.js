@@ -162,7 +162,7 @@ class DevServer {
 🚀 Vega Providers Dev Server Started!
 
 📡 Server URL: http://localhost:${this.port}
-📱 Mobile URL: http://${localIp}:${this.port}
+📱 Mobile Test URL: http://${localIp}:${this.port}
 
 💡 Usage:
   1. Run 'npm run auto' to to start the dev server ☑️
