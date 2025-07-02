@@ -152,6 +152,14 @@
     "disabled": false
   },
   {
+    "display_name": "9xflix",
+    "value": "9xflix",
+    "version": "1.0",
+    "icon": "",
+    "type": "india",
+    "disabled": false
+  },
+  {
     "display_name": "ShowBox",
     "value": "showbox",
     "version": "1.1",
