@@ -28,6 +28,7 @@ export const getMeta = async function ({
 }): Promise<Info> {
   try {
     const { axios, cheerio } = providerContext;
+    console.log("Fetching metadata from UHD...", link, providerContext);
     const url = link;
     const res = await axios.get(url, { headers });
     const html = await res.data;
@@ -43,7 +44,7 @@ export const getMeta = async function ({
     const episodes: Link[] = [];
 
     // new structure
-    $(".mks_separator").each((index, element) => {
+    $(".mks_separator,p:contains('mks_separator')").each((index, element) => {
       $(element)
         .nextUntil(".mks_separator")
         .each((index, element) => {

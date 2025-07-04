@@ -30,6 +30,7 @@ const getMeta = function (_a) {
         var _b;
         try {
             const { axios, cheerio } = providerContext;
+            console.log("Fetching metadata from UHD...", link, providerContext);
             const url = link;
             const res = yield axios.get(url, { headers });
             const html = yield res.data;
@@ -41,7 +42,7 @@ const getMeta = function (_a) {
             // Links
             const episodes = [];
             // new structure
-            $(".mks_separator").each((index, element) => {
+            $(".mks_separator,p:contains('mks_separator')").each((index, element) => {
                 $(element)
                     .nextUntil(".mks_separator")
                     .each((index, element) => {
