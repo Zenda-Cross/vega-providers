@@ -22,6 +22,9 @@ providers/
 
 ### 1. `catalog.ts`
 
+<img src="https://github.com/user-attachments/assets/40e5da3d-326d-4f5c-b266-a4167da2a269" width="200"/>
+
+
 - **Purpose:** Defines the categories or filters available for your provider.
 - **How it's used:**
   - The `title` property will be shown as the heading on the home page (e.g., "Popular Movies").
@@ -76,7 +79,7 @@ providers/
 
 - `axios`: For HTTP requests
 - `cheerio`: For HTML parsing
-- `getBaseUrl`: Helper to get the provider's base URL
+- `getBaseUrl`: Helper to get the provider's base URL (base url are generall stored here https://github.com/himanshu8443/providers/blob/main/modflix.json)
 - `commonHeaders`: Standard HTTP headers
 - `extractors`: Shared extractor functions
 - `Aes`: (if needed) for encryption/decryption
@@ -224,7 +227,10 @@ export const getEpisodes = async function ({
 
 The `linkList` property in the object returned by `getMeta` is used to describe available seasons, episodes, or direct download/stream links for the item.
 
-- Each entry in `linkList` can represent a season or anything you want it will be shown in dropdown.
+<img src="https://github.com/user-attachments/assets/f5dc31fc-0701-4d97-8056-01a58ecdefc0" width="200"/>
+
+
+- Each entry in `linkList` can represent a season or anything you want; it will be shown in the dropdown.
 - If your provider requires an extra request to fetch episodes for a season, set the `episodesLink` property. When the user selects that season, the app will call `getEpisodes` with this value.
 - If your provider does not require an extra request (i.e., you already have all episode links), you can return them directly in the `directLinks` array. Each `directLinks` entry should have a `link`, `title`, and `type` (e.g., "movie" or "series").
 - The `quality` property can be used to indicate video quality (e.g., "1080").
