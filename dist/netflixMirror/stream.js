@@ -29,7 +29,7 @@ const getStream = (_a) => __awaiter(void 0, [_a], void 0, function* ({ link: id,
             var _a;
             streamLinks.push({
                 server: source.label,
-                link: (_a = (baseUrl + source.file)) === null || _a === void 0 ? void 0 : _a.replace(":su", ":ni"),
+                link: (_a = source.file) === null || _a === void 0 ? void 0 : _a.replace(":su", ":ni"),
                 type: "m3u8",
                 headers: {
                     Referer: baseUrl,

@@ -26,7 +26,7 @@ export const getStream = async ({
     data?.sources.forEach((source: any) => {
       streamLinks.push({
         server: source.label,
-        link: (baseUrl + source.file)?.replace(":su", ":ni"),
+        link: source.file?.replace(":su", ":ni"),
         type: "m3u8",
         headers: {
           Referer: baseUrl,
