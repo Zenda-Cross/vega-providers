@@ -16,7 +16,7 @@ const getMeta = function (_a) {
         let providerValue = "netflixMirror";
         try {
             const isPrime = providerValue === "primeMirror" ? "isPrime=true" : "isPrime=false";
-            const url = `https://netmirror.8man.me/api/net-proxy?${isPrime}&url=${encodeURIComponent(link)}`;
+            const url = `https://netmirror.zendax.tech/api/net-proxy?${isPrime}&url=${encodeURIComponent(link)}`;
             console.log("nfifo", url);
             const res = yield fetch(url, {
                 credentials: "omit",

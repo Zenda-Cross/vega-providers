@@ -21,7 +21,7 @@ const getPosts = function (_a) {
             }
             // console.log(filter);
             const isPrime = providerValue === "primeMirror" ? "isPrime=true" : "isPrime=false";
-            const url = `https://netmirror.8man.me/api/net-proxy?${isPrime}&url=${baseUrl + filter}`;
+            const url = `https://netmirror.zendax.tech/api/net-proxy?${isPrime}&url=${baseUrl + filter}`;
             const res = yield fetch(url, {
                 signal: signal,
                 method: "GET",
@@ -70,7 +70,7 @@ const getSearchPosts = function (_a) {
             const catalog = [];
             const baseUrl = yield getBaseUrl("nfMirror");
             const isPrime = providerValue === "primeMirror" ? "isPrime=true" : "isPrime=false";
-            const url = `https://netmirror.8man.me/api/net-proxy?${isPrime}&url=${baseUrl}${providerValue === "netflixMirror" ? "" : "/pv"}/search.php?s=${encodeURI(searchQuery)}`;
+            const url = `https://netmirror.zendax.tech/api/net-proxy?${isPrime}&url=${baseUrl}${providerValue === "netflixMirror" ? "" : "/pv"}/search.php?s=${encodeURI(searchQuery)}`;
             const res = yield fetch(url, {
                 signal: signal,
                 method: "GET",
