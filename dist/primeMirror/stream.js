@@ -15,7 +15,7 @@ const getStream = (_a) => __awaiter(void 0, [_a], void 0, function* ({ link: id,
     try {
         let providerValue = "primeMirror";
         const baseUrl = yield getBaseUrl("nfMirror");
-        const url = `https://netmirror.8man.me/api/net-proxy?url=${baseUrl}${providerValue === "netflixMirror"
+        const url = `https://netmirror.zendax.tech/api/net-proxy?url=${baseUrl}${providerValue === "netflixMirror"
             ? "/mobile/playlist.php?id="
             : "/pv/playlist.php?id="}${id}&t=${Math.round(new Date().getTime() / 1000)}`;
         console.log("nfGetStream, url:", url);

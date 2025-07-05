@@ -9,7 +9,7 @@ export const getMeta = async function ({
   try {
     const isPrime =
       providerValue === "primeMirror" ? "isPrime=true" : "isPrime=false";
-    const url = `https://netmirror.8man.me/api/net-proxy?${isPrime}&url=${encodeURIComponent(
+    const url = `https://netmirror.zendax.tech/api/net-proxy?${isPrime}&url=${encodeURIComponent(
       link
     )}`;
     console.log("nfifo", url);
