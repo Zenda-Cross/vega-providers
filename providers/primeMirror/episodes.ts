@@ -12,11 +12,7 @@ export const getEpisodes = async function ({
   try {
     const baseUrl = await getBaseUrl("nfMirror");
     const url =
-      `${baseUrl}${
-        providerValue === "netflixMirror"
-          ? "/episodes.php?s="
-          : "/pv/episodes.php?s="
-      }` +
+      `${baseUrl}${"/pv/episodes.php?s="}` +
       link +
       "&t=" +
       Math.round(new Date().getTime() / 1000);

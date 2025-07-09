@@ -17,9 +17,7 @@ const getEpisodes = function (_a) {
         let providerValue = "netflixMirror";
         try {
             const baseUrl = yield getBaseUrl("nfMirror");
-            const url = `${baseUrl}${providerValue === "netflixMirror"
-                ? "/episodes.php?s="
-                : "/pv/episodes.php?s="}` +
+            const url = `${baseUrl}${"/pv/episodes.php?s="}` +
                 link +
                 "&t=" +
                 Math.round(new Date().getTime() / 1000);

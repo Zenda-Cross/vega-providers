@@ -82,7 +82,7 @@ const getSearchPosts = function (_a) {
                 const id = result === null || result === void 0 ? void 0 : result.id;
                 const image = providerValue === "netflixMirror"
                     ? `https://imgcdn.media/poster/v/${id}.jpg`
-                    : "";
+                    : `https://imgcdn.media/pv/341/${id}.jpg`;
                 if (id) {
                     catalog.push({
                         title: title,

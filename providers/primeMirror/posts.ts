@@ -107,7 +107,7 @@ export const getSearchPosts = async function ({
       const image =
         providerValue === "netflixMirror"
           ? `https://imgcdn.media/poster/v/${id}.jpg`
-          : "";
+          : `https://imgcdn.media/pv/341/${id}.jpg`;
 
       if (id) {
         catalog.push({
