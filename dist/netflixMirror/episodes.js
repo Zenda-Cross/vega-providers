@@ -36,7 +36,6 @@ const getEpisodes = function (_a) {
                     },
                 });
                 const data = res.data;
-                console.log("nfEpisodes", data);
                 (_b = data === null || data === void 0 ? void 0 : data.episodes) === null || _b === void 0 ? void 0 : _b.map((episode) => {
                     episodeList.push({
                         title: "Episode " + (episode === null || episode === void 0 ? void 0 : episode.ep.replace("E", "")),
@@ -50,7 +49,11 @@ const getEpisodes = function (_a) {
                     hasMorePages = false;
                 }
             }
-            return episodeList;
+            return episodeList.sort((a, b) => {
+                const aNum = parseInt(a.title.replace("Episode ", ""));
+                const bNum = parseInt(b.title.replace("Episode ", ""));
+                return aNum - bNum;
+            });
         }
         catch (err) {
             console.error("nfGetEpisodes error", err);

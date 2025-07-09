@@ -14,7 +14,7 @@ const getEpisodes = function (_a) {
     return __awaiter(this, arguments, void 0, function* ({ url: link, providerContext, }) {
         var _b;
         const { getBaseUrl, axios } = providerContext;
-        let providerValue = "primeMirror";
+        let providerValue = "netflixMirror";
         try {
             const baseUrl = yield getBaseUrl("nfMirror");
             const url = `${baseUrl}${providerValue === "netflixMirror"
@@ -24,23 +24,36 @@ const getEpisodes = function (_a) {
                 "&t=" +
                 Math.round(new Date().getTime() / 1000);
             console.log("nfEpisodesUrl", url);
-            const res = yield axios.get(url, {
-                headers: {
-                    "Content-Type": "application/json",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36",
-                    "Accept-Language": "en-US,en;q=0.9",
-                },
-            });
-            const data = res.data;
-            console.log("nfEpisodes", data);
+            let page = 1;
+            let hasMorePages = true;
             const episodeList = [];
-            (_b = data === null || data === void 0 ? void 0 : data.episodes) === null || _b === void 0 ? void 0 : _b.map((episode) => {
-                episodeList.push({
-                    title: "Episode " + (episode === null || episode === void 0 ? void 0 : episode.ep.replace("E", "")),
-                    link: episode === null || episode === void 0 ? void 0 : episode.id,
+            while (hasMorePages) {
+                const res = yield axios.get(url + `&page=${page}`, {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36",
+                        "Accept-Language": "en-US,en;q=0.9",
+                    },
                 });
+                const data = res.data;
+                (_b = data === null || data === void 0 ? void 0 : data.episodes) === null || _b === void 0 ? void 0 : _b.map((episode) => {
+                    episodeList.push({
+                        title: "Episode " + (episode === null || episode === void 0 ? void 0 : episode.ep.replace("E", "")),
+                        link: episode === null || episode === void 0 ? void 0 : episode.id,
+                    });
+                });
+                if (data === null || data === void 0 ? void 0 : data.nextPageShow) {
+                    page++;
+                }
+                else {
+                    hasMorePages = false;
+                }
+            }
+            return episodeList.sort((a, b) => {
+                const aNum = parseInt(a.title.replace("Episode ", ""));
+                const bNum = parseInt(b.title.replace("Episode ", ""));
+                return aNum - bNum;
             });
-            return episodeList;
         }
         catch (err) {
             console.error("nfGetEpisodes error", err);

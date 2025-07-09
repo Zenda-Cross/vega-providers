@@ -34,7 +34,6 @@ export const getEpisodes = async function ({
         },
       });
       const data = res.data;
-      console.log("nfEpisodes", data);
 
       data?.episodes?.map((episode: any) => {
         episodeList.push({
@@ -49,7 +48,11 @@ export const getEpisodes = async function ({
       }
     }
 
-    return episodeList;
+    return episodeList.sort((a, b) => {
+      const aNum = parseInt(a.title.replace("Episode ", ""));
+      const bNum = parseInt(b.title.replace("Episode ", ""));
+      return aNum - bNum;
+    });
   } catch (err) {
     console.error("nfGetEpisodes error", err);
     return [];
