@@ -10,7 +10,7 @@ export const getStream = async ({
   const { getBaseUrl } = providerContext;
   try {
     let providerValue = "primeMirror";
-    const baseUrl = await getBaseUrl("nfMirror");
+    const baseUrl = "https://netfree2.cc";
     const url = `https://netmirror.zendax.tech/api/net-proxy?url=${baseUrl}${
       providerValue === "netflixMirror"
         ? "/mobile/playlist.php?id="
