@@ -15,10 +15,10 @@ const headers = {
   "Sec-Fetch-Site": "none",
   "Sec-Fetch-User": "?1",
   Cookie:
-    "ext_name=ojplmecpdpgccookcobabopnaifgidhf; cf_clearance=gaIhTNzqSvp27JCVf7qiEUfYRfwyj0Jx9rcsn774BbE-1732694853-1.2.1.1-QKgYJvmrEz08gM9qbAp70diztE2.hseO2NNi.0imIUk_gkuWUcr7U8t5Zn_z4Ov30sIGPBES1PBgMUEa.s8e8QTkQoZjgziFmoC7YdX7s2Jnt.tYCxE_s5mMLQQBYbz_94A89IYe93Y6kyLQm_L.dvUKPPiGjn_sH3qRD0g4p9oOl0SPvH0T2W_EaD0r6mVBasbgro9dAROt_6CxshXOEGeMOnoWR.ID699FKldjMUhbXJbATAffdOY6kf2sD_iwrSl4bcetTlDHd4gusTVfxSS1pL5qNjyTU9wa38soPl1wZoqFHkEGOPWz6S7FD5ikHxX0bArFem9hiDeJXctYfWz5e_Lkc6lH7nW0Rm2XS3gxCadQSg21RkSReN6kDAEecqjgJSE4zUomkWAxFZ98TSShgGWC0ridPTpdQizPDZQ; _lscache_vary=c1d682536aea2d88fbb2574666e1f0aa",
+    "ext_name=ojplmecpdpgccookcobabopnaifgidhf; cf_clearance=lDWFqLsHL5LZ.VpfxQRtHY2_mpXRuq3OFTbVDKNIZGw-1752051595-1.2.1.1-VZ2S8yUrcCuOMLUgWfNv9a1LrtuhUKEd.uPN1Au_9tuTFYLra7ugoFBYKfsunvzrBOlYSYM0q8J7vpw.JhGZH0RO6MlaVBKH5olmoryhd6s11LXg7ZF1Ld_NedYoA7uKk_SBhbb1CCsj11S52U9VUve7twrLEjILmw3MEURU1eGqOOi3YGxtGgpQBNYgfnkJCoRkLB_6vQESw4RcIvO1j1BHMuyMVEkbn7sBtLEX52w",
   "Upgrade-Insecure-Requests": "1",
   "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0",
 };
 
 export const getPosts = async ({
@@ -60,7 +60,10 @@ export const getSearchPosts = async ({
   const baseUrl = await getBaseUrl("lux");
 
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
-  const url = `${baseUrl}/page/${page}/?s=${searchQuery}`;
+  const url =
+    page === 1
+      ? `${baseUrl}/?s=${searchQuery}`
+      : `${baseUrl}/page/${page}/?s=${searchQuery}`;
   console.log("lux url:", url);
 
   return posts(url, signal, providerContext);
@@ -73,7 +76,13 @@ async function posts(
 ): Promise<Post[]> {
   try {
     const { axios, cheerio } = providerContext;
-    const urlRes = await axios.get(url, { headers, signal });
+    const urlRes = await axios.get(url, {
+      headers: {
+        ...headers,
+        Referer: url,
+      },
+      signal,
+    });
     const $ = cheerio.load(urlRes.data);
     const posts: Post[] = [];
     $(".blog-items")
