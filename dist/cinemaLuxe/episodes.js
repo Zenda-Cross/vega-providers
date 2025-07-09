@@ -14,7 +14,7 @@ const getEpisodes = function (_a) {
     return __awaiter(this, arguments, void 0, function* ({ url, providerContext, }) {
         var _b;
         try {
-            if (!url.includes("luxelinks") || url.includes("luxecinema")) {
+            if (!url.includes("luxelinks") || url.includes("cinemalux")) {
                 const res = yield providerContext.axios.get(url, {
                     headers: providerContext.commonHeaders,
                 });
@@ -35,19 +35,19 @@ const getEpisodes = function (_a) {
                     url = (redirectUrl === null || redirectUrl === void 0 ? void 0 : redirectUrl.redirectUrl) || url;
                 }
             }
-            const res = yield providerContext.axios.get(url, {
-                headers: providerContext.commonHeaders,
-            });
-            const html = res.data;
-            let $ = providerContext.cheerio.load(html);
             const episodeLinks = [];
-            if (url.includes("luxedrive")) {
+            if (url.includes("luxedrive") || url.includes("drive.linkstore")) {
                 episodeLinks.push({
                     title: "Movie",
                     link: url,
                 });
                 return episodeLinks;
             }
+            const res = yield providerContext.axios.get(url, {
+                headers: providerContext.commonHeaders,
+            });
+            const html = res.data;
+            let $ = providerContext.cheerio.load(html);
             $("a.maxbutton-4,a.maxbutton,.maxbutton-hubcloud,.ep-simple-button").map((i, element) => {
                 var _a;
                 const title = (_a = $(element).text()) === null || _a === void 0 ? void 0 : _a.trim();

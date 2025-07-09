@@ -8,7 +8,7 @@ export const getEpisodes = async function ({
   providerContext: ProviderContext;
 }): Promise<EpisodeLink[]> {
   try {
-    if (!url.includes("luxelinks") || url.includes("luxecinema")) {
+    if (!url.includes("luxelinks") || url.includes("cinemalux")) {
       const res = await providerContext.axios.get(url, {
         headers: providerContext.commonHeaders,
       });
@@ -31,19 +31,21 @@ export const getEpisodes = async function ({
         url = redirectUrl?.redirectUrl || url;
       }
     }
-    const res = await providerContext.axios.get(url, {
-      headers: providerContext.commonHeaders,
-    });
-    const html = res.data;
-    let $ = providerContext.cheerio.load(html);
     const episodeLinks: EpisodeLink[] = [];
-    if (url.includes("luxedrive")) {
+
+    if (url.includes("luxedrive") || url.includes("drive.linkstore")) {
       episodeLinks.push({
         title: "Movie",
         link: url,
       });
       return episodeLinks;
     }
+    const res = await providerContext.axios.get(url, {
+      headers: providerContext.commonHeaders,
+    });
+    const html = res.data;
+    let $ = providerContext.cheerio.load(html);
+
     $("a.maxbutton-4,a.maxbutton,.maxbutton-hubcloud,.ep-simple-button").map(
       (i, element) => {
         const title = $(element).text()?.trim();
