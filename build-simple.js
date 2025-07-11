@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const { minify } = require("terser");
 
 // Build configuration
 const PROVIDERS_DIR = "./providers";
@@ -92,6 +93,101 @@ class ProviderBuilder {
   }
 
   /**
+   * Minify all JavaScript files in the dist directory
+   */
+  async minifyFiles() {
+    const keepConsole = process.env.KEEP_CONSOLE === "true";
+    log.build(
+      `Minifying JavaScript files... ${
+        keepConsole ? "(keeping console logs)" : "(removing console logs)"
+      }`
+    );
+
+    const minifyFile = async (filePath) => {
+      try {
+        const code = fs.readFileSync(filePath, "utf8");
+        const result = await minify(code, {
+          compress: {
+            drop_console: !keepConsole, // Remove console logs unless KEEP_CONSOLE=true
+            drop_debugger: true,
+            pure_funcs: keepConsole
+              ? ["console.debug"]
+              : [
+                  "console.debug",
+                  "console.log",
+                  "console.info",
+                  "console.warn",
+                ],
+          },
+          mangle: {
+            keep_fnames: false, // Mangle function names for better compression
+          },
+          format: {
+            comments: false, // Remove comments
+          },
+        });
+
+        if (result.code) {
+          fs.writeFileSync(filePath, result.code);
+          return true;
+        } else {
+          log.warning(`Failed to minify ${filePath}: No output code`);
+          return false;
+        }
+      } catch (error) {
+        log.error(`Error minifying ${filePath}: ${error.message}`);
+        return false;
+      }
+    };
+
+    const findJsFiles = (dir) => {
+      const files = [];
+      const items = fs.readdirSync(dir, { withFileTypes: true });
+
+      for (const item of items) {
+        const fullPath = path.join(dir, item.name);
+        if (item.isDirectory()) {
+          files.push(...findJsFiles(fullPath));
+        } else if (item.isFile() && item.name.endsWith(".js")) {
+          files.push(fullPath);
+        }
+      }
+
+      return files;
+    };
+
+    const jsFiles = findJsFiles(DIST_DIR);
+    let minifiedCount = 0;
+    let totalSizeBefore = 0;
+    let totalSizeAfter = 0;
+
+    for (const filePath of jsFiles) {
+      const statsBefore = fs.statSync(filePath);
+      totalSizeBefore += statsBefore.size;
+
+      const success = await minifyFile(filePath);
+      if (success) {
+        const statsAfter = fs.statSync(filePath);
+        totalSizeAfter += statsAfter.size;
+        minifiedCount++;
+      }
+    }
+
+    const compressionRatio =
+      totalSizeBefore > 0
+        ? (
+            ((totalSizeBefore - totalSizeAfter) / totalSizeBefore) *
+            100
+          ).toFixed(1)
+        : 0;
+
+    log.success(
+      `Minified ${minifiedCount}/${jsFiles.length} files. ` +
+        `Size reduced by ${compressionRatio}% (${totalSizeBefore} → ${totalSizeAfter} bytes)`
+    );
+  }
+
+  /**
    * Organize compiled files by provider
    */
   organizeFiles() {
@@ -137,7 +233,7 @@ class ProviderBuilder {
   /**
    * Build everything
    */
-  build() {
+  async build() {
     const isWatchMode = process.env.NODE_ENV === "development";
 
     if (isWatchMode) {
@@ -163,6 +259,13 @@ class ProviderBuilder {
 
     this.organizeFiles();
 
+    // Add minification step (skip if SKIP_MINIFY is set)
+    if (!process.env.SKIP_MINIFY) {
+      await this.minifyFiles();
+    } else {
+      log.info("Skipping minification (SKIP_MINIFY=true)");
+    }
+
     const buildTime = Date.now() - this.startTime;
     log.success(`Build completed in ${buildTime}ms`);
 
@@ -178,4 +281,7 @@ class ProviderBuilder {
 
 // Run the build
 const builder = new ProviderBuilder();
-builder.build();
+builder.build().catch((error) => {
+  console.error("Build failed:", error);
+  process.exit(1);
+});
