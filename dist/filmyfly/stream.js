@@ -1,1 +1,51 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,n,i){return new(n||(n=Promise))(function(r,o){function a(t){try{s(i.next(t))}catch(t){o(t)}}function c(t){try{s(i.throw(t))}catch(t){o(t)}}function s(t){var e;t.done?r(t.value):(e=t.value,e instanceof n?e:new n(function(t){t(e)})).then(a,c)}s((i=i.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getStream=void 0;const getStream=function(t){return __awaiter(this,arguments,void 0,function*({link:t,signal:e,providerContext:n}){try{const i=(yield n.axios.get(t,{signal:e})).data,r=n.cheerio.load(i),o=[],a=r(".button2,.button1,.button3,.button4,.button").toArray().map(t=>__awaiter(this,void 0,void 0,function*(){const i=r(t).text();let a=r(t).attr("href");if(i.includes("GDFLIX")&&a){const t=yield n.extractors.gdFlixExtracter(a,e);o.push(...t)}const c=o.find(t=>t.link===a);!i||!a||i.includes("Watch")||i.includes("Login")||i.includes("GoFile")||c||o.push({server:i,link:a,type:"mkv"})}));return yield Promise.all(a),o}catch(t){return[]}})};exports.getStream=getStream;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getStream = void 0;
+const getStream = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link, signal, providerContext, }) {
+        try {
+            const res = yield providerContext.axios.get(link, { signal });
+            const data = res.data;
+            const $ = providerContext.cheerio.load(data);
+            const streams = [];
+            const elements = $(".button2,.button1,.button3,.button4,.button").toArray();
+            const promises = elements.map((element) => __awaiter(this, void 0, void 0, function* () {
+                const title = $(element).text();
+                let link = $(element).attr("href");
+                if (title.includes("GDFLIX") && link) {
+                    const gdLinks = yield providerContext.extractors.gdFlixExtracter(link, signal);
+                    streams.push(...gdLinks);
+                }
+                const alreadyAdded = streams.find((s) => s.link === link);
+                if (title &&
+                    link &&
+                    !title.includes("Watch") &&
+                    !title.includes("Login") &&
+                    !title.includes("GoFile") &&
+                    !alreadyAdded) {
+                    streams.push({
+                        server: title,
+                        link: link,
+                        type: "mkv",
+                    });
+                }
+            }));
+            yield Promise.all(promises);
+            return streams;
+        }
+        catch (err) {
+            console.error(err);
+            return [];
+        }
+    });
+};
+exports.getStream = getStream;

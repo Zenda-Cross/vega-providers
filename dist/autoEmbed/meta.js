@@ -1,1 +1,99 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(i,e,t,o){return new(t||(t=Promise))(function(l,n){function d(i){try{s(o.next(i))}catch(i){n(i)}}function v(i){try{s(o.throw(i))}catch(i){n(i)}}function s(i){var e;i.done?l(i.value):(e=i.value,e instanceof t?e:new t(function(i){i(e)})).then(d,v)}s((o=o.apply(i,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getMeta=void 0;const getMeta=function(i){return __awaiter(this,arguments,void 0,function*({link:i,providerContext:e}){var t,o,l,n,d,v,s,a,u,r,m;const p=e.axios;try{const e=(yield p.get(i)).data,y={title:"",synopsis:"",image:"",imdbId:(null===(t=null==e?void 0:e.meta)||void 0===t?void 0:t.imdb_id)||"",type:(null===(o=null==e?void 0:e.meta)||void 0===o?void 0:o.type)||"movie"},c=[];let g=[],b=new Map;if("series"===y.type){null===(n=null===(l=null==e?void 0:e.meta)||void 0===l?void 0:l.videos)||void 0===n||n.map(i=>{var t,o,l,n,d,v,s,a;(null==i?void 0:i.season)<=0||(b.has(null==i?void 0:i.season)||b.set(null==i?void 0:i.season,[]),b.get(null==i?void 0:i.season).push({title:"Episode "+(null==i?void 0:i.episode),type:"series",link:JSON.stringify({title:null===(t=null==e?void 0:e.meta)||void 0===t?void 0:t.name,imdbId:null===(o=null==e?void 0:e.meta)||void 0===o?void 0:o.imdb_id,season:null===(l=null==i?void 0:i.id)||void 0===l?void 0:l.split(":")[1],episode:null===(n=null==i?void 0:i.id)||void 0===n?void 0:n.split(":")[2],type:null===(d=null==e?void 0:e.meta)||void 0===d?void 0:d.type,tmdbId:(null===(s=null===(v=null==e?void 0:e.meta)||void 0===v?void 0:v.moviedb_id)||void 0===s?void 0:s.toString())||"",year:null===(a=null==e?void 0:e.meta)||void 0===a?void 0:a.year})}))});const i=Array.from(b.keys());i.sort(),i.map(i=>{g=b.get(i),c.push({title:`Season ${i}`,directLinks:g})})}else c.push({title:null===(d=null==e?void 0:e.meta)||void 0===d?void 0:d.name,directLinks:[{title:"Movie",type:"movie",link:JSON.stringify({title:null===(v=null==e?void 0:e.meta)||void 0===v?void 0:v.name,imdbId:null===(s=null==e?void 0:e.meta)||void 0===s?void 0:s.imdb_id,season:"",episode:"",type:null===(a=null==e?void 0:e.meta)||void 0===a?void 0:a.type,tmdbId:(null===(r=null===(u=null==e?void 0:e.meta)||void 0===u?void 0:u.moviedb_id)||void 0===r?void 0:r.toString())||"",year:null===(m=null==e?void 0:e.meta)||void 0===m?void 0:m.year})}]});return Object.assign(Object.assign({},y),{linkList:c})}catch(i){return{title:"",synopsis:"",image:"",imdbId:"",type:"movie",linkList:[]}}})};exports.getMeta=getMeta;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getMeta = void 0;
+const getMeta = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link, providerContext, }) {
+        var _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+        const axios = providerContext.axios;
+        try {
+            console.log("all", link);
+            const res = yield axios.get(link);
+            const data = res.data;
+            const meta = {
+                title: "",
+                synopsis: "",
+                image: "",
+                imdbId: ((_b = data === null || data === void 0 ? void 0 : data.meta) === null || _b === void 0 ? void 0 : _b.imdb_id) || "",
+                type: ((_c = data === null || data === void 0 ? void 0 : data.meta) === null || _c === void 0 ? void 0 : _c.type) || "movie",
+            };
+            const links = [];
+            let directLinks = [];
+            let season = new Map();
+            if (meta.type === "series") {
+                (_e = (_d = data === null || data === void 0 ? void 0 : data.meta) === null || _d === void 0 ? void 0 : _d.videos) === null || _e === void 0 ? void 0 : _e.map((video) => {
+                    var _a, _b, _c, _d, _e, _f, _g, _h;
+                    if ((video === null || video === void 0 ? void 0 : video.season) <= 0)
+                        return;
+                    if (!season.has(video === null || video === void 0 ? void 0 : video.season)) {
+                        season.set(video === null || video === void 0 ? void 0 : video.season, []);
+                    }
+                    season.get(video === null || video === void 0 ? void 0 : video.season).push({
+                        title: "Episode " + (video === null || video === void 0 ? void 0 : video.episode),
+                        type: "series",
+                        link: JSON.stringify({
+                            title: (_a = data === null || data === void 0 ? void 0 : data.meta) === null || _a === void 0 ? void 0 : _a.name,
+                            imdbId: (_b = data === null || data === void 0 ? void 0 : data.meta) === null || _b === void 0 ? void 0 : _b.imdb_id,
+                            season: (_c = video === null || video === void 0 ? void 0 : video.id) === null || _c === void 0 ? void 0 : _c.split(":")[1],
+                            episode: (_d = video === null || video === void 0 ? void 0 : video.id) === null || _d === void 0 ? void 0 : _d.split(":")[2],
+                            type: (_e = data === null || data === void 0 ? void 0 : data.meta) === null || _e === void 0 ? void 0 : _e.type,
+                            tmdbId: ((_g = (_f = data === null || data === void 0 ? void 0 : data.meta) === null || _f === void 0 ? void 0 : _f.moviedb_id) === null || _g === void 0 ? void 0 : _g.toString()) || "",
+                            year: (_h = data === null || data === void 0 ? void 0 : data.meta) === null || _h === void 0 ? void 0 : _h.year,
+                        }),
+                    });
+                });
+                const keys = Array.from(season.keys());
+                keys.sort();
+                keys.map((key) => {
+                    directLinks = season.get(key);
+                    links.push({
+                        title: `Season ${key}`,
+                        directLinks: directLinks,
+                    });
+                });
+            }
+            else {
+                console.log("all meta Mv🔥🔥", meta);
+                links.push({
+                    title: (_f = data === null || data === void 0 ? void 0 : data.meta) === null || _f === void 0 ? void 0 : _f.name,
+                    directLinks: [
+                        {
+                            title: "Movie",
+                            type: "movie",
+                            link: JSON.stringify({
+                                title: (_g = data === null || data === void 0 ? void 0 : data.meta) === null || _g === void 0 ? void 0 : _g.name,
+                                imdbId: (_h = data === null || data === void 0 ? void 0 : data.meta) === null || _h === void 0 ? void 0 : _h.imdb_id,
+                                season: "",
+                                episode: "",
+                                type: (_j = data === null || data === void 0 ? void 0 : data.meta) === null || _j === void 0 ? void 0 : _j.type,
+                                tmdbId: ((_l = (_k = data === null || data === void 0 ? void 0 : data.meta) === null || _k === void 0 ? void 0 : _k.moviedb_id) === null || _l === void 0 ? void 0 : _l.toString()) || "",
+                                year: (_m = data === null || data === void 0 ? void 0 : data.meta) === null || _m === void 0 ? void 0 : _m.year,
+                            }),
+                        },
+                    ],
+                });
+            }
+            return Object.assign(Object.assign({}, meta), { linkList: links });
+        }
+        catch (err) {
+            console.error(err);
+            return {
+                title: "",
+                synopsis: "",
+                image: "",
+                imdbId: "",
+                type: "movie",
+                linkList: [],
+            };
+        }
+    });
+};
+exports.getMeta = getMeta;

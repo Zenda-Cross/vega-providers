@@ -1,1 +1,68 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,i,n){return new(i||(i=Promise))(function(r,a){function s(t){try{c(n.next(t))}catch(t){a(t)}}function o(t){try{c(n.throw(t))}catch(t){a(t)}}function c(t){var e;t.done?r(t.value):(e=t.value,e instanceof i?e:new i(function(t){t(e)})).then(s,o)}c((n=n.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getMeta=void 0;const getMeta=function(t){return __awaiter(this,arguments,void 0,function*({link:t,providerContext:e}){try{const{cheerio:i}=e,n=t,r=yield fetch(n),a=yield r.text(),s=i.load(a),o={title:s('.c_h2:contains("Title(s):")').text().replace("Title(s):","").trim().split("\n")[0],synopsis:s('.c_h2b:contains("Summary:"),.c_h2:contains("Summary:")').text().replace("Summary:","").trim(),image:s(".a_img").attr("src")||"",imdbId:"",type:"series"},c=[];return s(".episode").map((t,e)=>{const i="https://www.tokyoinsider.com"+s(e).find("a").attr("href")||s(".download-link").attr("href");let n=s(e).find("a").find("em").text()+" "+s(e).find("a").find("strong").text();n.trim()||(n=s(".download-link").text()),i&&n.trim()&&c.push({title:n,link:i})}),Object.assign(Object.assign({},o),{linkList:[{title:o.title,directLinks:c}]})}catch(t){return{title:"",synopsis:"",image:"",imdbId:"",type:"series",linkList:[]}}})};exports.getMeta=getMeta;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getMeta = void 0;
+const getMeta = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link, providerContext, }) {
+        try {
+            const { cheerio } = providerContext;
+            const url = link;
+            const res = yield fetch(url);
+            const data = yield res.text();
+            const $ = cheerio.load(data);
+            const meta = {
+                title: $('.c_h2:contains("Title(s):")')
+                    .text()
+                    .replace("Title(s):", "")
+                    .trim()
+                    .split("\n")[0],
+                synopsis: $('.c_h2b:contains("Summary:"),.c_h2:contains("Summary:")')
+                    .text()
+                    .replace("Summary:", "")
+                    .trim(),
+                image: $(".a_img").attr("src") || "",
+                imdbId: "",
+                type: "series",
+            };
+            const episodesList = [];
+            $(".episode").map((i, element) => {
+                const link = "https://www.tokyoinsider.com" + $(element).find("a").attr("href") ||
+                    $(".download-link").attr("href");
+                let title = $(element).find("a").find("em").text() +
+                    " " +
+                    $(element).find("a").find("strong").text();
+                if (!title.trim()) {
+                    title = $(".download-link").text();
+                }
+                if (link && title.trim()) {
+                    episodesList.push({ title, link });
+                }
+            });
+            return Object.assign(Object.assign({}, meta), { linkList: [
+                    {
+                        title: meta.title,
+                        directLinks: episodesList,
+                    },
+                ] });
+        }
+        catch (err) {
+            return {
+                title: "",
+                synopsis: "",
+                image: "",
+                imdbId: "",
+                type: "series",
+                linkList: [],
+            };
+        }
+    });
+};
+exports.getMeta = getMeta;

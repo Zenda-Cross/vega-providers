@@ -1,1 +1,47 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,n,i){return new(n||(n=Promise))(function(r,a){function o(t){try{s(i.next(t))}catch(t){a(t)}}function c(t){try{s(i.throw(t))}catch(t){a(t)}}function s(t){var e;t.done?r(t.value):(e=t.value,e instanceof n?e:new n(function(t){t(e)})).then(o,c)}s((i=i.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getStream=void 0;const getStream=function(t){return __awaiter(this,arguments,void 0,function*({link:t,signal:e,providerContext:n}){try{const{axios:i,cheerio:r}=n,a=[],[,o]=t.split("&"),c=`https://febbox.vercel.app/api/video-quality?fid=${o}`,s=(yield i.get(c,{signal:e})).data,u=r.load(s.html);return u(".file_quality").each((t,e)=>{const n=u(e).find("p.name").text()+" - "+u(e).find("p.size").text()+" - "+u(e).find("p.speed").text(),i=u(e).attr("data-url");i&&a.push({server:n,type:"mkv",link:i})}),a}catch(t){return[]}})};exports.getStream=getStream;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getStream = void 0;
+const getStream = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link: id, 
+    // type,
+    signal, providerContext, }) {
+        try {
+            const { axios, cheerio } = providerContext;
+            const stream = [];
+            const [, epId] = id.split("&");
+            const url = `https://febbox.vercel.app/api/video-quality?fid=${epId}`;
+            const res = yield axios.get(url, { signal });
+            const data = res.data;
+            const $ = cheerio.load(data.html);
+            $(".file_quality").each((i, el) => {
+                const server = $(el).find("p.name").text() +
+                    " - " +
+                    $(el).find("p.size").text() +
+                    " - " +
+                    $(el).find("p.speed").text();
+                const link = $(el).attr("data-url");
+                if (link) {
+                    stream.push({
+                        server: server,
+                        type: "mkv",
+                        link: link,
+                    });
+                }
+            });
+            return stream;
+        }
+        catch (err) {
+            return [];
+        }
+    });
+};
+exports.getStream = getStream;

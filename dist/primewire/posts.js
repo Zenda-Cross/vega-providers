@@ -1,1 +1,63 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,i,r){return new(i||(i=Promise))(function(s,n){function o(t){try{c(r.next(t))}catch(t){n(t)}}function a(t){try{c(r.throw(t))}catch(t){n(t)}}function c(t){var e;t.done?s(t.value):(e=t.value,e instanceof i?e:new i(function(t){t(e)})).then(o,a)}c((r=r.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getSearchPosts=exports.getPosts=void 0;const getPosts=function(t){return __awaiter(this,arguments,void 0,function*({filter:t,page:e,signal:i,providerContext:r}){const{getBaseUrl:s,axios:n,cheerio:o}=r,a=yield s("primewire");return posts({baseUrl:a,url:`${a+t}&page=${e}`,signal:i,axios:n,cheerio:o})})};exports.getPosts=getPosts;const getSearchPosts=function(t){return __awaiter(this,arguments,void 0,function*({searchQuery:t,page:e,signal:i,providerContext:r}){const{getBaseUrl:s,axios:n,cheerio:o,Aes:a}=r,c=yield s("primewire");return posts({baseUrl:c,url:`${c}/filter?s=${t}&page=${e}&ds=${(yield function(t){return __awaiter(this,void 0,void 0,function*(){return yield a.sha1(t)})}(t+"JyjId97F9PVqUPuMO0")).slice(0,10)}`,signal:i,axios:n,cheerio:o})})};function posts(t){return __awaiter(this,arguments,void 0,function*({baseUrl:t,url:e,signal:i,axios:r,cheerio:s}){try{const n=(yield r.get(e,{signal:i})).data,o=s.load(n),a=[];return o(".index_item.index_item_ie").map((e,i)=>{const r=o(i).find("a").attr("title"),s=o(i).find("a").attr("href"),n=o(i).find("img").attr("src")||"";r&&s&&a.push({title:r,link:t+s,image:n})}),a}catch(t){return[]}})}exports.getSearchPosts=getSearchPosts;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getSearchPosts = exports.getPosts = void 0;
+const getPosts = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ filter, page, signal, providerContext, }) {
+        const { getBaseUrl, axios, cheerio } = providerContext;
+        const baseUrl = yield getBaseUrl("primewire");
+        const url = `${baseUrl + filter}&page=${page}`;
+        return posts({ baseUrl, url, signal, axios, cheerio });
+    });
+};
+exports.getPosts = getPosts;
+const getSearchPosts = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ searchQuery, page, signal, providerContext, }) {
+        const { getBaseUrl, axios, cheerio, Aes } = providerContext;
+        const getSHA256ofJSON = function (input) {
+            return __awaiter(this, void 0, void 0, function* () {
+                return yield Aes.sha1(input);
+            });
+        };
+        const baseUrl = yield getBaseUrl("primewire");
+        const hash = yield getSHA256ofJSON(searchQuery + "JyjId97F9PVqUPuMO0");
+        const url = `${baseUrl}/filter?s=${searchQuery}&page=${page}&ds=${hash.slice(0, 10)}`;
+        return posts({ baseUrl, url, signal, axios, cheerio });
+    });
+};
+exports.getSearchPosts = getSearchPosts;
+function posts(_a) {
+    return __awaiter(this, arguments, void 0, function* ({ baseUrl, url, signal, axios, cheerio, }) {
+        try {
+            const res = yield axios.get(url, { signal });
+            const data = res.data;
+            const $ = cheerio.load(data);
+            const catalog = [];
+            $(".index_item.index_item_ie").map((i, element) => {
+                const title = $(element).find("a").attr("title");
+                const link = $(element).find("a").attr("href");
+                const image = $(element).find("img").attr("src") || "";
+                if (title && link) {
+                    catalog.push({
+                        title: title,
+                        link: baseUrl + link,
+                        image: image,
+                    });
+                }
+            });
+            return catalog;
+        }
+        catch (err) {
+            console.error("primewire error ", err);
+            return [];
+        }
+    });
+}

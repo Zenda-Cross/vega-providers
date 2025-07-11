@@ -1,1 +1,66 @@
-"use strict";var __createBinding=this&&this.__createBinding||(Object.create?function(e,r,t,o){void 0===o&&(o=t);var a=Object.getOwnPropertyDescriptor(r,t);a&&!("get"in a?!r.__esModule:a.writable||a.configurable)||(a={enumerable:!0,get:function(){return r[t]}}),Object.defineProperty(e,o,a)}:function(e,r,t,o){void 0===o&&(o=t),e[o]=r[t]}),__setModuleDefault=this&&this.__setModuleDefault||(Object.create?function(e,r){Object.defineProperty(e,"default",{enumerable:!0,value:r})}:function(e,r){e.default=r}),__importStar=this&&this.__importStar||function(){var e=function(r){return e=Object.getOwnPropertyNames||function(e){var r=[];for(var t in e)Object.prototype.hasOwnProperty.call(e,t)&&(r[r.length]=t);return r},e(r)};return function(r){if(r&&r.__esModule)return r;var t={};if(null!=r)for(var o=e(r),a=0;a<o.length;a++)"default"!==o[a]&&__createBinding(t,r,o[a]);return __setModuleDefault(t,r),t}}(),__importDefault=this&&this.__importDefault||function(e){return e&&e.__esModule?e:{default:e}};Object.defineProperty(exports,"__esModule",{value:!0}),exports.providerContext=void 0;const axios_1=__importDefault(require("axios")),getBaseUrl_1=require("./getBaseUrl"),headers_1=require("./headers"),cheerio=__importStar(require("cheerio")),hubcloudExtractor_1=require("./hubcloudExtractor"),gofileExtracter_1=require("./gofileExtracter"),superVideoExtractor_1=require("./superVideoExtractor"),gdflixExtractor_1=require("./gdflixExtractor"),react_native_aes_crypto_1=__importDefault(require("react-native-aes-crypto")),extractors={hubcloudExtracter:hubcloudExtractor_1.hubcloudExtracter,gofileExtracter:gofileExtracter_1.gofileExtracter,superVideoExtractor:superVideoExtractor_1.superVideoExtractor,gdFlixExtracter:gdflixExtractor_1.gdFlixExtracter};exports.providerContext={axios:axios_1.default,getBaseUrl:getBaseUrl_1.getBaseUrl,commonHeaders:headers_1.headers,Aes:react_native_aes_crypto_1.default,cheerio:cheerio,extractors:extractors};
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.providerContext = void 0;
+const axios_1 = __importDefault(require("axios"));
+const getBaseUrl_1 = require("./getBaseUrl");
+const headers_1 = require("./headers");
+const cheerio = __importStar(require("cheerio"));
+const hubcloudExtractor_1 = require("./hubcloudExtractor");
+const gofileExtracter_1 = require("./gofileExtracter");
+const superVideoExtractor_1 = require("./superVideoExtractor");
+const gdflixExtractor_1 = require("./gdflixExtractor");
+const react_native_aes_crypto_1 = __importDefault(require("react-native-aes-crypto"));
+/**
+ * Context for provider functions.
+ * This context is used to pass common dependencies to provider functions.
+ */
+const extractors = {
+    hubcloudExtracter: hubcloudExtractor_1.hubcloudExtracter,
+    gofileExtracter: gofileExtracter_1.gofileExtracter,
+    superVideoExtractor: superVideoExtractor_1.superVideoExtractor,
+    gdFlixExtracter: gdflixExtractor_1.gdFlixExtracter,
+};
+exports.providerContext = {
+    axios: axios_1.default,
+    getBaseUrl: getBaseUrl_1.getBaseUrl,
+    commonHeaders: headers_1.headers,
+    Aes: react_native_aes_crypto_1.default,
+    cheerio,
+    extractors,
+};

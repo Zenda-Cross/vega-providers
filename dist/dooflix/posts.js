@@ -1,1 +1,154 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,i,n){return new(i||(i=Promise))(function(s,r){function o(t){try{a(n.next(t))}catch(t){r(t)}}function l(t){try{a(n.throw(t))}catch(t){r(t)}}function a(t){var e;t.done?s(t.value):(e=t.value,e instanceof i?e:new i(function(t){t(e)})).then(o,l)}a((n=n.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getSearchPosts=exports.getPosts=void 0;const headers={"Accept-Encoding":"gzip","API-KEY":"2pm95lc6prpdbk0ppji9rsqo",Connection:"Keep-Alive","If-Modified-Since":"Wed, 14 Aug 2024 13:00:04 GMT","User-Agent":"okhttp/3.14.9"},getPosts=function(t){return __awaiter(this,arguments,void 0,function*({filter:t,page:e,signal:i,providerContext:n}){try{const{axios:s,getBaseUrl:r}=n,o=yield r("dooflix"),l=[],a=""+(o+t+`?page=${e}`),d=(yield s.get(a,{headers:headers,signal:i})).data;if(!d||"string"!=typeof d)return[];let u;try{const t=d.indexOf("["),e=d.lastIndexOf("]")+1;if(-1===t||e<=t)u=JSON.parse(d);else{const i=d.substring(t,e),n=JSON.parse(i);u=n.length>0?n:d}}catch(t){return[]}return Array.isArray(u)?(u.forEach(t=>{const e=null==t?void 0:t.videos_id;if(!e)return;const i=(null==t?void 0:t.is_tvseries)?"movie":"tvseries",n=`${o}/rest-api//v130/single_details?type=${i}&id=${e}`,s=null==t?void 0:t.thumbnail_url,r=(null==s?void 0:s.includes("https"))?s:null==s?void 0:s.replace("http","https");l.push({title:(null==t?void 0:t.title)||"",link:n,image:r})}),l):[]}catch(t){return[]}})};exports.getPosts=getPosts;const getSearchPosts=function(t){return __awaiter(this,arguments,void 0,function*({searchQuery:t,page:e,providerContext:i,signal:n}){var s,r;try{if(e>1)return[];const{axios:o,getBaseUrl:l}=i,a=[],d=yield l("dooflix"),u=`${d}/rest-api//v130/search?q=${t}&type=movietvserieslive&range_to=0&range_from=0&tv_category_id=0&genre_id=0&country_id=0`,c=(yield o.get(u,{headers:headers,signal:n})).data;if(!c||"string"!=typeof c)return[];let v;try{const t=c.indexOf("{"),e=c.lastIndexOf("}")+1;if(-1===t||e<=t)v=c;else{const i=c.substring(t,e),n=JSON.parse(i);v=(null==n?void 0:n.movie)?n:c}}catch(t){return[]}return null===(s=null==v?void 0:v.movie)||void 0===s||s.forEach(t=>{const e=null==t?void 0:t.videos_id;if(!e)return;const i=`${d}/rest-api//v130/single_details?type=movie&id=${e}`,n=null==t?void 0:t.thumbnail_url,s=(null==n?void 0:n.includes("https"))?n:null==n?void 0:n.replace("http","https");a.push({title:(null==t?void 0:t.title)||"",link:i,image:s})}),null===(r=null==v?void 0:v.tvseries)||void 0===r||r.forEach(t=>{const e=null==t?void 0:t.videos_id;if(!e)return;const i=`${d}/rest-api//v130/single_details?type=tvseries&id=${e}`,n=null==t?void 0:t.thumbnail_url,s=(null==n?void 0:n.includes("https"))?n:null==n?void 0:n.replace("http","https");a.push({title:(null==t?void 0:t.title)||"",link:i,image:s})}),a}catch(t){return[]}})};exports.getSearchPosts=getSearchPosts;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getSearchPosts = exports.getPosts = void 0;
+const headers = {
+    "Accept-Encoding": "gzip",
+    "API-KEY": "2pm95lc6prpdbk0ppji9rsqo",
+    Connection: "Keep-Alive",
+    "If-Modified-Since": "Wed, 14 Aug 2024 13:00:04 GMT",
+    "User-Agent": "okhttp/3.14.9",
+};
+const getPosts = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ filter, page, signal, providerContext, }) {
+        try {
+            const { axios, getBaseUrl } = providerContext;
+            const baseUrl = yield getBaseUrl("dooflix");
+            const catalog = [];
+            const url = `${baseUrl + filter + `?page=${page}`}`;
+            const res = yield axios.get(url, { headers, signal });
+            const resData = res.data;
+            if (!resData || typeof resData !== "string") {
+                console.warn("Unexpected response format from dooflix API");
+                return [];
+            }
+            let data;
+            try {
+                const jsonStart = resData.indexOf("[");
+                const jsonEnd = resData.lastIndexOf("]") + 1;
+                if (jsonStart === -1 || jsonEnd <= jsonStart) {
+                    // If we can't find valid JSON array markers, try parsing the entire response
+                    data = JSON.parse(resData);
+                }
+                else {
+                    const jsonSubstring = resData.substring(jsonStart, jsonEnd);
+                    const parsedArray = JSON.parse(jsonSubstring);
+                    data = parsedArray.length > 0 ? parsedArray : resData;
+                }
+            }
+            catch (parseError) {
+                console.error("Error parsing dooflix response:", parseError);
+                return [];
+            }
+            if (!Array.isArray(data)) {
+                console.warn("Unexpected data format from dooflix API");
+                return [];
+            }
+            data.forEach((result) => {
+                const id = result === null || result === void 0 ? void 0 : result.videos_id;
+                if (!id)
+                    return;
+                const type = !(result === null || result === void 0 ? void 0 : result.is_tvseries) ? "tvseries" : "movie";
+                const link = `${baseUrl}/rest-api//v130/single_details?type=${type}&id=${id}`;
+                const thumbnailUrl = result === null || result === void 0 ? void 0 : result.thumbnail_url;
+                const image = (thumbnailUrl === null || thumbnailUrl === void 0 ? void 0 : thumbnailUrl.includes("https"))
+                    ? thumbnailUrl
+                    : thumbnailUrl === null || thumbnailUrl === void 0 ? void 0 : thumbnailUrl.replace("http", "https");
+                catalog.push({
+                    title: (result === null || result === void 0 ? void 0 : result.title) || "",
+                    link,
+                    image,
+                });
+            });
+            return catalog;
+        }
+        catch (err) {
+            console.error("dooflix error:", err);
+            return [];
+        }
+    });
+};
+exports.getPosts = getPosts;
+const getSearchPosts = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ searchQuery, page, providerContext, signal, }) {
+        var _b, _c;
+        try {
+            if (page > 1) {
+                return [];
+            }
+            const { axios, getBaseUrl } = providerContext;
+            const catalog = [];
+            const baseUrl = yield getBaseUrl("dooflix");
+            const url = `${baseUrl}/rest-api//v130/search?q=${searchQuery}&type=movietvserieslive&range_to=0&range_from=0&tv_category_id=0&genre_id=0&country_id=0`;
+            const res = yield axios.get(url, { headers, signal });
+            const resData = res.data;
+            if (!resData || typeof resData !== "string") {
+                console.warn("Unexpected search response format from dooflix API");
+                return [];
+            }
+            let data;
+            try {
+                const jsonStart = resData.indexOf("{");
+                const jsonEnd = resData.lastIndexOf("}") + 1;
+                if (jsonStart === -1 || jsonEnd <= jsonStart) {
+                    data = resData;
+                }
+                else {
+                    const jsonSubstring = resData.substring(jsonStart, jsonEnd);
+                    const parsedData = JSON.parse(jsonSubstring);
+                    data = (parsedData === null || parsedData === void 0 ? void 0 : parsedData.movie) ? parsedData : resData;
+                }
+            }
+            catch (parseError) {
+                console.error("Error parsing dooflix search response:", parseError);
+                return [];
+            }
+            // Process movies
+            (_b = data === null || data === void 0 ? void 0 : data.movie) === null || _b === void 0 ? void 0 : _b.forEach((result) => {
+                const id = result === null || result === void 0 ? void 0 : result.videos_id;
+                if (!id)
+                    return;
+                const link = `${baseUrl}/rest-api//v130/single_details?type=movie&id=${id}`;
+                const thumbnailUrl = result === null || result === void 0 ? void 0 : result.thumbnail_url;
+                const image = (thumbnailUrl === null || thumbnailUrl === void 0 ? void 0 : thumbnailUrl.includes("https"))
+                    ? thumbnailUrl
+                    : thumbnailUrl === null || thumbnailUrl === void 0 ? void 0 : thumbnailUrl.replace("http", "https");
+                catalog.push({
+                    title: (result === null || result === void 0 ? void 0 : result.title) || "",
+                    link,
+                    image,
+                });
+            });
+            // Process TV series
+            (_c = data === null || data === void 0 ? void 0 : data.tvseries) === null || _c === void 0 ? void 0 : _c.forEach((result) => {
+                const id = result === null || result === void 0 ? void 0 : result.videos_id;
+                if (!id)
+                    return;
+                const link = `${baseUrl}/rest-api//v130/single_details?type=tvseries&id=${id}`;
+                const thumbnailUrl = result === null || result === void 0 ? void 0 : result.thumbnail_url;
+                const image = (thumbnailUrl === null || thumbnailUrl === void 0 ? void 0 : thumbnailUrl.includes("https"))
+                    ? thumbnailUrl
+                    : thumbnailUrl === null || thumbnailUrl === void 0 ? void 0 : thumbnailUrl.replace("http", "https");
+                catalog.push({
+                    title: (result === null || result === void 0 ? void 0 : result.title) || "",
+                    link,
+                    image,
+                });
+            });
+            return catalog;
+        }
+        catch (error) {
+            console.error("dooflix search error:", error);
+            return [];
+        }
+    });
+};
+exports.getSearchPosts = getSearchPosts;

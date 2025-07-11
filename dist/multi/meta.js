@@ -1,1 +1,87 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,i,n){return new(i||(i=Promise))(function(s,r){function o(t){try{c(n.next(t))}catch(t){r(t)}}function a(t){try{c(n.throw(t))}catch(t){r(t)}}function c(t){var e;t.done?s(t.value):(e=t.value,e instanceof i?e:new i(function(t){t(e)})).then(o,a)}c((n=n.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getMeta=void 0;const getMeta=function(t){return __awaiter(this,arguments,void 0,function*({link:t,providerContext:e}){try{const{axios:i,cheerio:n}=e,s=t,r=(yield i.get(s)).data,o=n.load(r),a=s.includes("tvshows")?"series":"movie",c="",d=s.split("/")[4].replace(/-/g," "),l=o(".g-item").find("a").attr("href")||"",p=o(".wp-content").find("p").text()||"",u=[];return"series"===a?o("#seasons").children().map((t,e)=>{const i=o(e).find(".title").children().remove().end().text();let n=[];o(e).find(".episodios").children().map((t,e)=>{const i="Episode"+o(e).find(".numerando").text().trim().split("-")[1],s=o(e).find("a").attr("href");i&&s&&n.push({title:i,link:s})}),i&&n.length>0&&u.push({title:i,directLinks:n})}):u.push({title:d,directLinks:[{title:d,link:s.slice(0,-1),type:"movie"}]}),{title:d,synopsis:p,image:l,imdbId:c,type:a,linkList:u}}catch(t){return{title:"",synopsis:"",image:"",imdbId:"",type:"movie",linkList:[]}}})};exports.getMeta=getMeta;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getMeta = void 0;
+const getMeta = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link, providerContext, }) {
+        try {
+            const { axios, cheerio } = providerContext;
+            const url = link;
+            const res = yield axios.get(url);
+            const data = res.data;
+            const $ = cheerio.load(data);
+            const type = url.includes("tvshows") ? "series" : "movie";
+            const imdbId = "";
+            const title = url.split("/")[4].replace(/-/g, " ");
+            const image = $(".g-item").find("a").attr("href") || "";
+            const synopsis = $(".wp-content").find("p").text() || "";
+            // Links
+            const links = [];
+            if (type === "series") {
+                $("#seasons")
+                    .children()
+                    .map((i, element) => {
+                    const title = $(element)
+                        .find(".title")
+                        .children()
+                        .remove()
+                        .end()
+                        .text();
+                    let episodesList = [];
+                    $(element)
+                        .find(".episodios")
+                        .children()
+                        .map((i, element) => {
+                        const title = "Episode" +
+                            $(element).find(".numerando").text().trim().split("-")[1];
+                        const link = $(element).find("a").attr("href");
+                        if (title && link) {
+                            episodesList.push({ title, link });
+                        }
+                    });
+                    if (title && episodesList.length > 0) {
+                        links.push({
+                            title,
+                            directLinks: episodesList,
+                        });
+                    }
+                });
+            }
+            else {
+                links.push({
+                    title: title,
+                    directLinks: [{ title: title, link: url.slice(0, -1), type: "movie" }],
+                });
+            }
+            // console.log('multi meta', links);
+            return {
+                title,
+                synopsis,
+                image,
+                imdbId,
+                type,
+                linkList: links,
+            };
+        }
+        catch (err) {
+            console.error(err);
+            return {
+                title: "",
+                synopsis: "",
+                image: "",
+                imdbId: "",
+                type: "movie",
+                linkList: [],
+            };
+        }
+    });
+};
+exports.getMeta = getMeta;

@@ -1,1 +1,68 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,r,n){return new(r||(r=Promise))(function(i,o){function s(t){try{c(n.next(t))}catch(t){o(t)}}function a(t){try{c(n.throw(t))}catch(t){o(t)}}function c(t){var e;t.done?i(t.value):(e=t.value,e instanceof r?e:new r(function(t){t(e)})).then(s,a)}c((n=n.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getSearchPosts=exports.getPosts=void 0;const hdbHeaders={Cookie:"xla=s4t",Referer:"https://google.com","User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"},getPosts=function(t){return __awaiter(this,arguments,void 0,function*({filter:t,page:e,signal:r,providerContext:n}){const{getBaseUrl:i}=n;return posts({url:`${(yield i("hdhub"))+t}/page/${e}/`,signal:r,providerContext:n})})};exports.getPosts=getPosts;const getSearchPosts=function(t){return __awaiter(this,arguments,void 0,function*({searchQuery:t,page:e,signal:r,providerContext:n}){const{getBaseUrl:i}=n;return posts({url:`${yield i("hdhub")}/page/${e}/?s=${t}`,signal:r,providerContext:n})})};function posts(t){return __awaiter(this,arguments,void 0,function*({url:t,signal:e,providerContext:r}){const{cheerio:n}=r;try{const r=yield fetch(t,{headers:hdbHeaders,signal:e}),i=yield r.text(),o=n.load(i),s=[];return o(".recent-movies").children().map((t,e)=>{const r=o(e).find("figure").find("img").attr("alt"),n=o(e).find("a").attr("href"),i=o(e).find("figure").find("img").attr("src");r&&n&&i&&s.push({title:r.replace("Download","").trim(),link:n,image:i})}),s}catch(t){return[]}})}exports.getSearchPosts=getSearchPosts;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getSearchPosts = exports.getPosts = void 0;
+const hdbHeaders = {
+    Cookie: "xla=s4t",
+    Referer: "https://google.com",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+};
+const getPosts = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ filter, page, signal, providerContext, }) {
+        const { getBaseUrl } = providerContext;
+        const baseUrl = yield getBaseUrl("hdhub");
+        const url = `${baseUrl + filter}/page/${page}/`;
+        return posts({ url, signal, providerContext });
+    });
+};
+exports.getPosts = getPosts;
+const getSearchPosts = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ searchQuery, page, signal, providerContext, }) {
+        const { getBaseUrl } = providerContext;
+        const baseUrl = yield getBaseUrl("hdhub");
+        const url = `${baseUrl}/page/${page}/?s=${searchQuery}`;
+        return posts({ url, signal, providerContext });
+    });
+};
+exports.getSearchPosts = getSearchPosts;
+function posts(_a) {
+    return __awaiter(this, arguments, void 0, function* ({ url, signal, providerContext, }) {
+        const { cheerio } = providerContext;
+        try {
+            const res = yield fetch(url, {
+                headers: hdbHeaders,
+                signal,
+            });
+            const data = yield res.text();
+            const $ = cheerio.load(data);
+            const catalog = [];
+            $(".recent-movies")
+                .children()
+                .map((i, element) => {
+                const title = $(element).find("figure").find("img").attr("alt");
+                const link = $(element).find("a").attr("href");
+                const image = $(element).find("figure").find("img").attr("src");
+                if (title && link && image) {
+                    catalog.push({
+                        title: title.replace("Download", "").trim(),
+                        link: link,
+                        image: image,
+                    });
+                }
+            });
+            return catalog;
+        }
+        catch (err) {
+            console.error("hdhubGetPosts error ", err);
+            return [];
+        }
+    });
+}

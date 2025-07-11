@@ -1,1 +1,73 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,i,a){return new(i||(i=Promise))(function(s,n){function r(t){try{l(a.next(t))}catch(t){n(t)}}function o(t){try{l(a.throw(t))}catch(t){n(t)}}function l(t){var e;t.done?s(t.value):(e=t.value,e instanceof i?e:new i(function(t){t(e)})).then(r,o)}l((a=a.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getSearchPosts=exports.getPosts=void 0;const getPosts=function(t){return __awaiter(this,arguments,void 0,function*({filter:t,signal:e,providerContext:i}){var a;const{getBaseUrl:s,axios:n}=i,r=yield s("kissKh"),o=`${r+t}&type=0`;try{const t=null===(a=(yield n.get(o,{signal:e})).data)||void 0===a?void 0:a.data,i=[];return null==t||t.map(t=>{const e=t.title,a=r+`/api/DramaList/Drama/${null==t?void 0:t.id}?isq=false`,s=t.thumbnail;e&&a&&s&&i.push({title:e,link:a,image:s})}),i}catch(t){return[]}})};exports.getPosts=getPosts;const getSearchPosts=function(t){return __awaiter(this,arguments,void 0,function*({searchQuery:t,signal:e,providerContext:i}){const{getBaseUrl:a,axios:s}=i,n=yield a("kissKh"),r=`${n}/api/DramaList/Search?q=${t}&type=0`;try{const t=(yield s.get(r,{signal:e})).data,i=[];return null==t||t.map(t=>{const e=t.title,a=n+`/api/DramaList/Drama/${null==t?void 0:t.id}?isq=false`,s=t.thumbnail;e&&a&&s&&i.push({title:e,link:a,image:s})}),i}catch(t){return[]}})};exports.getSearchPosts=getSearchPosts;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getSearchPosts = exports.getPosts = void 0;
+const getPosts = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ filter, signal, providerContext, }) {
+        var _b;
+        const { getBaseUrl, axios } = providerContext;
+        const baseUrl = yield getBaseUrl("kissKh");
+        const url = `${baseUrl + filter}&type=0`;
+        try {
+            const res = yield axios.get(url, { signal });
+            const data = (_b = res.data) === null || _b === void 0 ? void 0 : _b.data;
+            const catalog = [];
+            data === null || data === void 0 ? void 0 : data.map((element) => {
+                const title = element.title;
+                const link = baseUrl + `/api/DramaList/Drama/${element === null || element === void 0 ? void 0 : element.id}?isq=false`;
+                const image = element.thumbnail;
+                if (title && link && image) {
+                    catalog.push({
+                        title: title,
+                        link: link,
+                        image: image,
+                    });
+                }
+            });
+            return catalog;
+        }
+        catch (err) {
+            console.error("kiss error ", err);
+            return [];
+        }
+    });
+};
+exports.getPosts = getPosts;
+const getSearchPosts = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ searchQuery, signal, providerContext, }) {
+        const { getBaseUrl, axios } = providerContext;
+        const baseUrl = yield getBaseUrl("kissKh");
+        const url = `${baseUrl}/api/DramaList/Search?q=${searchQuery}&type=0`;
+        try {
+            const res = yield axios.get(url, { signal });
+            const data = res.data;
+            const catalog = [];
+            data === null || data === void 0 ? void 0 : data.map((element) => {
+                const title = element.title;
+                const link = baseUrl + `/api/DramaList/Drama/${element === null || element === void 0 ? void 0 : element.id}?isq=false`;
+                const image = element.thumbnail;
+                if (title && link && image) {
+                    catalog.push({
+                        title: title,
+                        link: link,
+                        image: image,
+                    });
+                }
+            });
+            return catalog;
+        }
+        catch (err) {
+            console.error("kiss error ", err);
+            return [];
+        }
+    });
+};
+exports.getSearchPosts = getSearchPosts;

@@ -1,1 +1,25 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,n,r){return new(n||(n=Promise))(function(i,o){function a(t){try{c(r.next(t))}catch(t){o(t)}}function u(t){try{c(r.throw(t))}catch(t){o(t)}}function c(t){var e;t.done?i(t.value):(e=t.value,e instanceof n?e:new n(function(t){t(e)})).then(a,u)}c((r=r.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getStream=void 0;const getStream=function(t){return __awaiter(this,arguments,void 0,function*({link:t}){const e=[],n=JSON.parse(t);return e.push({link:n.url,server:n.server,type:"mkv"}),e})};exports.getStream=getStream;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getStream = void 0;
+const getStream = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link: data, }) {
+        const streamLinks = [];
+        const dataJson = JSON.parse(data);
+        streamLinks.push({
+            link: dataJson.url,
+            server: dataJson.server,
+            type: "mkv",
+        });
+        return streamLinks;
+    });
+};
+exports.getStream = getStream;

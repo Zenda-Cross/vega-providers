@@ -1,1 +1,211 @@
-"use strict";var __createBinding=this&&this.__createBinding||(Object.create?function(e,t,r,i){void 0===i&&(i=r);var a=Object.getOwnPropertyDescriptor(t,r);a&&!("get"in a?!t.__esModule:a.writable||a.configurable)||(a={enumerable:!0,get:function(){return t[r]}}),Object.defineProperty(e,i,a)}:function(e,t,r,i){void 0===i&&(i=r),e[i]=t[r]}),__setModuleDefault=this&&this.__setModuleDefault||(Object.create?function(e,t){Object.defineProperty(e,"default",{enumerable:!0,value:t})}:function(e,t){e.default=t}),__importStar=this&&this.__importStar||function(){var e=function(t){return e=Object.getOwnPropertyNames||function(e){var t=[];for(var r in e)Object.prototype.hasOwnProperty.call(e,r)&&(t[t.length]=r);return t},e(t)};return function(t){if(t&&t.__esModule)return t;var r={};if(null!=t)for(var i=e(t),a=0;a<i.length;a++)"default"!==i[a]&&__createBinding(r,t,i[a]);return __setModuleDefault(r,t),r}}(),__awaiter=this&&this.__awaiter||function(e,t,r,i){return new(r||(r=Promise))(function(a,n){function o(e){try{s(i.next(e))}catch(e){n(e)}}function d(e){try{s(i.throw(e))}catch(e){n(e)}}function s(e){var t;e.done?a(e.value):(t=e.value,t instanceof r?t:new r(function(e){e(t)})).then(o,d)}s((i=i.apply(e,t||[])).next())})},__importDefault=this&&this.__importDefault||function(e){return e&&e.__esModule?e:{default:e}};Object.defineProperty(exports,"__esModule",{value:!0}),exports.gdFlixExtracter=gdFlixExtracter;const axios_1=__importDefault(require("axios")),cheerio=__importStar(require("cheerio")),headers_1=require("./headers");function gdFlixExtracter(e,t){return __awaiter(this,void 0,void 0,function*(){var r,i,a,n,o,d,s;try{const l=[],c=(yield(0,axios_1.default)(`${e}`,{headers:headers_1.headers,signal:t})).data;let u=cheerio.load(c);if(null===(r=u("body").attr("onload"))||void 0===r?void 0:r.includes("location.replace")){const e=null===(n=null===(a=null===(i=u("body").attr("onload"))||void 0===i?void 0:i.split("location.replace('"))||void 0===a?void 0:a[1].split("'"))||void 0===n?void 0:n[0];if(e){const r=yield axios_1.default.get(e,{headers:headers_1.headers,signal:t});u=cheerio.load(r.data)}}try{const t=e.split("/").slice(0,3).join("/"),r=u(".btn-secondary").attr("href")||"";if(r.includes("indexbot")){const e=yield axios_1.default.get(r,{headers:headers_1.headers}),t=e.data.match(/formData\.append\('token', '([a-f0-9]+)'\)/)[1],i=new FormData;i.append("token",t);const a=e.data.match(/fetch\('\/download\?id=([a-zA-Z0-9\/+]+)'/)[1],n=r.split("/download")[0],o=yield fetch(n+"/download?id="+a,{method:"POST",body:i,headers:{Referer:r,Cookie:"PHPSESSID=7e9658ce7c805dab5bbcea9046f7f308"}}),d=yield o.json();l.push({server:"ResumeBot",link:d.url,type:"mkv"})}else{const e=t+r,i=(yield axios_1.default.get(e,{headers:headers_1.headers})).data,a=cheerio.load(i)(".btn-success").attr("href");a&&l.push({server:"ResumeCloud",link:a,type:"mkv"})}}catch(e){}try{const e=u(".btn-danger").attr("href")||"";if(e.includes("?url=")){const t=e.split("=")[1],r=new FormData;r.append("keys",t);const i=e.split("/").slice(0,3).join("/")+"/api",a=yield fetch(i,{method:"POST",body:r,headers:{"x-token":i}}),n=yield a.json();if(!1===n.error){const e=n.url;l.push({server:"Gdrive-Instant",link:e,type:"mkv"})}}else{const r=(null===(s=null===(d=null===(o=(yield axios_1.default.head(e,{headers:headers_1.headers,signal:t})).request)||void 0===o?void 0:o.responseURL)||void 0===d?void 0:d.split("?url="))||void 0===s?void 0:s[1])||e;l.push({server:"G-Drive",link:r,type:"mkv"})}}catch(e){}return l}catch(e){return[]}})}
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.gdFlixExtracter = gdFlixExtracter;
+const axios_1 = __importDefault(require("axios"));
+const cheerio = __importStar(require("cheerio"));
+const headers_1 = require("./headers");
+function gdFlixExtracter(link, signal) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b, _c, _d, _e, _f, _g, _h;
+        try {
+            const streamLinks = [];
+            const res = yield (0, axios_1.default)(`${link}`, { headers: headers_1.headers, signal });
+            console.log('gdFlixExtracter', link);
+            const data = res.data;
+            let $drive = cheerio.load(data);
+            // handle if redirected to another link
+            if ((_a = $drive('body').attr('onload')) === null || _a === void 0 ? void 0 : _a.includes('location.replace')) {
+                const newLink = (_d = (_c = (_b = $drive('body')
+                    .attr('onload')) === null || _b === void 0 ? void 0 : _b.split("location.replace('")) === null || _c === void 0 ? void 0 : _c[1].split("'")) === null || _d === void 0 ? void 0 : _d[0];
+                console.log('newLink', newLink);
+                if (newLink) {
+                    const newRes = yield axios_1.default.get(newLink, { headers: headers_1.headers, signal });
+                    $drive = cheerio.load(newRes.data);
+                }
+            }
+            // try {
+            //   const resumeBot = $drive('.fab.fa-artstation').prev().attr('href') || '';
+            //   console.log('resumeBot', resumeBot);
+            //   const resumeBotRes = await axios.get(resumeBot, {headers});
+            //   const resumeBotToken = resumeBotRes.data.match(
+            //     /formData\.append\('token', '([a-f0-9]+)'\)/,
+            //   )[1];
+            //   const resumeBotBody = new FormData();
+            //   resumeBotBody.append('token', resumeBotToken);
+            //   const resumeBotPath = resumeBotRes.data.match(
+            //     /fetch\('\/download\?id=([a-zA-Z0-9\/+]+)'/,
+            //   )[1];
+            //   const resumeBotBaseUrl = resumeBot.split('/download')[0];
+            //   // console.log(
+            //   //   'resumeBotPath',
+            //   //   resumeBotBaseUrl + '/download?id=' + resumeBotPath,
+            //   // );
+            //   // console.log('resumeBotBody', resumeBotToken);
+            //   const resumeBotDownload = await fetch(
+            //     resumeBotBaseUrl + '/download?id=' + resumeBotPath,
+            //     {
+            //       method: 'POST',
+            //       body: resumeBotBody,
+            //       headers: {
+            //         Referer: resumeBot,
+            //         Cookie: 'PHPSESSID=7e9658ce7c805dab5bbcea9046f7f308',
+            //       },
+            //     },
+            //   );
+            //   const resumeBotDownloadData = await resumeBotDownload.json();
+            //   console.log('resumeBotDownloadData', resumeBotDownloadData.url);
+            //   streamLinks.push({
+            //     server: 'ResumeBot',
+            //     link: resumeBotDownloadData.url,
+            //     type: 'mkv',
+            //   });
+            // } catch (err) {
+            //   console.log('ResumeBot link not found', err);
+            // }
+            /// resume cloud
+            try {
+                const baseUrl = link.split('/').slice(0, 3).join('/');
+                const resumeDrive = $drive('.btn-secondary').attr('href') || '';
+                console.log('resumeDrive', resumeDrive);
+                if (resumeDrive.includes('indexbot')) {
+                    const resumeBotRes = yield axios_1.default.get(resumeDrive, { headers: headers_1.headers });
+                    const resumeBotToken = resumeBotRes.data.match(/formData\.append\('token', '([a-f0-9]+)'\)/)[1];
+                    const resumeBotBody = new FormData();
+                    resumeBotBody.append('token', resumeBotToken);
+                    const resumeBotPath = resumeBotRes.data.match(/fetch\('\/download\?id=([a-zA-Z0-9\/+]+)'/)[1];
+                    const resumeBotBaseUrl = resumeDrive.split('/download')[0];
+                    // console.log(
+                    //   'resumeBotPath',
+                    //   resumeBotBaseUrl + '/download?id=' + resumeBotPath,
+                    // );
+                    // console.log('resumeBotBody', resumeBotToken);
+                    const resumeBotDownload = yield fetch(resumeBotBaseUrl + '/download?id=' + resumeBotPath, {
+                        method: 'POST',
+                        body: resumeBotBody,
+                        headers: {
+                            Referer: resumeDrive,
+                            Cookie: 'PHPSESSID=7e9658ce7c805dab5bbcea9046f7f308',
+                        },
+                    });
+                    const resumeBotDownloadData = yield resumeBotDownload.json();
+                    console.log('resumeBotDownloadData', resumeBotDownloadData.url);
+                    streamLinks.push({
+                        server: 'ResumeBot',
+                        link: resumeBotDownloadData.url,
+                        type: 'mkv',
+                    });
+                }
+                else {
+                    const url = baseUrl + resumeDrive;
+                    const resumeDriveRes = yield axios_1.default.get(url, { headers: headers_1.headers });
+                    const resumeDriveHtml = resumeDriveRes.data;
+                    const $resumeDrive = cheerio.load(resumeDriveHtml);
+                    const resumeLink = $resumeDrive('.btn-success').attr('href');
+                    //   console.log('resumeLink', resumeLink);
+                    if (resumeLink) {
+                        streamLinks.push({
+                            server: 'ResumeCloud',
+                            link: resumeLink,
+                            type: 'mkv',
+                        });
+                    }
+                }
+            }
+            catch (err) {
+                console.log('Resume link not found');
+            }
+            //instant link
+            try {
+                const seed = $drive('.btn-danger').attr('href') || '';
+                console.log('seed', seed);
+                if (!seed.includes('?url=')) {
+                    const newLinkRes = yield axios_1.default.head(seed, { headers: headers_1.headers, signal });
+                    console.log('newLinkRes', (_e = newLinkRes.request) === null || _e === void 0 ? void 0 : _e.responseURL);
+                    const newLink = ((_h = (_g = (_f = newLinkRes.request) === null || _f === void 0 ? void 0 : _f.responseURL) === null || _g === void 0 ? void 0 : _g.split('?url=')) === null || _h === void 0 ? void 0 : _h[1]) || seed;
+                    streamLinks.push({ server: 'G-Drive', link: newLink, type: 'mkv' });
+                }
+                else {
+                    const instantToken = seed.split('=')[1];
+                    //   console.log('InstantToken', instantToken);
+                    const InstantFromData = new FormData();
+                    InstantFromData.append('keys', instantToken);
+                    const videoSeedUrl = seed.split('/').slice(0, 3).join('/') + '/api';
+                    //   console.log('videoSeedUrl', videoSeedUrl);
+                    const instantLinkRes = yield fetch(videoSeedUrl, {
+                        method: 'POST',
+                        body: InstantFromData,
+                        headers: {
+                            'x-token': videoSeedUrl,
+                        },
+                    });
+                    const instantLinkData = yield instantLinkRes.json();
+                    //   console.log('instantLinkData', instantLinkData);
+                    if (instantLinkData.error === false) {
+                        const instantLink = instantLinkData.url;
+                        streamLinks.push({
+                            server: 'Gdrive-Instant',
+                            link: instantLink,
+                            type: 'mkv',
+                        });
+                    }
+                    else {
+                        console.log('Instant link not found', instantLinkData);
+                    }
+                }
+            }
+            catch (err) {
+                console.log('Instant link not found', err);
+            }
+            return streamLinks;
+        }
+        catch (error) {
+            console.log('gdflix error: ', error);
+            return [];
+        }
+    });
+}

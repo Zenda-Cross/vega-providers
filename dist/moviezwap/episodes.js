@@ -1,1 +1,46 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(e,t,o,n){return new(o||(o=Promise))(function(i,r){function a(e){try{d(n.next(e))}catch(e){r(e)}}function s(e){try{d(n.throw(e))}catch(e){r(e)}}function d(e){var t;e.done?i(e.value):(t=e.value,t instanceof o?t:new o(function(e){e(t)})).then(a,s)}d((n=n.apply(e,t||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getEpisodes=void 0;const getEpisodes=function(e){return __awaiter(this,arguments,void 0,function*({url:e,providerContext:t}){const{axios:o,cheerio:n,getBaseUrl:i}=t;try{const t=yield o.get(e),r=yield i("moviezwap"),a=t.data,s=n.load(a),d=[];return s('a[href*="download.php?file="], a[href*="dwload.php?file="]').each((e,t)=>{var o;const n=(null===(o=s(t).attr("href"))||void 0===o?void 0:o.replace("dwload.php","download.php"))||"";let i=s(t).text().trim();i.includes("Download page")&&(i="Play"),n&&i&&d.push({title:i,link:r+n})}),d}catch(e){return[]}})};exports.getEpisodes=getEpisodes;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getEpisodes = void 0;
+const getEpisodes = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ url, providerContext, }) {
+        const { axios, cheerio, getBaseUrl } = providerContext;
+        try {
+            const res = yield axios.get(url);
+            const baseUrl = yield getBaseUrl("moviezwap");
+            const html = res.data;
+            const $ = cheerio.load(html);
+            const episodeLinks = [];
+            $('a[href*="download.php?file="], a[href*="dwload.php?file="]').each((i, el) => {
+                var _a;
+                const downloadPage = ((_a = $(el).attr("href")) === null || _a === void 0 ? void 0 : _a.replace("dwload.php", "download.php")) || "";
+                let text = $(el).text().trim();
+                if (text.includes("Download page")) {
+                    // Remove "Download" from the text
+                    text = "Play";
+                }
+                if (downloadPage && text) {
+                    // Only add links with quality in text
+                    episodeLinks.push({
+                        title: text,
+                        link: baseUrl + downloadPage,
+                    });
+                }
+            });
+            return episodeLinks;
+        }
+        catch (err) {
+            console.error(err);
+            return [];
+        }
+    });
+};
+exports.getEpisodes = getEpisodes;

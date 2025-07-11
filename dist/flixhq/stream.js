@@ -1,1 +1,68 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(e,t,i,n){return new(i||(i=Promise))(function(o,l){function r(e){try{u(n.next(e))}catch(e){l(e)}}function s(e){try{u(n.throw(e))}catch(e){l(e)}}function u(e){var t;e.done?o(e.value):(t=e.value,t instanceof i?t:new i(function(e){e(t)})).then(r,s)}u((n=n.apply(e,t||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getStream=void 0;const getStream=function(e){return __awaiter(this,arguments,void 0,function*({link:e,providerContext:t}){var i;try{const{getBaseUrl:n}=t,o=e.split("*")[0],l=e.split("*")[1],r=yield n("consumet"),s=`${r}/movies/flixhq/servers?episodeId=${o}&mediaId=${l}`,u=yield fetch(s),a=yield u.json(),c=[];for(const e of a){const t=`${r}/movies/flixhq/watch?server=`+e.name+"&episodeId="+o+"&mediaId="+l,n=yield fetch(t),s=yield n.json(),u=[];(null===(i=null==s?void 0:s.sources)||void 0===i?void 0:i.length)>0&&(s.subtitles&&s.subtitles.forEach(e=>{var t;u.push({language:null===(t=null==e?void 0:e.lang)||void 0===t?void 0:t.slice(0,2),uri:null==e?void 0:e.url,type:"text/vtt",title:null==e?void 0:e.lang})}),s.sources.forEach(t=>{var i;c.push({server:(null==e?void 0:e.name)+"-"+(null===(i=null==t?void 0:t.quality)||void 0===i?void 0:i.replace("auto","MultiQuality")),link:t.url,type:t.isM3U8?"m3u8":"mp4",subtitles:u})}))}return c}catch(e){return[]}})};exports.getStream=getStream;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getStream = void 0;
+const getStream = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link: id, providerContext, }) {
+        var _b;
+        try {
+            const { getBaseUrl } = providerContext;
+            const episodeId = id.split("*")[0];
+            const mediaId = id.split("*")[1];
+            const baseUrl = yield getBaseUrl("consumet");
+            const serverUrl = `${baseUrl}/movies/flixhq/servers?episodeId=${episodeId}&mediaId=${mediaId}`;
+            const res = yield fetch(serverUrl);
+            const servers = yield res.json();
+            const streamLinks = [];
+            for (const server of servers) {
+                const streamUrl = `${baseUrl}/movies/flixhq/watch?server=` +
+                    server.name +
+                    "&episodeId=" +
+                    episodeId +
+                    "&mediaId=" +
+                    mediaId;
+                const streamRes = yield fetch(streamUrl);
+                const streamData = yield streamRes.json();
+                const subtitles = [];
+                if (((_b = streamData === null || streamData === void 0 ? void 0 : streamData.sources) === null || _b === void 0 ? void 0 : _b.length) > 0) {
+                    if (streamData.subtitles) {
+                        streamData.subtitles.forEach((sub) => {
+                            var _a;
+                            subtitles.push({
+                                language: (_a = sub === null || sub === void 0 ? void 0 : sub.lang) === null || _a === void 0 ? void 0 : _a.slice(0, 2),
+                                uri: sub === null || sub === void 0 ? void 0 : sub.url,
+                                type: "text/vtt",
+                                title: sub === null || sub === void 0 ? void 0 : sub.lang,
+                            });
+                        });
+                    }
+                    streamData.sources.forEach((source) => {
+                        var _a;
+                        streamLinks.push({
+                            server: (server === null || server === void 0 ? void 0 : server.name) +
+                                "-" +
+                                ((_a = source === null || source === void 0 ? void 0 : source.quality) === null || _a === void 0 ? void 0 : _a.replace("auto", "MultiQuality")),
+                            link: source.url,
+                            type: source.isM3U8 ? "m3u8" : "mp4",
+                            subtitles: subtitles,
+                        });
+                    });
+                }
+            }
+            return streamLinks;
+        }
+        catch (err) {
+            console.error(err);
+            return [];
+        }
+    });
+};
+exports.getStream = getStream;

@@ -1,1 +1,86 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,i,n){return new(i||(i=Promise))(function(s,o){function u(t){try{r(n.next(t))}catch(t){o(t)}}function l(t){try{r(n.throw(t))}catch(t){o(t)}}function r(t){var e;t.done?s(t.value):(e=t.value,e instanceof i?e:new i(function(t){t(e)})).then(u,l)}r((n=n.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getMeta=void 0;const getMeta=function(t){return __awaiter(this,arguments,void 0,function*({link:t,providerContext:e}){try{const{getBaseUrl:i,axios:n}=e,s=`${yield i("consumet")}/anime/zoro/info?id=`+t,o=(yield n.get(s)).data,u={title:o.title,synopsis:o.description,image:o.image,tags:[null==o?void 0:o.type,"both"===(null==o?void 0:o.subOrDub)?"Sub And Dub":null==o?void 0:o.subOrDub],imdbId:"",type:o.episodes.length>0?"series":"movie"},l=[],r=[];if(o.episodes.forEach(t=>{if(!(null==t?void 0:t.isSubbed))return;const e="Episode "+t.number+((null==t?void 0:t.isFiller)?" (Filler)":""),i=t.id+"$sub";i&&e&&r.push({title:e,link:i})}),l.push({title:u.title+" (Sub)",directLinks:r}),"both"===(null==o?void 0:o.subOrDub)){const t=[];o.episodes.forEach(e=>{if(!(null==e?void 0:e.isDubbed))return;const i="Episode "+e.number+((null==e?void 0:e.isFiller)?" (Filler)":""),n=e.id+"$dub";n&&i&&t.push({title:i,link:n})}),l.push({title:u.title+" (Dub)",directLinks:t})}return Object.assign(Object.assign({},u),{linkList:l})}catch(t){return{title:"",synopsis:"",image:"",imdbId:"",type:"movie",linkList:[]}}})};exports.getMeta=getMeta;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getMeta = void 0;
+const getMeta = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link, providerContext, }) {
+        try {
+            const { getBaseUrl, axios } = providerContext;
+            const baseUrl = yield getBaseUrl("consumet");
+            const url = `${baseUrl}/anime/zoro/info?id=` + link;
+            const res = yield axios.get(url);
+            const data = res.data;
+            const meta = {
+                title: data.title,
+                synopsis: data.description,
+                image: data.image,
+                tags: [
+                    data === null || data === void 0 ? void 0 : data.type,
+                    (data === null || data === void 0 ? void 0 : data.subOrDub) === "both" ? "Sub And Dub" : data === null || data === void 0 ? void 0 : data.subOrDub,
+                ],
+                imdbId: "",
+                type: data.episodes.length > 0 ? "series" : "movie",
+            };
+            const linkList = [];
+            const subLinks = [];
+            data.episodes.forEach((episode) => {
+                if (!(episode === null || episode === void 0 ? void 0 : episode.isSubbed)) {
+                    return;
+                }
+                const title = "Episode " + episode.number + ((episode === null || episode === void 0 ? void 0 : episode.isFiller) ? " (Filler)" : "");
+                const link = episode.id + "$sub";
+                if (link && title) {
+                    subLinks.push({
+                        title,
+                        link,
+                    });
+                }
+            });
+            linkList.push({
+                title: meta.title + " (Sub)",
+                directLinks: subLinks,
+            });
+            if ((data === null || data === void 0 ? void 0 : data.subOrDub) === "both") {
+                const dubLinks = [];
+                data.episodes.forEach((episode) => {
+                    if (!(episode === null || episode === void 0 ? void 0 : episode.isDubbed)) {
+                        return;
+                    }
+                    const title = "Episode " + episode.number + ((episode === null || episode === void 0 ? void 0 : episode.isFiller) ? " (Filler)" : "");
+                    const link = episode.id + "$dub";
+                    if (link && title) {
+                        dubLinks.push({
+                            title,
+                            link,
+                        });
+                    }
+                });
+                linkList.push({
+                    title: meta.title + " (Dub)",
+                    directLinks: dubLinks,
+                });
+            }
+            return Object.assign(Object.assign({}, meta), { linkList: linkList });
+        }
+        catch (err) {
+            console.error(err);
+            return {
+                title: "",
+                synopsis: "",
+                image: "",
+                imdbId: "",
+                type: "movie",
+                linkList: [],
+            };
+        }
+    });
+};
+exports.getMeta = getMeta;

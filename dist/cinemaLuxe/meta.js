@@ -1,1 +1,106 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,i,n){return new(i||(i=Promise))(function(o,a){function r(t){try{s(n.next(t))}catch(t){a(t)}}function l(t){try{s(n.throw(t))}catch(t){a(t)}}function s(t){var e;t.done?o(t.value):(e=t.value,e instanceof i?e:new i(function(t){t(e)})).then(r,l)}s((n=n.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getMeta=void 0;const getMeta=function(t){return __awaiter(this,arguments,void 0,function*({link:t,providerContext:e}){try{const i=t,n=(yield e.axios.get(i,{headers:e.commonHeaders})).data,o=e.cheerio.load(n),a=i.includes("tvshows")?"series":"movie",r="",l=i.split("/")[4].replace(/-/g," "),s=o(".g-item").find("a").attr("href")||"",c=o(".wp-content").text().trim(),d=o(".sgeneros").children().map((t,e)=>o(e).text()).get().slice(3),p=Number(o("#repimdb").find("strong").text()).toFixed(1).toString(),u=[];return o(".custom-links").find(".ep-button-container").map((t,e)=>{var i;const n=o(e).text().replace("⬇Download","").replace("⬇ Download","").trim(),a=o(e).find("a").attr("href");n&&a&&u.push({title:n,episodesLink:a,quality:(null===(i=null==n?void 0:n.match(/\d+P\b/))||void 0===i?void 0:i[0].replace("P","p"))||""})}),0===u.length&&o(".ep-button-container:not(:has(a:contains('Click Here To Visit')))").map((t,e)=>{var i;let n=o(e).find("a").text().replace("⬇Download","").replace("⬇ Download","").trim();n.includes("Download Now")&&(n=o(e).parent().find("h3").text().trim().replace("⬇Download","").replace("⬇ Download",""));const a=o(e).find("a").attr("href");n&&a&&u.push({title:n,episodesLink:a,quality:(null===(i=null==n?void 0:n.match(/\d+P\b/))||void 0===i?void 0:i[0].replace("P","p"))||""})}),{title:l,tags:d,rating:p,synopsis:c,image:s,imdbId:r,type:a,linkList:u}}catch(t){return{title:"",synopsis:"",image:"",imdbId:"",type:"movie",linkList:[]}}})};exports.getMeta=getMeta;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getMeta = void 0;
+const getMeta = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link, providerContext, }) {
+        try {
+            const url = link;
+            const res = yield providerContext.axios.get(url, {
+                headers: providerContext.commonHeaders,
+            });
+            const data = res.data;
+            const $ = providerContext.cheerio.load(data);
+            const type = url.includes("tvshows") ? "series" : "movie";
+            const imdbId = "";
+            const title = url.split("/")[4].replace(/-/g, " ");
+            const image = $(".g-item").find("a").attr("href") || "";
+            const synopsis = $(".wp-content").text().trim();
+            const tags = $(".sgeneros")
+                .children()
+                .map((i, element) => $(element).text())
+                .get()
+                .slice(3);
+            const rating = Number($("#repimdb").find("strong").text())
+                .toFixed(1)
+                .toString();
+            const links = [];
+            $(".custom-links")
+                .find(".ep-button-container")
+                .map((i, element) => {
+                var _a;
+                const title = $(element)
+                    .text()
+                    .replace("\u2b07Download", "")
+                    .replace("\u2b07 Download", "")
+                    .trim();
+                const link = $(element).find("a").attr("href");
+                if (title && link) {
+                    links.push({
+                        title,
+                        episodesLink: link,
+                        quality: ((_a = title === null || title === void 0 ? void 0 : title.match(/\d+P\b/)) === null || _a === void 0 ? void 0 : _a[0].replace("P", "p")) || "",
+                    });
+                }
+            });
+            if (links.length === 0) {
+                $(".ep-button-container:not(:has(a:contains('Click Here To Visit')))").map((i, element) => {
+                    var _a;
+                    let title = $(element)
+                        .find("a")
+                        .text()
+                        .replace("\u2b07Download", "")
+                        .replace("\u2b07 Download", "")
+                        .trim();
+                    if (title.includes("Download Now")) {
+                        title = $(element)
+                            .parent()
+                            .find("h3")
+                            .text()
+                            .trim()
+                            .replace("\u2b07Download", "")
+                            .replace("\u2b07 Download", "");
+                    }
+                    const link = $(element).find("a").attr("href");
+                    if (title && link) {
+                        links.push({
+                            title,
+                            episodesLink: link,
+                            quality: ((_a = title === null || title === void 0 ? void 0 : title.match(/\d+P\b/)) === null || _a === void 0 ? void 0 : _a[0].replace("P", "p")) || "",
+                        });
+                    }
+                });
+            }
+            return {
+                title,
+                tags,
+                rating,
+                synopsis,
+                image,
+                imdbId,
+                type,
+                linkList: links,
+            };
+        }
+        catch (err) {
+            console.error(err);
+            return {
+                title: "",
+                synopsis: "",
+                image: "",
+                imdbId: "",
+                type: "movie",
+                linkList: [],
+            };
+        }
+    });
+};
+exports.getMeta = getMeta;

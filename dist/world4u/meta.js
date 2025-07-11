@@ -1,1 +1,89 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,n,i){return new(n||(n=Promise))(function(o,r){function a(t){try{c(i.next(t))}catch(t){r(t)}}function s(t){try{c(i.throw(t))}catch(t){r(t)}}function c(t){var e;t.done?o(t.value):(e=t.value,e instanceof n?e:new n(function(t){t(e)})).then(a,s)}c((i=i.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getMeta=void 0;const getMeta=function(t){return __awaiter(this,arguments,void 0,function*({link:t,providerContext:e}){var n;try{const{axios:i,cheerio:o}=e,r=t,a=(yield i.get(r)).data,s=o.load(a),c=s(".entry-content").text().toLocaleLowerCase().includes("movie name")?"movie":"series",d=(null===(n=s(".imdb_left").find("a").attr("href"))||void 0===n?void 0:n.split("/")[4])||"",p=s(".entry-content").find('strong:contains("Name")').children().remove().end().text().replace(":",""),l=s(".entry-content").find('p:contains("Synopsis"),p:contains("Plot"),p:contains("Story")').children().remove().end().text(),u=s(".wp-caption").find("img").attr("data-src")||s(".entry-content").find("img").attr("data-src")||"",v=[];return s(".my-button").map((t,e)=>{var n;const i=s(e).parent().parent().prev().text(),o=s(e).attr("href"),r=(null===(n=i.match(/\b(480p|720p|1080p|2160p)\b/i))||void 0===n?void 0:n[0])||"";o&&i&&v.push({title:i,episodesLink:"series"===c?o:"",directLinks:"movie"===c?[{link:o,title:i,type:"movie"}]:[],quality:r})}),{title:p,synopsis:l,image:u,imdbId:d,type:c,linkList:v}}catch(t){return{title:"",synopsis:"",image:"",imdbId:"",type:"movie",linkList:[]}}})};exports.getMeta=getMeta;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getMeta = void 0;
+const getMeta = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link, providerContext, }) {
+        var _b;
+        try {
+            const { axios, cheerio } = providerContext;
+            const url = link;
+            const res = yield axios.get(url);
+            const data = res.data;
+            const $ = cheerio.load(data);
+            const type = $(".entry-content")
+                .text()
+                .toLocaleLowerCase()
+                .includes("movie name")
+                ? "movie"
+                : "series";
+            const imdbId = ((_b = $(".imdb_left").find("a").attr("href")) === null || _b === void 0 ? void 0 : _b.split("/")[4]) || "";
+            const title = $(".entry-content")
+                .find('strong:contains("Name")')
+                .children()
+                .remove()
+                .end()
+                .text()
+                .replace(":", "");
+            const synopsis = $(".entry-content")
+                .find('p:contains("Synopsis"),p:contains("Plot"),p:contains("Story")')
+                .children()
+                .remove()
+                .end()
+                .text();
+            const image = $(".wp-caption").find("img").attr("data-src") ||
+                $(".entry-content").find("img").attr("data-src") ||
+                "";
+            const links = [];
+            $(".my-button").map((i, element) => {
+                var _a;
+                const title = $(element).parent().parent().prev().text();
+                const episodesLink = $(element).attr("href");
+                const quality = ((_a = title.match(/\b(480p|720p|1080p|2160p)\b/i)) === null || _a === void 0 ? void 0 : _a[0]) || "";
+                if (episodesLink && title) {
+                    links.push({
+                        title,
+                        episodesLink: type === "series" ? episodesLink : "",
+                        directLinks: type === "movie"
+                            ? [
+                                {
+                                    link: episodesLink,
+                                    title,
+                                    type: "movie",
+                                },
+                            ]
+                            : [],
+                        quality,
+                    });
+                }
+            });
+            return {
+                title,
+                synopsis,
+                image,
+                imdbId,
+                type,
+                linkList: links,
+            };
+        }
+        catch (err) {
+            return {
+                title: "",
+                synopsis: "",
+                image: "",
+                imdbId: "",
+                type: "movie",
+                linkList: [],
+            };
+        }
+    });
+};
+exports.getMeta = getMeta;

@@ -1,1 +1,95 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(e,i,t,n){return new(t||(t=Promise))(function(r,l){function o(e){try{u(n.next(e))}catch(e){l(e)}}function s(e){try{u(n.throw(e))}catch(e){l(e)}}function u(e){var i;e.done?r(e.value):(i=e.value,i instanceof t?i:new t(function(e){e(i)})).then(o,s)}u((n=n.apply(e,i||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getMeta=void 0;const getMeta=function(e){return __awaiter(this,arguments,void 0,function*({link:e}){var i,t;try{const n=JSON.parse(e),r=(null==n?void 0:n.kn)||(null==n?void 0:n.mn),l=(null==n?void 0:n.IH)||(null==n?void 0:n.IV),o=null==n?void 0:n.gn.split(",").slice(0,3).map(e=>e.trim()),s="webSeries"===(null==n?void 0:n.cg)?"series":"movie",u=[];if("webSeries"===(null==n?void 0:n.cg))null===(i=["1","2","3","4"])||void 0===i||i.forEach(e=>{var i;const t=[];"object"==typeof(null==n?void 0:n["eServer"+e])&&(null===(i=null==Object?void 0:Object.keys(null==n?void 0:n["eServer"+e]))||void 0===i?void 0:i.length)>0&&(Object.keys(null==n?void 0:n["eServer"+e]).forEach(i=>{t.push({title:"Episode "+i,link:JSON.stringify({url:null==n?void 0:n["eServer"+e][i],server:"Server "+e})})}),u.push({title:(null==n?void 0:n.pn)+" (Server "+e+")",directLinks:t}))});else{const e=[];null===(t=["1","2","3","4"])||void 0===t||t.forEach(i=>{(null==n?void 0:n["s"+i])&&e.push({title:"Server "+i+" (HD)",link:JSON.stringify({url:null==n?void 0:n.s1,server:"Server "+i})}),(null==n?void 0:n["4s"+i])&&e.push({title:"Server "+i+" (480p)",link:JSON.stringify({url:null==n?void 0:n["4s"+i],server:"Server "+i})})}),u.push({title:null==n?void 0:n.pn,directLinks:e})}return{title:r,image:l,imdbId:"",synopsis:"",type:s,linkList:u,tags:o}}catch(e){return{title:"",image:"",imdbId:"",synopsis:"",type:"movie",linkList:[],tags:[]}}})};exports.getMeta=getMeta;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getMeta = void 0;
+const getMeta = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link: data, }) {
+        var _b, _c;
+        try {
+            const dataJson = JSON.parse(data);
+            const title = (dataJson === null || dataJson === void 0 ? void 0 : dataJson.kn) || (dataJson === null || dataJson === void 0 ? void 0 : dataJson.mn);
+            const image = (dataJson === null || dataJson === void 0 ? void 0 : dataJson.IH) || (dataJson === null || dataJson === void 0 ? void 0 : dataJson.IV);
+            const tags = dataJson === null || dataJson === void 0 ? void 0 : dataJson.gn.split(",").slice(0, 3).map((tag) => tag.trim());
+            const type = (dataJson === null || dataJson === void 0 ? void 0 : dataJson.cg) === "webSeries" ? "series" : "movie";
+            const linkList = [];
+            if ((dataJson === null || dataJson === void 0 ? void 0 : dataJson.cg) === "webSeries") {
+                (_b = ["1", "2", "3", "4"]) === null || _b === void 0 ? void 0 : _b.forEach((item) => {
+                    var _a;
+                    const directLinks = [];
+                    if (typeof (dataJson === null || dataJson === void 0 ? void 0 : dataJson["eServer" + item]) === "object" &&
+                        ((_a = Object === null || Object === void 0 ? void 0 : Object.keys(dataJson === null || dataJson === void 0 ? void 0 : dataJson["eServer" + item])) === null || _a === void 0 ? void 0 : _a.length) > 0) {
+                        Object.keys(dataJson === null || dataJson === void 0 ? void 0 : dataJson["eServer" + item]).forEach((key) => {
+                            directLinks.push({
+                                title: "Episode " + key,
+                                link: JSON.stringify({
+                                    url: dataJson === null || dataJson === void 0 ? void 0 : dataJson["eServer" + item][key],
+                                    server: "Server " + item,
+                                }),
+                            });
+                        });
+                        linkList.push({
+                            title: (dataJson === null || dataJson === void 0 ? void 0 : dataJson.pn) + " (Server " + item + ")",
+                            directLinks,
+                        });
+                    }
+                });
+            }
+            else {
+                const directLinks = [];
+                (_c = ["1", "2", "3", "4"]) === null || _c === void 0 ? void 0 : _c.forEach((item) => {
+                    if (dataJson === null || dataJson === void 0 ? void 0 : dataJson["s" + item]) {
+                        directLinks.push({
+                            title: "Server " + item + " (HD)",
+                            link: JSON.stringify({
+                                url: dataJson === null || dataJson === void 0 ? void 0 : dataJson.s1,
+                                server: "Server " + item,
+                            }),
+                        });
+                    }
+                    if (dataJson === null || dataJson === void 0 ? void 0 : dataJson["4s" + item]) {
+                        directLinks.push({
+                            title: "Server " + item + " (480p)",
+                            link: JSON.stringify({
+                                url: dataJson === null || dataJson === void 0 ? void 0 : dataJson["4s" + item],
+                                server: "Server " + item,
+                            }),
+                        });
+                    }
+                });
+                linkList.push({
+                    title: dataJson === null || dataJson === void 0 ? void 0 : dataJson.pn,
+                    directLinks,
+                });
+            }
+            return {
+                title,
+                image,
+                imdbId: "",
+                synopsis: "",
+                type,
+                linkList,
+                tags,
+            };
+        }
+        catch (err) {
+            return {
+                title: "",
+                image: "",
+                imdbId: "",
+                synopsis: "",
+                type: "movie",
+                linkList: [],
+                tags: [],
+            };
+        }
+    });
+};
+exports.getMeta = getMeta;

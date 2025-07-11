@@ -1,1 +1,66 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,i,e,n){return new(e||(e=Promise))(function(o,s){function l(t){try{d(n.next(t))}catch(t){s(t)}}function r(t){try{d(n.throw(t))}catch(t){s(t)}}function d(t){var i;t.done?o(t.value):(i=t.value,i instanceof e?i:new e(function(t){t(i)})).then(l,r)}d((n=n.apply(t,i||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getMeta=void 0;const getMeta=function(t){return __awaiter(this,arguments,void 0,function*({link:t}){var i,e,n,o;try{const s=`https://netmirror.zendax.tech/api/net-proxy?${"isPrime=true"}&url=${encodeURIComponent(t)}`,l=yield fetch(s,{credentials:"omit"}),r=yield l.json(),d=null===(i=t.split("id=")[1])||void 0===i?void 0:i.split("&")[0],a={title:r.title,synopsis:r.desc,image:`https://img.nfmirrorcdn.top/poster/h/${d}.jpg`,cast:null===(e=null==r?void 0:r.short_cast)||void 0===e?void 0:e.split(","),tags:[null==r?void 0:r.year,null==r?void 0:r.hdsd,...null===(n=null==r?void 0:r.thismovieis)||void 0===n?void 0:n.split(",")],imdbId:"",type:"series"},u=[];return(null===(o=null==r?void 0:r.season)||void 0===o?void 0:o.length)>0?r.season.map(t=>{u.push({title:"Season "+(null==t?void 0:t.s),episodesLink:null==t?void 0:t.id})}):u.push({title:a.title,directLinks:[{link:d,title:"Movie",type:"movie"}]}),Object.assign(Object.assign({},a),{linkList:u})}catch(t){return{title:"",synopsis:"",image:"",imdbId:"",type:"",linkList:[]}}})};exports.getMeta=getMeta;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getMeta = void 0;
+const getMeta = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ link, }) {
+        var _b, _c, _d, _e;
+        let providerValue = "primeMirror";
+        try {
+            const isPrime = providerValue === "primeMirror" ? "isPrime=true" : "isPrime=false";
+            const url = `https://netmirror.zendax.tech/api/net-proxy?${isPrime}&url=${encodeURIComponent(link)}`;
+            console.log("nfifo", url);
+            const res = yield fetch(url, {
+                credentials: "omit",
+            });
+            const data = yield res.json();
+            const id = (_b = link.split("id=")[1]) === null || _b === void 0 ? void 0 : _b.split("&")[0];
+            const meta = {
+                title: data.title,
+                synopsis: data.desc,
+                image: `https://img.nfmirrorcdn.top/poster/h/${id}.jpg`,
+                cast: (_c = data === null || data === void 0 ? void 0 : data.short_cast) === null || _c === void 0 ? void 0 : _c.split(","),
+                tags: [data === null || data === void 0 ? void 0 : data.year, data === null || data === void 0 ? void 0 : data.hdsd, ...(_d = data === null || data === void 0 ? void 0 : data.thismovieis) === null || _d === void 0 ? void 0 : _d.split(",")],
+                imdbId: "",
+                type: "series",
+            };
+            console.log("nfinfo", meta);
+            const linkList = [];
+            if (((_e = data === null || data === void 0 ? void 0 : data.season) === null || _e === void 0 ? void 0 : _e.length) > 0) {
+                data.season.map((season) => {
+                    linkList.push({
+                        title: "Season " + (season === null || season === void 0 ? void 0 : season.s),
+                        episodesLink: season === null || season === void 0 ? void 0 : season.id,
+                    });
+                });
+            }
+            else {
+                linkList.push({
+                    title: meta.title,
+                    directLinks: [{ link: id, title: "Movie", type: "movie" }],
+                });
+            }
+            return Object.assign(Object.assign({}, meta), { linkList: linkList });
+        }
+        catch (err) {
+            console.error(err);
+            return {
+                title: "",
+                synopsis: "",
+                image: "",
+                imdbId: "",
+                type: "",
+                linkList: [],
+            };
+        }
+    });
+};
+exports.getMeta = getMeta;

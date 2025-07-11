@@ -1,1 +1,48 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(t,e,n,o){return new(n||(n=Promise))(function(i,r){function s(t){try{c(o.next(t))}catch(t){r(t)}}function a(t){try{c(o.throw(t))}catch(t){r(t)}}function c(t){var e;t.done?i(t.value):(e=t.value,e instanceof n?e:new n(function(t){t(e)})).then(s,a)}c((o=o.apply(t,e||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getEpisodes=void 0;const getEpisodes=function(t){return __awaiter(this,arguments,void 0,function*({url:t,providerContext:e}){const{axios:n,cheerio:o}=e;try{const e=(yield n.get(t)).data;let i=o.load(e);const r=[];return i('strong:contains("Episode"),strong:contains("1080"),strong:contains("720"),strong:contains("480")').map((t,e)=>{const n=i(e).text(),o=i(e).parent().parent().next("h4").find("a").attr("href");o&&!n.includes("zip")&&r.push({title:n,link:o})}),r}catch(e){return[{title:"Server 1",link:t}]}})};exports.getEpisodes=getEpisodes;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getEpisodes = void 0;
+const getEpisodes = function (_a) {
+    return __awaiter(this, arguments, void 0, function* ({ url, providerContext, }) {
+        const { axios, cheerio } = providerContext;
+        try {
+            const res = yield axios.get(url);
+            const html = res.data;
+            let $ = cheerio.load(html);
+            const episodeLinks = [];
+            $('strong:contains("Episode"),strong:contains("1080"),strong:contains("720"),strong:contains("480")').map((i, element) => {
+                const title = $(element).text();
+                const link = $(element)
+                    .parent()
+                    .parent()
+                    .next("h4")
+                    .find("a")
+                    .attr("href");
+                if (link && !title.includes("zip")) {
+                    episodeLinks.push({
+                        title: title,
+                        link,
+                    });
+                }
+            });
+            return episodeLinks;
+        }
+        catch (err) {
+            return [
+                {
+                    title: "Server 1",
+                    link: url,
+                },
+            ];
+        }
+    });
+};
+exports.getEpisodes = getEpisodes;

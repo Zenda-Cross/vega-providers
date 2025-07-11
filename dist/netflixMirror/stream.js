@@ -1,1 +1,49 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(e,t,r,n){return new(r||(r=Promise))(function(i,o){function a(e){try{c(n.next(e))}catch(e){o(e)}}function l(e){try{c(n.throw(e))}catch(e){o(e)}}function c(e){var t;e.done?i(e.value):(t=e.value,t instanceof r?t:new r(function(e){e(t)})).then(a,l)}c((n=n.apply(e,t||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getStream=void 0;const getStream=e=>__awaiter(void 0,[e],void 0,function*({link:e,providerContext:t}){const{getBaseUrl:r}=t;try{const t="https://netfree2.cc",r=`https://netmirror.zendax.tech/api/net-proxy?url=${t}${"netflixMirror"==="netflixMirror"?"/mobile/playlist.php?id=":"/pv/playlist.php?id="}${e}&t=${Math.round((new Date).getTime()/1e3)}`,n=yield fetch(r,{credentials:"omit"}),i=yield n.json(),o=null==i?void 0:i[0],a=[];return null==o||o.sources.forEach(e=>{var r;a.push({server:e.label,link:null===(r=e.file)||void 0===r?void 0:r.replace(":su",":ni"),type:"m3u8",headers:{Referer:t,origin:t,Cookie:"hd=on"}})}),a}catch(e){return[]}});exports.getStream=getStream;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getStream = void 0;
+const getStream = (_a) => __awaiter(void 0, [_a], void 0, function* ({ link: id, providerContext, }) {
+    const { getBaseUrl } = providerContext;
+    try {
+        let providerValue = "netflixMirror";
+        const baseUrl = "https://netfree2.cc";
+        const url = `https://netmirror.zendax.tech/api/net-proxy?url=${baseUrl}${providerValue === "netflixMirror"
+            ? "/mobile/playlist.php?id="
+            : "/pv/playlist.php?id="}${id}&t=${Math.round(new Date().getTime() / 1000)}`;
+        console.log("nfGetStream, url:", url);
+        const res = yield fetch(url, {
+            credentials: "omit",
+        });
+        const resJson = yield res.json();
+        const data = resJson === null || resJson === void 0 ? void 0 : resJson[0];
+        const streamLinks = [];
+        data === null || data === void 0 ? void 0 : data.sources.forEach((source) => {
+            var _a;
+            streamLinks.push({
+                server: source.label,
+                link: (_a = source.file) === null || _a === void 0 ? void 0 : _a.replace(":su", ":ni"),
+                type: "m3u8",
+                headers: {
+                    Referer: baseUrl,
+                    origin: baseUrl,
+                    Cookie: "hd=on",
+                },
+            });
+        });
+        console.log(streamLinks);
+        return streamLinks;
+    }
+    catch (err) {
+        console.error(err);
+        return [];
+    }
+});
+exports.getStream = getStream;

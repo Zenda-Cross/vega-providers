@@ -1,1 +1,76 @@
-"use strict";var __awaiter=this&&this.__awaiter||function(e,t,o,a){return new(o||(o=Promise))(function(i,n){function s(e){try{c(a.next(e))}catch(e){n(e)}}function r(e){try{c(a.throw(e))}catch(e){n(e)}}function c(e){var t;e.done?i(e.value):(t=e.value,t instanceof o?t:new o(function(e){e(t)})).then(s,r)}c((a=a.apply(e,t||[])).next())})};Object.defineProperty(exports,"__esModule",{value:!0}),exports.getSearchPosts=exports.getPosts=void 0;const headers={Accept:"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7","Cache-Control":"no-store","Accept-Language":"en-US,en;q=0.9",DNT:"1","sec-ch-ua":'"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',"sec-ch-ua-mobile":"?0","sec-ch-ua-platform":'"Windows"',"Sec-Fetch-Dest":"document","Sec-Fetch-Mode":"navigate","Sec-Fetch-Site":"none","Sec-Fetch-User":"?1","Upgrade-Insecure-Requests":"1","User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"},getPosts=e=>__awaiter(void 0,[e],void 0,function*({filter:e,page:t,signal:o,providerContext:a}){const{getBaseUrl:i}=a,n=yield i("UhdMovies");return posts(n,1===t?`${n}/${e}/`:`${n+e}/page/${t}/`,o,a)});exports.getPosts=getPosts;const getSearchPosts=e=>__awaiter(void 0,[e],void 0,function*({searchQuery:e,page:t,signal:o,providerContext:a}){const{getBaseUrl:i}=a,n=yield i("UhdMovies");return posts(n,`${n}/search/${e}/page/${t}/`,o,a)});function posts(e,t,o,a){return __awaiter(this,void 0,void 0,function*(){try{const{axios:e,cheerio:i}=a,n=(yield e.get(t,{headers:headers,signal:o})).data,s=i.load(n),r=[];return s(".gridlove-posts").find(".layout-masonry").each((e,t)=>{const o=s(t).find("a").attr("title"),a=s(t).find("a").attr("href"),i=s(t).find("a").find("img").attr("src");o&&a&&i&&r.push({title:o.replace("Download","").trim(),link:a,image:i})}),r}catch(e){return[]}})}exports.getSearchPosts=getSearchPosts;
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getSearchPosts = exports.getPosts = void 0;
+const headers = {
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Cache-Control": "no-store",
+    "Accept-Language": "en-US,en;q=0.9",
+    DNT: "1",
+    "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+};
+const getPosts = (_a) => __awaiter(void 0, [_a], void 0, function* ({ filter, page, 
+// providerValue,
+signal, providerContext, }) {
+    const { getBaseUrl } = providerContext;
+    const baseUrl = yield getBaseUrl("UhdMovies");
+    const url = page === 1 ? `${baseUrl}/${filter}/` : `${baseUrl + filter}/page/${page}/`;
+    console.log("url", url);
+    return posts(baseUrl, url, signal, providerContext);
+});
+exports.getPosts = getPosts;
+const getSearchPosts = (_a) => __awaiter(void 0, [_a], void 0, function* ({ searchQuery, page, 
+// providerValue,
+signal, providerContext, }) {
+    const { getBaseUrl } = providerContext;
+    const baseUrl = yield getBaseUrl("UhdMovies");
+    const url = `${baseUrl}/search/${searchQuery}/page/${page}/`;
+    return posts(baseUrl, url, signal, providerContext);
+});
+exports.getSearchPosts = getSearchPosts;
+function posts(baseURL, url, signal, providerContext) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { axios, cheerio } = providerContext;
+            const res = yield axios.get(url, { headers, signal });
+            const html = res.data;
+            const $ = cheerio.load(html);
+            const uhdCatalog = [];
+            $(".gridlove-posts")
+                .find(".layout-masonry")
+                .each((index, element) => {
+                const title = $(element).find("a").attr("title");
+                const link = $(element).find("a").attr("href");
+                const image = $(element).find("a").find("img").attr("src");
+                if (title && link && image) {
+                    uhdCatalog.push({
+                        title: title.replace("Download", "").trim(),
+                        link: link,
+                        image: image,
+                    });
+                }
+            });
+            return uhdCatalog;
+        }
+        catch (err) {
+            console.error("uhd error ", err);
+            return [];
+        }
+    });
+}
