@@ -119,9 +119,7 @@ class ProviderBuilder {
                   "console.warn",
                 ],
           },
-          mangle: {
-            keep_fnames: false, // Mangle function names for better compression
-          },
+          mangle: false, // Disable variable name mangling to keep original names
           format: {
             comments: false, // Remove comments
           },
