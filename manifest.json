@@ -96,6 +96,14 @@
     "disabled": false
   },
   {
+    "display_name": "MovieBox",
+    "value": "movieBox",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
     "display_name": "Ringz",
     "value": "ringz",
     "version": "1.0",
