@@ -17,7 +17,9 @@ export const getPosts = async function ({
   if (page > 1) {
     return posts;
   }
-  const baseUrl = getBaseUrl("movieBox");
+  const baseUrl = await getBaseUrl("movieBox");
+  console.log("baseUrl", baseUrl);
+
   const url = `${baseUrl}/wefeed-mobile-bff/tab-operating?page=3&tabId=0&version=2fe0d7c224603ff7b0df294b46d3b84b`;
 
   const response = await fetch("https://dob-worker.8man.workers.dev", {

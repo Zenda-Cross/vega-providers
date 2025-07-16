@@ -9,7 +9,7 @@ export const getMeta = async function ({
 }): Promise<Info> {
   try {
     const { axios, cheerio, getBaseUrl } = providerContext;
-    const baseUrl = getBaseUrl("movieBox");
+    const baseUrl = await getBaseUrl("movieBox");
     const links: Link[] = [];
     // this is just a proxy please host your own if you want to use this code:- https://github.com/himanshu8443/Cf-Workers/blob/main/src/dob-worker/index.js
     const response = await fetch("https://dob-worker.8man.workers.dev", {
