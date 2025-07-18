@@ -18,7 +18,7 @@ export const getEpisodes = async function ({
         url = encodedLink ? atob(encodedLink) : url;
       } else {
         const redirectUrlRes = await fetch(
-          "https://ext.8man.me/api/cinemaluxe",
+          "https://cm-decrypt.8man.workers.dev/cinemaluxe",
           {
             method: "POST",
             headers: {
