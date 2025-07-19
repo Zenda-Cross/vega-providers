@@ -61,7 +61,7 @@ export const getSearchPosts = async function ({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   const { getBaseUrl, axios, cheerio } = providerContext;
-  const baseUrl = getBaseUrl("movieBox");
+  const baseUrl = await getBaseUrl("movieBox");
   const url = `${baseUrl}/wefeed-mobile-bff/subject-api/search/v2`;
   if (page > 1) {
     return [];
