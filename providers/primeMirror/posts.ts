@@ -24,7 +24,7 @@ export const getPosts = async function ({
     const isPrime =
       providerValue === "primeMirror" ? "isPrime=true" : "isPrime=false";
 
-    const url = `https://netmirror.zendax.tech/api/net-proxy?${isPrime}&url=${
+    const url = `https://netmirror.8man.dev/api/net-proxy?${isPrime}&url=${
       baseUrl + filter
     }`;
 
@@ -89,7 +89,7 @@ export const getSearchPosts = async function ({
     const isPrime =
       providerValue === "primeMirror" ? "isPrime=true" : "isPrime=false";
 
-    const url = `https://netmirror.zendax.tech/api/net-proxy?${isPrime}&url=${baseUrl}${
+    const url = `https://netmirror.8man.dev/api/net-proxy?${isPrime}&url=${baseUrl}${
       providerValue === "netflixMirror" ? "" : "/pv"
     }/search.php?s=${encodeURI(searchQuery)}`;
 

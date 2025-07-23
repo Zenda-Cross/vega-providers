@@ -11,7 +11,7 @@ export const getStream = async ({
   try {
     let providerValue = "primeMirror";
     const baseUrl = "https://netfree2.cc";
-    const url = `https://netmirror.zendax.tech/api/net-proxy?url=${baseUrl}${
+    const url = `https://netmirror.8man.dev/api/net-proxy?url=${baseUrl}${
       providerValue === "netflixMirror"
         ? "/mobile/playlist.php?id="
         : "/pv/playlist.php?id="

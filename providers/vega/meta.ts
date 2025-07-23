@@ -73,7 +73,7 @@ export const getMeta = async ({
     }
     // console.log(image);
 
-    // console.log({title, synopsis, image, imdbId, type});
+    console.log({ title, synopsis, image, imdbId, type });
     /// Links
     const hr = infoContainer?.first()?.find("hr");
     const list = hr?.nextUntil("hr");
@@ -103,7 +103,6 @@ export const getMeta = async ({
         )
         ?.parent()
         ?.attr("href");
-      console.log(title);
       const episodesLink =
         (vcloudLinks
           ? vcloudLinks

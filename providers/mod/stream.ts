@@ -257,7 +257,7 @@ async function modExtractor(url: string, providerContext: ProviderContext) {
     // find input with name="_wp_http2"
     const wpHttp2 = $("input").attr("name", "_wp_http2").val();
 
-    // console.log('wpHttp2', wpHttp2);
+    console.log("wpHttp2", wpHttp2);
 
     // form data
     var bodyFormData = new FormData();
