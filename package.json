@@ -19,7 +19,7 @@
     "dev:build": "npm run build && npm run dev",
     "watch": "nodemon",
     "watch:dev": "nodemon --watch providers --ext ts --exec \"npm run build\" & npm run dev",
-    "dev:auto": "concurrently \"npm run watch\" \"npm run dev\"",
+    "dev:auto": "concurrently \"nodemon --watch providers --ext ts --exec \\\"npm run build:dev\\\"\" \"npm run dev\"",
     "auto": "node auto-dev.js",
     "start": "npm run build && npm run dev"
   },
