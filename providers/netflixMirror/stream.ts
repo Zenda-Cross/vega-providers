@@ -10,7 +10,8 @@ export const getStream = async ({
   const { getBaseUrl } = providerContext;
   try {
     let providerValue = "netflixMirror";
-    const baseUrl = "https://netfree2.cc";
+    const baseUrl = await getBaseUrl("nfMirror");
+    console.log("nfGetStream, baseUrl:", baseUrl);
     const url = `https://netmirror.8man.dev/api/net-proxy?url=${baseUrl}${
       providerValue === "netflixMirror"
         ? "/mobile/playlist.php?id="
@@ -26,7 +27,9 @@ export const getStream = async ({
     data?.sources.forEach((source: any) => {
       streamLinks.push({
         server: source.label,
-        link: source.file?.replace(":su", ":ni"),
+        link: source.file?.startsWith("http")
+          ? source.file
+          : `${baseUrl}${source.file}`,
         type: "m3u8",
         headers: {
           Referer: baseUrl,
