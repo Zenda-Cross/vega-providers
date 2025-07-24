@@ -18,7 +18,7 @@
   {
     "display_name": "MoviesDrive",
     "value": "drive",
-    "version": "1.3",
+    "version": "1.4",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -26,7 +26,7 @@
   {
     "display_name": "MultiMovies",
     "value": "multi",
-    "version": "1.0",
+    "version": "1.1",
     "icon": "",
     "type": "global",
     "disabled": false
