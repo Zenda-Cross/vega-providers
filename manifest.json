@@ -208,55 +208,6 @@
     "disabled": false
   },
   {
-    "display_name": "AnimeZy",
-    "value": "animeZy",
-    "version": "1.0",
-    "icon": "",
-    "type": "english",
-    "disabled": false
-  },
-  {
-    "display_name": "AnimeFrenzy",
-    "value": "animeFrenzy",
-    "version": "1.0",
-    "icon": "",
-    "type": "english",
-    "disabled": false
-  },
-  {
-    "display_name": "AnimeFlix",
-    "value": "animeFlix",
-    "version": "1.0",
-    "icon": "",
-    "type": "english",
-    "disabled": false
-  },
-  {
-    "display_name": "AnimeKisa",
-    "value": "animeKisa",
-    "version": "1.0",
-    "icon": "",
-    "type": "english",
-    "disabled": false
-  },
-  {
-    "display_name": "AnimeVibe",
-    "value": "animeVibe",
-    "version": "1.0",
-    "icon": "",
-    "type": "english",
-    "disabled": false
-  },
-  {
-    "display_name": "AnimeWorldHD",
-    "value": "",
-    "version": "",
-    "icon": "",
-    "type": ""
-    // This provider is currently disabled
-    // It will be enabled in the future
-  },
-  {
     "display_name": "TokyoInsider",
     "value": "tokyoInsider",
     "version": "1.0",
