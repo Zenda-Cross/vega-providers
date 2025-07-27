@@ -15,7 +15,7 @@ export const catalog = [
       "/api/anime/search?query=&page=1&perPage=35&year=any&sort=rating&season=any&format=any&status=any",
   },
   {
-    title: "Recently Updated",
+    title: "Favourites",
     filter:
       "/api/anime/search?query=&page=1&perPage=35&year=any&sort=updated&season=any&format=any&status=any",
   },

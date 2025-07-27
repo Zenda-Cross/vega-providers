@@ -16,8 +16,8 @@ export const getPosts = async function ({
   const baseUrl = "https://backend.animetsu.to";
 
   // Parse filter to modify page parameter
-  const url = new URL(baseUrl + filter);
-  url.searchParams.set("page", page.toString());
+  const url = baseUrl + filter + "&page=" + page.toString();
+  console.log("animetsuGetPosts url", url);
 
   return posts({ url: url.toString(), signal, axios });
 };

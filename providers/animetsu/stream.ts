@@ -1,4 +1,4 @@
-import { Stream, ProviderContext } from "../types";
+import { Stream, ProviderContext, TextTracks } from "../types";
 
 export const getStream = async function ({
   link: id,
@@ -33,17 +33,48 @@ export const getStream = async function ({
           });
 
           if (res.data && res.data.sources) {
+            const subtitles: TextTracks = [];
+            // if (res.data.subtitles && Array.isArray(res.data.subtitles)) {
+            //   res.data.subtitles.forEach((sub: any) => {
+            //     if (sub.url && sub.lang) {
+            //       // Extract language code from lang string (e.g., "English" -> "en", "Arabic - CR" -> "ar")
+            //       const langCode = sub.lang.toLowerCase().includes("english")
+            //         ? "en"
+            //         : sub.lang.toLowerCase().includes("arabic")
+            //         ? "ar"
+            //         : sub.lang.toLowerCase().includes("french")
+            //         ? "fr"
+            //         : sub.lang.toLowerCase().includes("german")
+            //         ? "de"
+            //         : sub.lang.toLowerCase().includes("italian")
+            //         ? "it"
+            //         : sub.lang.toLowerCase().includes("portuguese")
+            //         ? "pt"
+            //         : sub.lang.toLowerCase().includes("russian")
+            //         ? "ru"
+            //         : sub.lang.toLowerCase().includes("spanish")
+            //         ? "es"
+            //         : "und";
+
+            //       subtitles.push({
+            //         title: sub.lang,
+            //         language: langCode,
+            //         type: "text/vtt",
+            //         uri: sub.url,
+            //       });
+            //     }
+            //   });
+            // }
             res.data.sources.forEach((source: any) => {
               streamLinks.push({
-                server: server,
+                server: server + `: ${source.quality}`,
                 link: source.url,
-                type: source.url.includes(".m3u8") ? "m3u8" : "mp4",
+                type: "m3u8",
                 quality: source.quality,
                 headers: {
-                  Referer: "https://animetsu.to/",
-                  Origin: "https://animetsu.to",
+                  referer: "https://animetsu.to/",
                 },
-                subtitles: [], // No subtitle info provided in API response
+                subtitles: subtitles.length > 0 ? subtitles : [],
               });
             });
           }
@@ -61,22 +92,53 @@ export const getStream = async function ({
 
           const res = await axios.get(url, {
             headers: {
-              Referer: "https://animetsu.to/",
+              referer: "https://animetsu.to/",
             },
           });
 
           if (res.data && res.data.sources) {
+            const subtitles: TextTracks = [];
+            // if (res.data.subtitles && Array.isArray(res.data.subtitles)) {
+            //   res.data.subtitles.forEach((sub: any) => {
+            //     if (sub.url && sub.lang) {
+            //       // Extract language code from lang string (e.g., "English" -> "en", "Arabic - CR" -> "ar")
+            //       const langCode = sub.lang.toLowerCase().includes("english")
+            //         ? "en"
+            //         : sub.lang.toLowerCase().includes("arabic")
+            //         ? "ar"
+            //         : sub.lang.toLowerCase().includes("french")
+            //         ? "fr"
+            //         : sub.lang.toLowerCase().includes("german")
+            //         ? "de"
+            //         : sub.lang.toLowerCase().includes("italian")
+            //         ? "it"
+            //         : sub.lang.toLowerCase().includes("portuguese")
+            //         ? "pt"
+            //         : sub.lang.toLowerCase().includes("russian")
+            //         ? "ru"
+            //         : sub.lang.toLowerCase().includes("spanish")
+            //         ? "es"
+            //         : "und";
+
+            //       subtitles.push({
+            //         title: sub.lang,
+            //         language: langCode,
+            //         type: "text/vtt",
+            //         uri: sub.url,
+            //       });
+            //     }
+            //   });
+            // }
             res.data.sources.forEach((source: any) => {
               streamLinks.push({
-                server: `${server} (Dub)`,
+                server: `${server} (Dub) : ${source.quality}`,
                 link: source.url,
-                type: source.url.includes(".m3u8") ? "m3u8" : "mp4",
+                type: "m3u8",
                 quality: source.quality,
                 headers: {
-                  Referer: "https://animetsu.to/",
-                  Origin: "https://animetsu.to",
+                  referer: "https://animetsu.to/",
                 },
-                subtitles: [],
+                subtitles: subtitles.length > 0 ? subtitles : [],
               });
             });
           }
@@ -86,6 +148,7 @@ export const getStream = async function ({
       })
     );
 
+    console.log("Stream links:", streamLinks);
     return streamLinks;
   } catch (err) {
     console.error("animetsu stream error:", err);
