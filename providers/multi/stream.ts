@@ -154,7 +154,7 @@ export const getStream = async function ({
         server: "Multi",
         link: streamUrl.replace(/&i=\d+,'\.4&/, "&i=0.4&"),
         type: "m3u8",
-        subtitles: subtitles,
+        subtitles: [],
       });
     }
 
