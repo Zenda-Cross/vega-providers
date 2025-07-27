@@ -33,6 +33,7 @@ export const getSearchPosts = async function ({
   const { getBaseUrl, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("multi");
   const url = `${baseUrl}/?s=${searchQuery}`;
+  console.log("multiGetPosts url", url);
   return posts({ url, signal, cheerio });
 };
 
@@ -50,14 +51,15 @@ async function posts({
     const data = await res.text();
     const $ = cheerio.load(data);
     const catalog: Post[] = [];
-    $(".items.full")
+    $(".items.full,.result-item")
       .children()
       .map((i, element) => {
-        const title = $(element).find(".poster").find("img").attr("alt");
-        const link = $(element).find(".poster").find("a").attr("href");
+        console.log("multiGetPosts element", element);
+        const title = $(element).find(".poster,.image").find("img").attr("alt");
+        const link = $(element).find(".poster,.image").find("a").attr("href");
         const image =
-          $(element).find(".poster").find("img").attr("data-src") ||
-          $(element).find(".poster").find("img").attr("src");
+          $(element).find(".poster,.image").find("img").attr("data-src") ||
+          $(element).find(".poster,.image").find("img").attr("src");
         if (title && link && image) {
           catalog.push({
             title: title,
