@@ -24,7 +24,7 @@ export const getStream = async function ({
     await Promise.all(
       servers.map(async (server) => {
         try {
-          const url = `${baseUrl}/api/anime/tiddies?server=${server}&id=${animeId}&num=${episodeNumber}&subType=sub`;
+          const url = `https://m3u8.8man.workers.dev?url=${baseUrl}/api/anime/tiddies?server=${server}&id=${animeId}&num=${episodeNumber}&subType=sub`;
 
           const res = await axios.get(url, {
             headers: {
@@ -88,7 +88,7 @@ export const getStream = async function ({
     await Promise.all(
       servers.map(async (server) => {
         try {
-          const url = `${baseUrl}/api/anime/tiddies?server=${server}&id=${animeId}&num=${episodeNumber}&subType=dub`;
+          const url = `https://m3u8.8man.workers.dev?url=${baseUrl}/api/anime/tiddies?server=${server}&id=${animeId}&num=${episodeNumber}&subType=dub`;
 
           const res = await axios.get(url, {
             headers: {
