@@ -24,7 +24,7 @@ export const getStream = async function ({
     await Promise.all(
       servers.map(async (server) => {
         try {
-          const url = `https://m3u8.8man.workers.dev?url=${baseUrl}/api/anime/tiddies?server=${server}&id=${animeId}&num=${episodeNumber}&subType=sub`;
+          const url = `${baseUrl}/api/anime/tiddies?server=${server}&id=${animeId}&num=${episodeNumber}&subType=sub`;
 
           const res = await axios.get(url, {
             headers: {
@@ -68,7 +68,7 @@ export const getStream = async function ({
             res.data.sources.forEach((source: any) => {
               streamLinks.push({
                 server: server + `: ${source.quality}`,
-                link: source.url,
+                link: `https://m3u8.8man.workers.dev?url=${source.url}`,
                 type: "m3u8",
                 quality: source.quality,
                 headers: {
@@ -88,7 +88,7 @@ export const getStream = async function ({
     await Promise.all(
       servers.map(async (server) => {
         try {
-          const url = `https://m3u8.8man.workers.dev?url=${baseUrl}/api/anime/tiddies?server=${server}&id=${animeId}&num=${episodeNumber}&subType=dub`;
+          const url = `${baseUrl}/api/anime/tiddies?server=${server}&id=${animeId}&num=${episodeNumber}&subType=dub`;
 
           const res = await axios.get(url, {
             headers: {
@@ -132,7 +132,7 @@ export const getStream = async function ({
             res.data.sources.forEach((source: any) => {
               streamLinks.push({
                 server: `${server} (Dub) : ${source.quality}`,
-                link: source.url,
+                link: `https://m3u8.8man.workers.dev?url=${source.url}`,
                 type: "m3u8",
                 quality: source.quality,
                 headers: {
