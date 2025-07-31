@@ -60,7 +60,7 @@ export const getSearchPosts = async ({
   const baseUrl = await getBaseUrl("Vega");
 
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
-  const url = `https://c.8man.workers.dev/?url=${baseUrl}/page/${page}/?s=${searchQuery}`;
+  const url = `${baseUrl}/page/${page}/?s=${searchQuery}`;
   console.log("vegaGetPosts url:", url);
 
   return posts(baseUrl, url, signal, commonHeaders, axios, cheerio);
@@ -75,14 +75,14 @@ async function posts(
   cheerio: ProviderContext["cheerio"]
 ): Promise<Post[]> {
   try {
-    const urlRes = await axios.get(url, {
+    const urlRes = await fetch(url, {
       headers: {
         ...headers,
         Referer: baseUrl,
       },
       signal,
     });
-    const $ = cheerio.load(urlRes.data);
+    const $ = cheerio.load(await urlRes.text());
     const posts: Post[] = [];
     $(".blog-items,.post-list")
       ?.children("article")
