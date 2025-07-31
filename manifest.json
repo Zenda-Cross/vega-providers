@@ -2,7 +2,7 @@
   {
     "display_name": "VegaMovies",
     "value": "vega",
-    "version": "1.4",
+    "version": "1.5",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -234,7 +234,7 @@
   {
     "display_name": "RogMovies",
     "value": "luxMovies",
-    "version": "1.2",
+    "version": "1.3",
     "icon": "",
     "type": "india",
     "disabled": false
