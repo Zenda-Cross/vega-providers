@@ -38,7 +38,7 @@ export const getPosts = async ({
   const baseUrl = await getBaseUrl("lux");
 
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
-  const url = `${baseUrl}/${filter}/page/${page}/`;
+  const url = `https://c.8man.workers.dev/?url=${baseUrl}/${filter}/page/${page}/`;
   console.log("lux url:", url);
   return posts(url, signal, providerContext);
 };
@@ -62,8 +62,8 @@ export const getSearchPosts = async ({
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
   const url =
     page === 1
-      ? `${baseUrl}/?s=${searchQuery}`
-      : `${baseUrl}/page/${page}/?s=${searchQuery}`;
+      ? `https://c.8man.workers.dev/?url=${baseUrl}/?s=${searchQuery}`
+      : `https://c.8man.workers.dev/?url=${baseUrl}/page/${page}/?s=${searchQuery}`;
   console.log("lux url:", url);
 
   return posts(url, signal, providerContext);
