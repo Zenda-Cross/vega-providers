@@ -76,14 +76,14 @@ async function posts(
 ): Promise<Post[]> {
   try {
     const { axios, cheerio } = providerContext;
-    const urlRes = await axios.get(url, {
+    const urlRes = await fetch(url, {
       headers: {
         ...headers,
         Referer: url,
       },
       signal,
     });
-    const $ = cheerio.load(urlRes.data);
+    const $ = cheerio.load(await urlRes.text());
     const posts: Post[] = [];
     $(".blog-items")
       ?.children("article")
