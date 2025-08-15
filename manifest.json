@@ -136,12 +136,20 @@
     "disabled": false
   },
   {
+    "display_name": "A.111477",
+    "value": "a111477",
+    "version": "1.2",
+    "icon": "",
+    "type": "english",
+    "disabled": false
+  },
+  {
     "display_name": "VadaPav",
     "value": "vadapav",
     "version": "1.0",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "MoviesApi",
@@ -250,10 +258,9 @@
   {
     "display_name": "GuardaHD",
     "value": "guardahd",
-    "version": "1.2",
+    "version": "1.0",
     "icon": "",
     "type": "italy",
     "disabled": false
   }
 ]
-
