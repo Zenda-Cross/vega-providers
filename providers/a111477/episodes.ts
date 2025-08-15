@@ -34,7 +34,7 @@ export const getEpisodes = async function ({
           fileName.includes(".avi") ||
           fileName.includes(".mov")
         ) {
-          const fullLink = encodeURIComponent(fileLink);
+          const fullLink = fileLink;
 
           // Try to extract episode information from filename
           let episodeTitle = fileName;
