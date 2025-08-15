@@ -35,7 +35,7 @@ export const getMeta = async function ({
         itemTitle !== "../" &&
         itemTitle !== "Parent Directory"
       ) {
-        const fullLink = link + itemLink;
+        const fullLink = encodeURIComponent(itemLink);
 
         // If it's a directory (ends with /)
         if (itemTitle.endsWith("/")) {
