@@ -120,7 +120,7 @@ async function posts({
       }
     });
 
-    return catalog;
+    return catalog.slice(0, 50);
   } catch (err) {
     console.error("111477 directory listing error:", err);
     return [];

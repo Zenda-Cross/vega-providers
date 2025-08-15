@@ -41,7 +41,7 @@ export const getMeta = async function ({
         if (itemTitle.endsWith("/")) {
           const cleanTitle = itemTitle.replace(/\/$/, "");
           links.push({
-            episodesLink: fullLink,
+            episodesLink: link + itemLink + fullLink,
             title: cleanTitle,
           });
         }
