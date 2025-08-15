@@ -136,12 +136,20 @@
     "disabled": false
   },
   {
+    "display_name": "a.111477",
+    "value": "a111477",
+    "version": "1.0",
+    "icon": "",
+    "type": "english",
+    "disabled": false
+  },
+  {
     "display_name": "VadaPav",
     "value": "vadapav",
     "version": "1.0",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "MoviesApi",
