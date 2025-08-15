@@ -136,8 +136,8 @@
     "disabled": false
   },
   {
-    "display_name": "A.111477",
-    "value": "a111477",
+    "display_name": "maze",
+    "value": "maze",
     "version": "1.2",
     "icon": "",
     "type": "english",
@@ -264,3 +264,4 @@
     "disabled": false
   }
 ]
+
