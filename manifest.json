@@ -130,7 +130,7 @@
   {
     "display_name": "HdHub4u",
     "value": "hdhub4u",
-    "version": "1.0",
+    "version": "1.2",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -264,4 +264,5 @@
     "disabled": false
   }
 ]
+
 
