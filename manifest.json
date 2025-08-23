@@ -262,7 +262,17 @@
     "icon": "",
     "type": "italy",
     "disabled": false
+  },
+{
+    "display_name": "HDMovie2",
+    "value": "HDMovie2",
+    "version": "1.0",
+    "icon": "",
+    "type": "india",
+    "disabled": false
   }
+  
 ]
+
 
 
