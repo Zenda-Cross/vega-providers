@@ -52,7 +52,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://hdmovie2.partners";
+    const baseUrl = "https://hdmovie2.africa/";
     let url: string;
 
     if (query && query.trim()) {
@@ -100,4 +100,5 @@ async function fetchPosts({
     return [];
   }
 }
+
 
