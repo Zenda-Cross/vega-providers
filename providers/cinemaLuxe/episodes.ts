@@ -8,68 +8,37 @@ export const getEpisodes = async function ({
   providerContext: ProviderContext;
 }): Promise<EpisodeLink[]> {
   try {
-    if (!url.includes("luxelinks") || url.includes("cinemalux")) {
-      const res = await providerContext.axios.get(url, {
-        headers: providerContext.commonHeaders,
-      });
-      const data = res.data;
-      const encodedLink = data.match(/"link":"([^"]+)"/)?.[1];
-      if (encodedLink) {
-        url = encodedLink ? atob(encodedLink) : url;
-      } else {
-        const redirectUrlRes = await fetch(
-          "https://cm-decrypt.8man.workers.dev/cinemaluxe",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ url }),
-          }
-        );
-        const redirectUrl = await redirectUrlRes.json();
-        url = redirectUrl?.redirectUrl || url;
-      }
-    }
-    const episodeLinks: EpisodeLink[] = [];
-
-    if (url.includes("luxedrive") || url.includes("drive.linkstore")) {
-      episodeLinks.push({
-        title: "Movie",
-        link: url,
-      });
-      return episodeLinks;
-    }
     const res = await providerContext.axios.get(url, {
       headers: providerContext.commonHeaders,
     });
-    const html = res.data;
-    let $ = providerContext.cheerio.load(html);
+    const $ = providerContext.cheerio.load(res.data || "");
+    const episodeLinks: EpisodeLink[] = [];
 
-    $("a.maxbutton-4,a.maxbutton,.maxbutton-hubcloud,.ep-simple-button").map(
-      (i, element) => {
-        const title = $(element).text()?.trim();
-        const link = $(element).attr("href");
-        if (
-          title &&
-          link &&
-          !title.includes("Batch") &&
-          !title.toLowerCase().includes("zip")
-        ) {
-          episodeLinks.push({
-            title: title
-              .replace(/\(\d{4}\)/, "")
-              .replace("Download", "Movie")
-              .replace("⚡", "")
-              .trim(),
-            link,
-          });
-        }
-      }
-    );
+    // Common selectors for episode/download links
+    $("a, .download-links a, .episodes a, .links a, .entry-content a").each((i: number, el: any) => {
+      const $el = $(el);
+      let title = $el.text().trim() || $el.attr("title") || "";
+      const link = $el.attr("href") || "";
+      if (!link) return;
+      // skip archives / zips / batch links
+      if (title.toLowerCase().includes("zip") || title.toLowerCase().includes("batch")) return;
+      title = title.replace(/\s+Download\s*/i, "").replace(/\(\d{4}\)/, "").trim();
+      episodeLinks.push({ title, link });
+    });
+
+    // If none found, try to parse buttons
+    if (!episodeLinks.length) {
+      $(".btn, .dl-btn, .download a").each((i: number, el: any) => {
+        const $el = $(el);
+        const title = $el.text().trim();
+        const link = $el.attr("href") || "";
+        if (link && !title.toLowerCase().includes("zip")) episodeLinks.push({ title, link });
+      });
+    }
+
     return episodeLinks;
   } catch (err) {
-    console.error("cl episode links", err);
+    console.error("cinemaluxe getEpisodes error", err);
     return [];
   }
 };
