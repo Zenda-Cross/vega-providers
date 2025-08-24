@@ -52,7 +52,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://hdmovie2.africa/";
+    const baseUrl = "https://hdmovie2.africa";
     let url: string;
 
     if (query && query.trim()) {
@@ -61,18 +61,21 @@ async function fetchPosts({
       const normalizedFilter = filter || "";
       url = normalizedFilter.startsWith("http")
         ? normalizedFilter
-        : `${baseUrl}${normalizedFilter}${page > 1 ? `/page/${page}` : ""}`;
+        : `${baseUrl}/${normalizedFilter.replace(/^\/|\/$/g, "")}${page > 1 ? `/page/${page}` : ""}`;
     }
 
     const res = await providerContext.axios.get(url, { headers: defaultHeaders, signal });
     const $ = providerContext.cheerio.load(res.data || "");
     const catalog: Post[] = [];
 
+    // Updated selectors for HDMovie2
     const selectors = [".pstr_box", "article", ".result-item", ".post", ".item", ".thumbnail"];
     selectors.forEach((sel) => {
       $(sel).each((i: number, el: any) => {
         const $el = $(el);
         const a = $el.find("a").first();
+        if (!a) return;
+
         const title =
           $el.find("h2").text().trim() ||
           a.attr("title") ||
@@ -80,7 +83,11 @@ async function fetchPosts({
           a.text().trim() ||
           "";
         let link = a.attr("href") || "";
-        let image = $el.find("img").attr("data-src") || $el.find("img").attr("src") || "";
+        let image =
+          $el.find("img").attr("data-src") ||
+          $el.find("img").attr("src") ||
+          $el.find("img").attr("data-lazy-src") ||
+          "";
 
         if (!title || !link || !image) return;
 
@@ -94,11 +101,12 @@ async function fetchPosts({
     return catalog;
   } catch (err) {
     console.error(
-      "hdmovie2.partners fetchPosts error:",
+      "HDMovie2 fetchPosts error:",
       err instanceof Error ? err.message : String(err)
     );
     return [];
   }
 }
+
 
 
