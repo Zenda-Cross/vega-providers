@@ -1,5 +1,3 @@
-// providers/HDMovie2/meta.ts
-
 import { Info, Link, ProviderContext } from "../types";
 
 export const getMeta = async function ({
@@ -10,11 +8,11 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { axios, cheerio } = providerContext;
-    const url = link;
-    const res = await axios.get(url, { headers: providerContext.commonHeaders });
+    const { axios, cheerio, commonHeaders, getBaseUrl } = providerContext;
+    const base = (await getBaseUrl("HDMovie2")) || "https://hdmovie2.africa";
+
+    const res = await axios.get(link, { headers: commonHeaders });
     const $ = cheerio.load(res.data || "");
-    const base = "https://hdmovie2.africa";
 
     const title =
       $("h1.entry-title, h1.post-title, h1").first().text().trim() ||
@@ -40,77 +38,94 @@ export const getMeta = async function ({
       if (t) tags.push(t);
     });
 
-    let rating =
-      $("span.rating, .rating, .imdb, .imdbRatingValue strong, .ratingValue").first().text().trim() ||
-      $("meta[itemprop='ratingValue']").attr("content") ||
-      "";
-    const ratingMatch = rating.match(/\d+(\.\d+)?/);
-    rating = ratingMatch ? ratingMatch[0] : "";
+    const ratingRaw =
+      $("span.rating, .rating, .imdb, .imdbRatingValue strong, .ratingValue")
+        .first()
+        .text()
+        .trim() || $("meta[itemprop='ratingValue']").attr("content") || "";
+    const ratingMatch = ratingRaw.match(/\d+(\.\d+)?/);
+    const rating = ratingMatch ? ratingMatch[0] : "";
 
-    const links: Link[] = [];
-    $("a").each((i, el) => {
+    const imdbId =
+      $("a[href*='imdb.com/title/tt']")
+        .attr("href")
+        ?.split("/tt")[1]
+        ?.split("/")[0] || "";
+
+    const linkList: Link[] = [];
+    const allLinks: Link["directLinks"] = [];
+
+    // Collect all movie links (Play / Download)
+    $("a, button").each((_, el) => {
       const $el = $(el);
       let href = $el.attr("href") || $el.data("href") || "";
-      if (!href) {
-        const onclick = $el.attr("onclick");
-        if (onclick) {
-          const match = onclick.match(/'(https?:\/\/[^']+)'/);
-          if (match) href = match[1];
-        }
+      const lowerText = $el.text().trim().toLowerCase();
+
+      if (!href || href.startsWith("#") || href.startsWith("javascript:void(0)")) return;
+
+      if (href.startsWith("/")) href = base + href;
+      const qualityMatch = lowerText.match(/\d{3,4}p|4k|hd/);
+      const quality = qualityMatch ? qualityMatch[0].toUpperCase() : "auto";
+
+      if (lowerText.includes("play") || lowerText.includes("stream")) {
+        allLinks.push({ title: "Play", link: href, type: "movie", quality });
+      } else if (lowerText.includes("download")) {
+        allLinks.push({ title: "Download", link: href, type: "movie", quality });
       }
-      if (!href) return;
-
-      let titleText = $el.text().trim() || $el.attr("title") || "Link";
-      let quality = "";
-      const qMatch = titleText.match(/(\d{3,4}P|4K|HD|1080|720)/i);
-      if (qMatch) quality = qMatch[0].toUpperCase();
-
-      let directLinkType: "movie" | "series" | "episode" = "episode";
-      const lowerTitle = titleText.toLowerCase();
-      const lowerHref = href.toLowerCase();
-
-      if (
-        lowerTitle.includes("play") ||
-        lowerTitle.includes("stream") ||
-        lowerHref.includes("embed") ||
-        lowerHref.includes("player")
-      ) {
-        directLinkType = "episode"; // Or you can add logic to detect if it's a movie/series
-      } else if (
-        lowerTitle.includes("download") ||
-        lowerTitle.includes("dl") ||
-        lowerHref.includes(".mp4") ||
-        lowerHref.includes(".mkv")
-      ) {
-        directLinkType = "episode";
-      }
-
-      // Instead of pushing an object with 'type', we push an object that has a 'directLinks' array
-      // This conforms to your provided 'Link' interface.
-      links.push({
-        title: titleText,
-        episodesLink: href.startsWith("/") ? base + href : href, // Use episodesLink as a fallback
-        quality: quality || "HD",
-        directLinks: [
-          {
-            title: titleText,
-            link: href.startsWith("/") ? base + href : href,
-            quality: quality || "HD",
-            type: directLinkType,
-          },
-        ],
-      });
     });
 
-    const mediaType = title.toLocaleLowerCase().includes("season") ? "series" : "movie";
+    // Detect if series
+    const isSeries = $(".episodios li, .episode-list li, .episodes li").length > 0;
+
+    if (isSeries) {
+      const episodeLinkMap: { [key: string]: Link["directLinks"] } = {};
+
+      $(".episodios li a, .episode-list li a, .episodes li a").each((i, el) => {
+        const $el = $(el);
+        let href = $el.attr("href") || "";
+        const lowerText = $el.text().trim().toLowerCase();
+        if (!href) return;
+
+        if (href.startsWith("/")) href = base + href;
+        const qualityMatch = lowerText.match(/\d{3,4}p|4k|hd/);
+        const quality = qualityMatch ? qualityMatch[0].toUpperCase() : "auto";
+
+        const epTitle = $el.text().trim() || `Episode ${i + 1}`;
+
+        if (!episodeLinkMap[epTitle]) episodeLinkMap[epTitle] = [];
+
+        if (lowerText.includes("play") || lowerText.includes("stream")) {
+          episodeLinkMap[epTitle].push({ title: "Play", link: href, type: "episode", quality });
+        } else if (lowerText.includes("download")) {
+          episodeLinkMap[epTitle].push({ title: "Download", link: href, type: "episode", quality });
+        } else {
+          // default Play if not specified
+          episodeLinkMap[epTitle].push({ title: "Play", link: href, type: "episode", quality });
+        }
+      });
+
+      for (const [epTitle, links] of Object.entries(episodeLinkMap)) {
+        if (links && links.length > 0) {
+          linkList.push({ title: epTitle, directLinks: links });
+        }
+      }
+    } else {
+      // Single movie
+      if (allLinks.length > 0) {
+        linkList.push({ title: title || "Movie", directLinks: allLinks });
+      } else {
+        // fallback
+        linkList.push({ title: "Play", directLinks: [{ title: "Play", link, type: "movie", quality: "auto" }] });
+      }
+    }
 
     return {
-      title: title || "",
-      synopsis: synopsis || "",
-      image: image || "",
-      imdbId: "",
-      type: mediaType,
-      linkList: links,
+      title,
+      synopsis,
+      image,
+      imdbId,
+      type: isSeries ? "series" : "movie",
+      linkList,
       tags,
       rating,
     };
@@ -128,5 +143,6 @@ export const getMeta = async function ({
     };
   }
 };
+
 
 
