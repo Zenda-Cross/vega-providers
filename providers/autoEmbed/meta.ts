@@ -8,77 +8,93 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   const axios = providerContext.axios;
+
   try {
-    console.log("all", link);
     const res = await axios.get(link);
     const data = res.data;
-    const meta = {
-      title: "",
-      synopsis: "",
-      image: "",
+
+    const meta: Info = {
+      title: data?.meta?.name || "",
+      synopsis: data?.meta?.overview || "",
+      image: data?.meta?.poster_path || "",
       imdbId: data?.meta?.imdb_id || "",
       type: data?.meta?.type || "movie",
+      linkList: [],
     };
 
     const links: Link[] = [];
-    let directLinks: EpisodeLink[] = [];
-    let season = new Map();
+
     if (meta.type === "series") {
-      data?.meta?.videos?.map((video: any) => {
+      const seasonMap = new Map<number, EpisodeLink[]>();
+
+      data?.meta?.videos?.forEach((video: any) => {
         if (video?.season <= 0) return;
-        if (!season.has(video?.season)) {
-          season.set(video?.season, []);
-        }
-        season.get(video?.season).push({
-          title: "Episode " + video?.episode,
+
+        if (!seasonMap.has(video.season)) seasonMap.set(video.season, []);
+
+        const episodeData = {
+          title: "Episode " + video.episode,
           type: "series",
           link: JSON.stringify({
-            title: data?.meta?.name as string,
-            imdbId: data?.meta?.imdb_id,
-            season: video?.id?.split(":")[1],
-            episode: video?.id?.split(":")[2],
-            type: data?.meta?.type,
-            tmdbId: data?.meta?.moviedb_id?.toString() || "",
-            year: data?.meta?.year,
+            title: data.meta.name,
+            imdbId: data.meta.imdb_id,
+            season: video.season,
+            episode: video.episode,
+            type: "series",
+            stream: video?.stream_url || "", // ✅ Stream URL
+            download: video?.download_url || "", // ✅ Download URL
+            year: data.meta.year,
           }),
-        });
+        };
+
+        seasonMap.get(video.season)?.push(episodeData);
       });
-      const keys = Array.from(season.keys());
-      keys.sort();
-      keys.map((key) => {
-        directLinks = season.get(key);
-        links.push({
-          title: `Season ${key}`,
-          directLinks: directLinks,
+
+      Array.from(seasonMap.keys())
+        .sort((a, b) => a - b)
+        .forEach((seasonNum) => {
+          links.push({
+            title: `Season ${seasonNum}`,
+            directLinks: seasonMap.get(seasonNum) || [],
+          });
         });
-      });
     } else {
-      console.log("all meta Mv🔥🔥", meta);
+      // Movie
       links.push({
-        title: data?.meta?.name as string,
+        title: meta.title,
         directLinks: [
           {
-            title: "Movie",
+            title: "Play",
             type: "movie",
             link: JSON.stringify({
-              title: data?.meta?.name as string,
-              imdbId: data?.meta?.imdb_id,
-              season: "",
-              episode: "",
-              type: data?.meta?.type,
-              tmdbId: data?.meta?.moviedb_id?.toString() || "",
+              title: meta.title,
+              imdbId: meta.imdbId,
+              type: "movie",
+              stream: data?.meta?.stream_url || "", // ✅ Stream URL
+              download: data?.meta?.download_url || "", // ✅ Download URL
+              year: data?.meta?.year,
+            }),
+          },
+          {
+            title: "Download",
+            type: "movie",
+            link: JSON.stringify({
+              title: meta.title,
+              imdbId: meta.imdbId,
+              type: "movie",
+              stream: data?.meta?.stream_url || "",
+              download: data?.meta?.download_url || "",
               year: data?.meta?.year,
             }),
           },
         ],
       });
     }
-    return {
-      ...meta,
-      linkList: links,
-    };
+
+    meta.linkList = links;
+    return meta;
   } catch (err) {
-    console.error(err);
+    console.error("getMeta error:", err);
     return {
       title: "",
       synopsis: "",
@@ -89,3 +105,4 @@ export const getMeta = async function ({
     };
   }
 };
+
