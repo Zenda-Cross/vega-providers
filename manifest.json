@@ -286,10 +286,19 @@
     "icon": "",
     "type": "india",
     "disabled": false
-  } 
-  
+  },
+  {
+    "display_name": "Rareanime",
+    "value": "rareanimes",
+    "version": "1.0",
+    "icon": "",
+    "type": "india",
+    "disabled": false
+  }
+ 
   
 ]
+
 
 
 
