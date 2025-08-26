@@ -94,4 +94,3 @@ function rot13(str: string): string {
     return String.fromCharCode(((charCode - base + 13) % 26) + base);
   });
 }
-

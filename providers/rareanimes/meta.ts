@@ -19,7 +19,7 @@ export const getMeta = async function ({
     const res = await axios.get(link, { headers });
     const $ = cheerio.load(res.data);
 
-    // --- Container selection
+    // --- Container
     const container = $("article, .entry-content").first();
 
     // --- Title
@@ -35,7 +35,7 @@ export const getMeta = async function ({
       .trim();
 
     // --- Type
-    const type: "movie" | "series" = /season|episode/i.test(title)
+    const type: "movie" | "series" = /season|episode|ep\s*\d+/i.test(title)
       ? "series"
       : "movie";
 
@@ -43,7 +43,7 @@ export const getMeta = async function ({
     const synopsis =
       container
         .find("p")
-        .map((i, el) => $(el).text().trim())
+        .map((_, el) => $(el).text().trim())
         .get()
         .join(" ") ||
       $("meta[name='description']").attr("content") ||
@@ -60,27 +60,32 @@ export const getMeta = async function ({
 
     // --- IMDb Id
     const imdbId =
-      $('a[href*="imdb.com/title/tt"]')
-        .attr("href")
-        ?.match(/tt\d+/)?.[0] || "";
+      $('a[href*="imdb.com/title/tt"]').attr("href")?.match(/tt\d+/)?.[0] || "";
 
     // --- Links
     const links: Link[] = [];
     const episodeLinks: Link["directLinks"] = [];
     const seenLinks = new Set<string>();
 
-    // --- Episodes
-    container.find('a:contains("Episode"), a:contains("EP")').each((_, el) => {
+    // --- Episodes (improved selectors)
+    $(
+      'a:contains("Episode"), a:contains("EP"), .eplister a, .episodelist a, ul li a'
+    ).each((_, el) => {
       const epTitle = $(el).text().trim();
       const epLink = $(el).attr("href");
       if (!epLink) return;
-      const finalLink = epLink.startsWith("http") ? epLink : new URL(epLink, link).href;
+
+      const finalLink = epLink.startsWith("http")
+        ? epLink
+        : new URL(epLink, link).href;
       if (seenLinks.has(finalLink)) return;
       seenLinks.add(finalLink);
 
-      // Include episode number in title if exists
-      const numberMatch = epTitle.match(/\d+/);
-      const fullTitle = numberMatch ? `Episode ${numberMatch[0]} - ${title}` : epTitle;
+      // Extract episode number
+      const numberMatch = epTitle.match(/(\d+)/);
+      const fullTitle = numberMatch
+        ? `Episode ${numberMatch[0]} - ${title}`
+        : epTitle || `Episode - ${title}`;
 
       episodeLinks.push({
         title: fullTitle,
@@ -91,41 +96,43 @@ export const getMeta = async function ({
 
     // --- Movie / Quality Links
     container.find("a").each((_, el) => {
-      const qText = $(el).text();
+      const qText = $(el).text().trim();
       const qLink = $(el).attr("href");
       if (!qLink) return;
-      const finalLink = qLink.startsWith("http") ? qLink : new URL(qLink, link).href;
+
+      const finalLink = qLink.startsWith("http")
+        ? qLink
+        : new URL(qLink, link).href;
       if (seenLinks.has(finalLink)) return;
 
       if (/480|720|1080|2160|4K|mp4|m3u8/i.test(qText)) {
         seenLinks.add(finalLink);
         episodeLinks.push({
-          title: qText.trim() || "Movie",
+          title: qText || "Movie",
           link: finalLink,
           type: "movie",
-          quality: qText.match(/\b(480p|720p|1080p|2160p|4K|mp4|m3u8)\b/i)?.[0] || "",
+          quality:
+            qText.match(/\b(480p|720p|1080p|2160p|4K)\b/i)?.[0] || "",
         });
       }
     });
 
-    // --- JS Embedded streaming links
+    // --- Embedded JS links (mp4/m3u8 inside <script>)
     const scriptData = $("script")
-      .map((i, el) => $(el).html())
+      .map((_, el) => $(el).html())
       .get()
       .join(" ");
-
-    const jsLinks: { link: string; title: string; type: "movie" }[] = [
-      ...scriptData.matchAll(/https?:\/\/[^'"]+\.(mp4|m3u8)/gi),
-    ].map((m) => ({
-      link: m[0],
-      title: "Stream",
-      type: "movie",
-    }));
-
-    jsLinks.forEach((l) => {
-      if (!seenLinks.has(l.link)) {
-        seenLinks.add(l.link);
-        episodeLinks.push(l);
+    const jsMatches = [
+      ...scriptData.matchAll(/https?:\/\/[^\s'"]+\.(mp4|m3u8)/gi),
+    ];
+    jsMatches.forEach((m) => {
+      if (!seenLinks.has(m[0])) {
+        seenLinks.add(m[0]);
+        episodeLinks.push({
+          title: "Stream Link",
+          link: m[0],
+          type: "movie",
+        });
       }
     });
 
@@ -157,10 +164,3 @@ export const getMeta = async function ({
     };
   }
 };
-
-
-
-
-
-
-

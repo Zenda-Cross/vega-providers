@@ -65,7 +65,7 @@ async function fetchPosts({
     // --- Switch-case for filters
     switch (filter) {
       case "Latest":
-        url = `${baseUrl}/latest/${page > 1 ? `page/${page}/` : ""}`;
+        url = `${baseUrl}/home/${page > 1 ? `page/${page}/` : ""}`;
         break;
       case "Naruto":
         url = `${baseUrl}/?s=Naruto${page > 1 ? `&paged=${page}` : ""}`;
@@ -202,6 +202,8 @@ async function fetchPosts({
       catalog.push({ title, link, image });
     });
 
+    return catalog.slice(0, 100);
+
     // Extra fallback: anchors with images
     $("a[href]").each((_, el) => {
       const anchor = $(el);
@@ -228,5 +230,4 @@ async function fetchPosts({
     return [];
   }
 }
-
 
