@@ -1,12 +1,9 @@
 export const catalog = [
-  { title: "Latest", filter: "" },
-  { title: "Punjabi", filter: "/punjabi" },
-  { title: "Action", filter: "/action" },
-  { title: "Crime", filter: "/crime" },
-  { title: "Comedy", filter: "/comedy" },
-  { title: "Family", filter: "/family" },
-  { title: "Horror", filter: "/horror" },
-  { title: "Romance", filter: "/romance" },
+  { title: "Latest", filter: "genre/bollywood" },
+  { title: "Punjabi", filter: "genre/punjabi" },
+  { title: "Sony-liv", filter: "genre/sonyliv" },
+  { title: "Jio-Cinema", filter: "genre/jio-cinema" },
+  { title: "Hotstar", filter: "genre/hotstar" },
+  { title: "Netflix", filter: "genre/netflix" },
+  { title: "zee5", filter: "genre/zee5" },
 ];
-
-

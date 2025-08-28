@@ -5,9 +5,13 @@ const defaultHeaders = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
     "(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  Pragma: "no-cache",
+  "Cache-Control": "no-cache",
 };
 
-// Normal catalog posts
+// --- Normal catalog posts ---
 export async function getPosts({
   filter,
   page = 1,
@@ -22,7 +26,7 @@ export async function getPosts({
   return fetchPosts({ filter, page, query: "", signal, providerContext });
 }
 
-// Search posts
+// --- Search posts ---
 export async function getSearchPosts({
   searchQuery,
   page = 1,
@@ -37,7 +41,7 @@ export async function getSearchPosts({
   return fetchPosts({ filter: "", page, query: searchQuery, signal, providerContext });
 }
 
-// Core function
+// --- Core function ---
 async function fetchPosts({
   filter,
   query,
@@ -52,53 +56,68 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://hdmovie2.africa";
+    const baseUrl = "https://hdmovie2.careers";
     let url: string;
 
+    // --- Build URL for category filter or search query
     if (query && query.trim()) {
       url = `${baseUrl}/?s=${encodeURIComponent(query)}${page > 1 ? `&paged=${page}` : ""}`;
+    } else if (filter) {
+      url = filter.startsWith("/")
+        ? `${baseUrl}${filter.replace(/\/$/, "")}${page > 1 ? `/page/${page}` : ""}`
+        : `${baseUrl}/${filter}${page > 1 ? `/page/${page}` : ""}`;
     } else {
-      const normalizedFilter = filter || "";
-      url = normalizedFilter.startsWith("http")
-        ? normalizedFilter
-        : `${baseUrl}/${normalizedFilter.replace(/^\/|\/$/g, "")}${page > 1 ? `/page/${page}` : ""}`;
+      url = `${baseUrl}${page > 1 ? `/page/${page}` : ""}`;
     }
 
-    const res = await providerContext.axios.get(url, { headers: defaultHeaders, signal });
-    const $ = providerContext.cheerio.load(res.data || "");
+    const { axios, cheerio } = providerContext;
+    const res = await axios.get(url, { headers: defaultHeaders, signal });
+    const $ = cheerio.load(res.data || "");
+
+    const resolveUrl = (href: string) =>
+      href?.startsWith("http") ? href : new URL(href, url).href;
+
+    const seen = new Set<string>();
     const catalog: Post[] = [];
 
-    // Updated selectors for HDMovie2
-    const selectors = [".pstr_box", "article", ".result-item", ".post", ".item", ".thumbnail"];
-    selectors.forEach((sel) => {
-      $(sel).each((i: number, el: any) => {
-        const $el = $(el);
-        const a = $el.find("a").first();
-        if (!a) return;
+    // --- HDMovie2 selectors
+    const POST_SELECTORS = [
+      ".pstr_box",
+      "article",
+      ".result-item",
+      ".post",
+      ".item",
+      ".thumbnail",
+      ".latest-movies",
+      ".movie-item",
+    ].join(",");
 
-        const title =
-          $el.find("h2").text().trim() ||
-          a.attr("title") ||
-          a.find("img").attr("alt") ||
-          a.text().trim() ||
-          "";
-        let link = a.attr("href") || "";
-        let image =
-          $el.find("img").attr("data-src") ||
-          $el.find("img").attr("src") ||
-          $el.find("img").attr("data-lazy-src") ||
-          "";
+    $(POST_SELECTORS).each((_, el) => {
+      const card = $(el);
+      let link = card.find("a[href]").first().attr("href") || "";
+      if (!link) return;
+      link = resolveUrl(link);
+      if (seen.has(link)) return;
 
-        if (!title || !link || !image) return;
+      let title =
+        card.find("h2").first().text().trim() ||
+        card.find("a[title]").first().attr("title")?.trim() ||
+        card.text().trim();
+      title = title.replace(/\[.*?\]/g, "").replace(/\(.+?\)/g, "").replace(/\s{2,}/g, " ").trim();
+      if (!title) return;
 
-        if (link.startsWith("/")) link = baseUrl + link;
-        if (image.startsWith("/")) image = baseUrl + image;
+      const img =
+        card.find("img").first().attr("src") ||
+        card.find("img").first().attr("data-src") ||
+        card.find("img").first().attr("data-original") ||
+        "";
+      const image = img ? resolveUrl(img) : "";
 
-        catalog.push({ title, link, image });
-      });
+      seen.add(link);
+      catalog.push({ title, link, image });
     });
 
-    return catalog;
+    return catalog.slice(0, 100);
   } catch (err) {
     console.error(
       "HDMovie2 fetchPosts error:",
@@ -107,6 +126,3 @@ async function fetchPosts({
     return [];
   }
 }
-
-
-

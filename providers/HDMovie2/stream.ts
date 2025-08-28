@@ -1,33 +1,54 @@
-// providers/HDMovie2/stream.ts
 import { Stream, ProviderContext } from "../types";
 
 export const getStream = async function ({
   link,
-  type,
-  signal,
   providerContext,
 }: {
   link: string;
-  type: string;
-  signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Stream[]> {
+  const { axios, cheerio } = providerContext;
+  const streams: Stream[] = [];
+
   try {
-    const { extractors, commonHeaders } = providerContext;
+    const res = await axios.get(link);
+    const $ = cheerio.load(res.data);
 
-    // For HDMovie2, we use hubcloudExtracter for all playable links
-    const streams = await extractors.hubcloudExtracter(link, signal);
+    // --- Find all player options (servers / episodes)
+    const playerOptions = $("#playeroptionsul li");
+    if (playerOptions.length === 0) {
+      // fallback: single iframe
+      const iframeLink = $("iframe").attr("src");
+      if (iframeLink) {
+        streams.push({
+          link: iframeLink.startsWith("//") ? "https:" + iframeLink : iframeLink,
+          type: "embed",
+          quality: "auto",
+          server: "Main",
+        });
+      }
+      return streams;
+    }
 
-    if (!streams.length) throw new Error("No streams available");
-    return streams.map((s) => ({
-      ...s,
-      quality: s.quality || "auto",
-      type,
-    }));
+    playerOptions.each((_, el) => {
+      const option = $(el);
+      const serverName = option.find(".title").text().trim() || "Server";
+      const postId = option.attr("data-post");
+      const numeId = option.attr("data-nume");
+
+      if (!postId || !numeId || numeId === "trailer") return;
+
+      streams.push({
+        link: `https://hdmovie2.careers/wp-json/dooplayer/v2/${postId}/${numeId}`,
+        type: "embed",
+        quality: "auto",
+        server: serverName,
+      });
+    });
   } catch (err) {
     console.error("HDMovie2 getStream error:", err);
-    return [];
   }
-};
 
+  return streams;
+};
 

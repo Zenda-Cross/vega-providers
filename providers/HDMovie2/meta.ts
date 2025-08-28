@@ -1,5 +1,11 @@
 import { Info, Link, ProviderContext } from "../types";
 
+const hdbHeaders = {
+  Referer: "https://google.com",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+};
+
 export const getMeta = async function ({
   link,
   providerContext,
@@ -8,115 +14,100 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { axios, cheerio, commonHeaders, getBaseUrl } = providerContext;
-    const base = (await getBaseUrl("HDMovie2")) || "https://hdmovie2.africa";
+    const { axios, cheerio } = providerContext;
+    const res = await axios.get(link, { headers: hdbHeaders });
+    const $ = cheerio.load(res.data);
 
-    const res = await axios.get(link, { headers: commonHeaders });
-    const $ = cheerio.load(res.data || "");
+    const container = $("#single");
 
+    // --- Title
     const title =
-      $("h1.entry-title, h1.post-title, h1").first().text().trim() ||
-      $("meta[property='og:title']").attr("content") ||
-      $("title").text().split("|")[0].trim() ||
-      "";
+      container.find("h1.entry-title").text().trim() ||
+      $("meta[property='og:title']")
+        .attr("content")
+        ?.replace(" - Hdmovie2", "")
+        .trim() ||
+      "Unknown";
 
-    const synopsis =
-      $("div.synopsis, .summary, .entry-content p").first().text().trim() ||
-      $("meta[name='description']").attr("content") ||
-      "";
+    // --- Type
+    const type = title.toLowerCase().includes("season") ? "series" : "movie";
 
-    let image =
+    // --- Image
+    const image =
+      container.find(".poster img").attr("src") ||
       $("meta[property='og:image']").attr("content") ||
-      $("img.wp-post-image").attr("src") ||
-      $("img.featured, .poster img, .cover img").attr("src") ||
       "";
-    if (image.startsWith("/")) image = base + image;
 
-    const tags: string[] = [];
-    $("a[rel='tag'], .tags a, .post-categories a, .genres a").each((i, el) => {
-      const t = $(el).text().trim();
-      if (t) tags.push(t);
+    // --- Synopsis (first valid paragraph)
+    let synopsis = "";
+    container.find(".entry-content p").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && !text.includes("Watch Online HD Print")) {
+        synopsis = text;
+        return false; // exit after first valid para
+      }
     });
 
-    const ratingRaw =
-      $("span.rating, .rating, .imdb, .imdbRatingValue strong, .ratingValue")
-        .first()
-        .text()
-        .trim() || $("meta[itemprop='ratingValue']").attr("content") || "";
-    const ratingMatch = ratingRaw.match(/\d+(\.\d+)?/);
-    const rating = ratingMatch ? ratingMatch[0] : "";
-
+    // --- Rating, IMDB ID, Tags, Cast
+    const rating =
+      container.find(".imdb span[itemprop='ratingValue']").text().trim() || "";
     const imdbId =
-      $("a[href*='imdb.com/title/tt']")
-        .attr("href")
-        ?.split("/tt")[1]
-        ?.split("/")[0] || "";
+      container.find(".imdb a").attr("href")?.split("/")[4] || "";
+    const tags = container
+      .find(".sgeneros a")
+      .map((_, el) => $(el).text().trim())
+      .get();
+    const cast = container
+      .find(".cast .person a")
+      .map((_, el) => $(el).text().trim())
+      .get();
 
+    // --- Links
     const linkList: Link[] = [];
-    const allLinks: Link["directLinks"] = [];
 
-    // Collect all movie links (Play / Download)
-    $("a, button").each((_, el) => {
-      const $el = $(el);
-      let href = $el.attr("href") || $el.data("href") || "";
-      const lowerText = $el.text().trim().toLowerCase();
+    // --- Play Button (all servers inside)
+    const playServers: Link["directLinks"] = [];
+    container.find("#playeroptionsul li").each((_, el) => {
+      const linkEl = $(el);
+      const linkTitle = linkEl.find(".title").text().trim() || "Server";
+      const linkDataPost = linkEl.attr("data-post");
+      const linkDataNume = linkEl.attr("data-nume");
 
-      if (!href || href.startsWith("#") || href.startsWith("javascript:void(0)")) return;
-
-      if (href.startsWith("/")) href = base + href;
-      const qualityMatch = lowerText.match(/\d{3,4}p|4k|hd/);
-      const quality = qualityMatch ? qualityMatch[0].toUpperCase() : "auto";
-
-      if (lowerText.includes("play") || lowerText.includes("stream")) {
-        allLinks.push({ title: "Play", link: href, type: "movie", quality });
-      } else if (lowerText.includes("download")) {
-        allLinks.push({ title: "Download", link: href, type: "movie", quality });
+      if (linkDataPost && linkDataNume && linkDataNume !== "trailer") {
+        playServers.push({
+          title: linkTitle,
+          link: `https://hdmovie2.careers/wp-json/dooplayer/v2/${linkDataPost}/${linkDataNume}`,
+        });
       }
     });
 
-    // Detect if series
-    const isSeries = $(".episodios li, .episode-list li, .episodes li").length > 0;
-
-    if (isSeries) {
-      const episodeLinkMap: { [key: string]: Link["directLinks"] } = {};
-
-      $(".episodios li a, .episode-list li a, .episodes li a").each((i, el) => {
-        const $el = $(el);
-        let href = $el.attr("href") || "";
-        const lowerText = $el.text().trim().toLowerCase();
-        if (!href) return;
-
-        if (href.startsWith("/")) href = base + href;
-        const qualityMatch = lowerText.match(/\d{3,4}p|4k|hd/);
-        const quality = qualityMatch ? qualityMatch[0].toUpperCase() : "auto";
-
-        const epTitle = $el.text().trim() || `Episode ${i + 1}`;
-
-        if (!episodeLinkMap[epTitle]) episodeLinkMap[epTitle] = [];
-
-        if (lowerText.includes("play") || lowerText.includes("stream")) {
-          episodeLinkMap[epTitle].push({ title: "Play", link: href, type: "episode", quality });
-        } else if (lowerText.includes("download")) {
-          episodeLinkMap[epTitle].push({ title: "Download", link: href, type: "episode", quality });
-        } else {
-          // default Play if not specified
-          episodeLinkMap[epTitle].push({ title: "Play", link: href, type: "episode", quality });
-        }
+    if (playServers.length > 0) {
+      linkList.push({
+        title: "Play",
+        directLinks: playServers,
       });
+    }
 
-      for (const [epTitle, links] of Object.entries(episodeLinkMap)) {
-        if (links && links.length > 0) {
-          linkList.push({ title: epTitle, directLinks: links });
-        }
+    // --- Download Links
+    const downloadLinks: Link["directLinks"] = [];
+    container.find(".dooplay_player .downloads a").each((_, el) => {
+      const href = $(el).attr("href");
+      const text = $(el).text().trim();
+      if (href && text) {
+        downloadLinks.push({
+          title: text,
+          link: href,
+          quality:
+            text.match(/\b(480p|720p|1080p|2160p|4k|hd)\b/i)?.[0] || "AUTO",
+        });
       }
-    } else {
-      // Single movie
-      if (allLinks.length > 0) {
-        linkList.push({ title: title || "Movie", directLinks: allLinks });
-      } else {
-        // fallback
-        linkList.push({ title: "Play", directLinks: [{ title: "Play", link, type: "movie", quality: "auto" }] });
-      }
+    });
+
+    if (downloadLinks.length > 0) {
+      linkList.push({
+        title: "Download",
+        directLinks: downloadLinks,
+      });
     }
 
     return {
@@ -124,10 +115,11 @@ export const getMeta = async function ({
       synopsis,
       image,
       imdbId,
-      type: isSeries ? "series" : "movie",
-      linkList,
+      type,
       tags,
+      cast,
       rating,
+      linkList,
     };
   } catch (err) {
     console.error("HDMovie2 getMeta error:", err);
@@ -137,12 +129,10 @@ export const getMeta = async function ({
       image: "",
       imdbId: "",
       type: "movie",
-      linkList: [],
       tags: [],
+      cast: [],
       rating: "",
+      linkList: [],
     };
   }
 };
-
-
-
