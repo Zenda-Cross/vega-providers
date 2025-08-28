@@ -2,7 +2,7 @@
   {
     "display_name": "VegaMovies",
     "value": "vega",
-    "version": "1.5",
+    "version": "1.7",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -298,6 +298,7 @@
  
   
 ]
+
 
 
 
