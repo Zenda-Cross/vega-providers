@@ -15,7 +15,7 @@ const headers = {
   "Sec-Fetch-Site": "none",
   "Sec-Fetch-User": "?1",
   Cookie:
-    "ext_name=ojplmecpdpgccookcobabopnaifgidhf; cf_clearance=lDWFqLsHL5LZ.VpfxQRtHY2_mpXRuq3OFTbVDKNIZGw-1752051595-1.2.1.1-VZ2S8yUrcCuOMLUgWfNv9a1LrtuhUKEd.uPN1Au_9tuTFYLra7ugoFBYKfsunvzrBOlYSYM0q8J7vpw.JhGZH0RO6MlaVBKH5olmoryhd6s11LXg7ZF1Ld_NedYoA7uKk_SBhbb1CCsj11S52U9VUve7twrLEjILmw3MEURU1eGqOOi3YGxtGgpQBNYgfnkJCoRkLB_6vQESw4RcIvO1j1BHMuyMVEkbn7sBtLEX52w",
+    "xla=s4t; _ga=GA1.1.1081149560.1756378968; _ga_BLZGKYN5PF=GS2.1.s1756378968$o1$g1$t1756378984$j44$l0$h0",
   "Upgrade-Insecure-Requests": "1",
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0",
@@ -38,7 +38,7 @@ export const getPosts = async ({
   const baseUrl = await getBaseUrl("lux");
 
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
-  const url = `https://c.8man.workers.dev/?url=${baseUrl}/${filter}/page/${page}/`;
+  const url = `${baseUrl}/${filter}/page/${page}/`;
   console.log("lux url:", url);
   return posts(url, signal, providerContext);
 };

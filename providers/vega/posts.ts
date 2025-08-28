@@ -15,7 +15,7 @@ const headers = {
   "Sec-Fetch-Site": "none",
   "Sec-Fetch-User": "?1",
   Cookie:
-    "_lscache_vary=62abf8b96599676eb8ec211cffaeb8ff; ext_name=ojplmecpdpgccookcobabopnaifgidhf; cf_clearance=n4Y1XTKZ5TfIMBNQuAXzerwKpx0U35KoOm3imfT0GpU-1732097818-1.2.1.1-ZeAnEu.8D9TSZHYDoj7vwo1A1rpdKl304ZpaBn_QbAQOr211JFAb7.JRQU3EL2eIy1Dfl8HhYvH7_259.22lUz8gbchHcQ8hvfuQXMtFMCbqDBLzjNUZa9stuk.39l28IcPhH9Z2szsf3SGtNI1sAfo66Djt7sOReLK3lHw9UkJp7BdGqt6a2X9qAc8EsAI3lE480Tmt0fkHv14Oc30LSbPB_WwFmiqAki2W.Gv9hV7TN_QBFESleTDlXd.6KGflfd4.KwWF7rpSRo_cgoc9ALLLIafpxHVbe7_g5r7zvpml_Pj8fEL75fw.1GBuy16bciHBuB8s_kahuJYUnhtQFFgfTQl8_Gn6KeovBWx.PJ7nFv5sklHUfAyBVq3t30xKe8ZDydsQ_G.yipfj_In5GmmWcXGb6E4.bioDOwW_sKLtxwdTQt7Nu.RkILX_mKvXNpyLqflIVj8G7X5E8I.unw",
+    "xla=s4t; _ga=GA1.1.1081149560.1756378968; _ga_BLZGKYN5PF=GS2.1.s1756378968$o1$g1$t1756378984$j44$l0$h0",
   "Upgrade-Insecure-Requests": "1",
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
@@ -38,7 +38,7 @@ export const getPosts = async ({
   const baseUrl = await getBaseUrl("Vega");
 
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
-  const url = `https://c.8man.workers.dev/?url=${baseUrl}/${filter}/page/${page}/`;
+  const url = `${baseUrl}/${filter}/page/${page}/`;
   console.log("vegaGetPosts url:", url);
   return posts(baseUrl, url, signal, headers, axios, cheerio);
 };
@@ -60,7 +60,7 @@ export const getSearchPosts = async ({
   const baseUrl = await getBaseUrl("Vega");
 
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
-  const url = `https://c.8man.workers.dev/?url=${baseUrl}/page/${page}/?s=${searchQuery}`;
+  const url = `${baseUrl}/page/${page}/?s=${searchQuery}`;
   console.log("vegaGetPosts url:", url);
 
   return posts(baseUrl, url, signal, commonHeaders, axios, cheerio);
