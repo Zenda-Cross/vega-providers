@@ -56,14 +56,14 @@ export const getSearchPosts = async ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> => {
-  const { getBaseUrl, axios, commonHeaders, cheerio } = providerContext;
+  const { getBaseUrl, axios, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("Vega");
 
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
   const url = `${baseUrl}/page/${page}/?s=${searchQuery}`;
   console.log("vegaGetPosts url:", url);
 
-  return posts(baseUrl, url, signal, commonHeaders, axios, cheerio);
+  return posts(baseUrl, url, signal, headers, axios, cheerio);
 };
 
 async function posts(
