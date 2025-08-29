@@ -34,17 +34,13 @@ export const getMeta = async function ({
       .trim();
 
     // --- Type
-    const type: "movie" | "series" = /season|episode|ep\s*\d+/i.test(title)
+    const type: "movie" | "series" = /season|episode|ep\s*\d+/i.test(rawTitle)
       ? "series"
       : "movie";
 
     // --- Synopsis
     const synopsis =
-      container
-        .find("p")
-        .map((_, el) => $(el).text().trim())
-        .get()
-        .join(" ") ||
+      $('h2:contains("Storyline")').next('p').text().trim() ||
       $("meta[name='description']").attr("content") ||
       $("meta[property='og:description']").attr("content") ||
       "";
@@ -52,7 +48,7 @@ export const getMeta = async function ({
     // --- Image
     let image =
       $("meta[property='og:image']").attr("content") ||
-      container.find("img.wp-post-image").attr("src") ||
+      container.find("img[fetchpriority='high']").attr("src") ||
       container.find("img").first().attr("src") ||
       "";
     if (image.startsWith("/")) image = `https://pikahd.eu${image}`;
@@ -65,103 +61,57 @@ export const getMeta = async function ({
 
     // --- Links
     const links: Link[] = [];
-    const streamLinks: Link["directLinks"] = [];
-    const downloadLinks: Link["directLinks"] = [];
     const seenLinks = new Set<string>();
 
-    // --- Episodes (Play button)
-    $('a:contains("Episode"), a:contains("EP"), .episodelist a, ul li a', container).each(
-      (_, el) => {
-        const epTitle = $(el).text().trim();
-        const epLink = $(el).attr("href");
-        if (!epLink) return;
+    const episodeNumberMatch = rawTitle.match(/Episode\s*(\d+)/i);
+    const seasonNumberMatch = rawTitle.match(/S(\d+)/i);
+    let episodeNumber = episodeNumberMatch ? episodeNumberMatch[1] : "Unknown";
+    let seasonNumber = seasonNumberMatch ? seasonNumberMatch[1] : "Unknown";
 
-        const finalLink = epLink.startsWith("http") ? epLink : new URL(epLink, link).href;
-        if (seenLinks.has(finalLink)) return;
-        seenLinks.add(finalLink);
-
-        const numberMatch = epTitle.match(/(\d+)/);
-        const episodeNumber = numberMatch ? numberMatch[0] : "Unknown";
-        const fullTitle = `Episode ${episodeNumber} - ${title}`;
-
-        streamLinks.push({
-          title: fullTitle,
-          link: finalLink,
-          type: "episode",
-        });
-      }
-    );
-
-    // --- Download / Direct links (Download button)
-    container.find("a").each((_, el) => {
-      const linkText = $(el).text().trim();
-      const href = $(el).attr("href");
-      if (!href) return;
-
-      const finalLink = href.startsWith("http") ? href : new URL(href, link).href;
-      if (seenLinks.has(finalLink)) return;
-
-      if (/download/i.test(linkText)) {
-        seenLinks.add(finalLink);
-        downloadLinks.push({
-          title: linkText || "Download",
-          link: finalLink,
-          type: "movie",
-        });
-      } else if (/480|720|1080|2160|4K|mp4|m3u8/i.test(linkText) || /\.(mp4|m3u8)$/i.test(finalLink)) {
-        // Stream link inside normal a tags
-        seenLinks.add(finalLink);
-        streamLinks.push({
-          title: linkText || "Stream",
-          link: finalLink,
-          type: "movie",
-          quality: linkText.match(/\b(480p|720p|1080p|2160p|4K)\b/i)?.[0] || "",
-        });
-      }
-    });
-
-    // --- Script embedded mp4/m3u8
-    const scriptData = $("script", container)
-      .map((_, el) => $(el).html())
-      .get()
-      .join(" ");
-    const jsMatches = [...scriptData.matchAll(/https?:\/\/[^\s'"]+\.(mp4|m3u8)/gi)];
-    jsMatches.forEach((m) => {
-      if (!seenLinks.has(m[0])) {
-        seenLinks.add(m[0]);
-        streamLinks.push({
-          title: "Stream Link",
-          link: m[0],
-          type: "movie",
-        });
-      }
-    });
-
-    // --- Iframe embedded streams
+    // --- Iframe embedded streams (Primary Stream)
+    const episodeLinks: Link["directLinks"] = [];
     $("iframe", container).each((_, el) => {
       const src = $(el).attr("src");
       if (!src) return;
       const finalLink = src.startsWith("http") ? src : new URL(src, link).href;
       if (!seenLinks.has(finalLink)) {
         seenLinks.add(finalLink);
-        streamLinks.push({
-          title: "Iframe Stream",
+        episodeLinks.push({
+          title: `Main Stream (Season ${seasonNumber}, Episode ${episodeNumber})`,
           link: finalLink,
-          type: "movie",
         });
       }
     });
 
-    // --- Push into final links array (always default empty array)
-    links.push({
-      title: title || "Episodes / Stream",
-      directLinks: streamLinks || [],
+    // --- Episode Download Links (Structured in <h3> tags)
+    container.find('h3 a[href*="links.kmhd.net"]').each((_, el) => {
+      const href = $(el).attr("href");
+      if (!href) return;
+
+      const finalLink = href.startsWith("http") ? href : new URL(href, link).href;
+      if (seenLinks.has(finalLink)) return;
+      seenLinks.add(finalLink);
+
+      const linkText = $(el).text().trim(); // e.g., "E01: 1080p"
+      const epMatch = linkText.match(/E(\d+)/i);
+      const qualityMatch = linkText.match(/(1080p|720p|480p)/i);
+
+      episodeNumber = epMatch ? epMatch[1] : episodeNumber;
+      const quality = qualityMatch ? qualityMatch[0] : "HD";
+
+      episodeLinks.push({
+        title: `Season ${seasonNumber}, Episode ${episodeNumber} (${quality})`,
+        link: finalLink,
+        quality,
+      });
     });
 
-    links.push({
-      title: title || "Download Links",
-      directLinks: downloadLinks || [],
-    });
+    if (episodeLinks.length > 0) {
+      links.push({
+        title: "Episodes",
+        directLinks: episodeLinks,
+      });
+    }
 
     return {
       title,
@@ -183,4 +133,3 @@ export const getMeta = async function ({
     };
   }
 };
-

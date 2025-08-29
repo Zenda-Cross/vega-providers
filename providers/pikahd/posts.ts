@@ -70,4 +70,3 @@ export async function getSearchPosts({
   const url = `https://pikahd.eu/?s=${query}&page=${page}`;
   return fetchPosts(url, providerContext, signal);
 }
-
