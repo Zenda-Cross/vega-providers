@@ -1,70 +1,16 @@
-// catalog.ts
 export const catalog = [
-  {
-    title: "Latest",
-    filter: "",
-  },
-  {
-    title: "Bollywood",
-    filter: "/category/bollywood-movies",
-  },
-  {
-    title: "Hollywood",
-    filter: "/category/hollywood-movies",
-  },
-  {
-    title: "Dual Audio",
-    filter: "/category/dual-audio-movies",
-  },
-  {
-    title: "South Movies",
-    filter: "/category/south-hindi-dubbed-movies",
-  },
-  {
-    title: "Web Series",
-    filter: "/category/tv-shows-hindi",
-  },
+  { title: "Naruto", filter: "Naruto" },
+  { title: "Pokémon", filter: "Pokémon" },
+  { title: "Doraemon", filter: "Doraemon" },
+  { title: "Ben 10", filter: "Ben 10" },
+  { title: "One Punch Man", filter: "One Punch Man" },
 ];
 
 export const genres = [
-  {
-    title: "Action",
-    filter: "/category/action",
-  },
-  {
-    title: "Comedy",
-    filter: "/category/comedy",
-  },
-  {
-    title: "Crime",
-    filter: "/category/crime",
-  },
-  {
-    title: "Drama",
-    filter: "/category/drama",
-  },
-  {
-    title: "Family",
-    filter: "/category/family",
-  },
-  {
-    title: "Horror",
-    filter: "/category/horror",
-  },
-  {
-    title: "Romance",
-    filter: "/category/romance",
-  },
-  {
-    title: "Sci-Fi",
-    filter: "/category/scifi",
-  },
-  {
-    title: "Thriller",
-    filter: "/category/thriller",
-  },
-  {
-    title: "Adventure",
-    filter: "/category/adventure",
-  },
+  { title: "one-piece", filter: "one-piece" },
+{ title: "Naruto", filter: "Naruto" },
+  { title: "Pokémon", filter: "Pokémon" },
+  { title: "Doraemon", filter: "Doraemon" },
+  { title: "Ben 10", filter: "Ben 10" },
+  { title: "One Punch Man", filter: "One Punch Man" },
 ];
