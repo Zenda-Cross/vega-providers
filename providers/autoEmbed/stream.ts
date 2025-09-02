@@ -11,12 +11,25 @@ export const getStream = async ({
 }): Promise<Stream[]> => {
   try {
     const streams: Stream[] = [];
-    const { imdbId, season, episode, title, tmdbId, year } = JSON.parse(id);
+    const payload = (() => {
+      try {
+        return JSON.parse(id);
+      } catch {
+        return { tmdbId: id };
+      }
+    })();
+
+    const tmdbId: string | number =
+      payload.tmdbId ?? payload.id ?? payload.tmdId ?? "";
+    const season: string = payload.season ?? "";
+    const episode: string = payload.episode ?? "";
+    const effectiveType: string = payload.type ?? type ?? "movie";
+
     await getRiveStream(
-      tmdbId,
+      String(tmdbId),
       episode,
       season,
-      type,
+      effectiveType,
       streams,
       providerContext
     );
@@ -35,31 +48,25 @@ export async function getRiveStream(
   Streams: Stream[],
   providerContext: ProviderContext
 ) {
-  const secret = generateSecretKey(Number(tmdId));
+  if (!tmdId || tmdId === "undefined") {
+    console.warn("autoEmbed/rive: missing tmdbId in link payload");
+    return;
+  }
+  const secret = generateSecretKey(tmdId);
   const servers = [
     "flowcast",
-    "shadow",
+    "primevids",
+    "humpy",
+    "loki",
     "asiacloud",
+    "shadow",
     "hindicast",
-    "anime",
     "animez",
-    "guard",
-    "curve",
-    "hq",
-    "ninja",
-    "alpha",
-    "kaze",
-    "zenesis",
-    "genesis",
-    "zenith",
-    "ghost",
-    "halo",
-    "kinoecho",
-    "ee3",
-    "volt",
+    "aqua",
+    "voyager",
+    "yggdrasil",
     "putafilme",
     "ophim",
-    "kage",
   ];
   const baseUrl = await providerContext.getBaseUrl("rive");
   const cors = process.env.CORS_PRXY ? process.env.CORS_PRXY + "?url=" : "";
@@ -109,142 +116,177 @@ export async function getRiveStream(
 }
 
 function generateSecretKey(id: number | string) {
-  // Array of secret key fragments - updated array from the new implementation
+  // Array of secret key fragments from the provided implementation
   const c = [
-    "Yhv40uKAZa",
-    "nn8YU4yBA",
-    "uNeH",
-    "ehK",
-    "jT0",
-    "n5G",
-    "99R",
-    "MvB1M",
-    "DQtPCh",
-    "GBRjk4k4I",
-    "CzIOoa95UT",
-    "BLE8s",
-    "GDZlc7",
-    "Fz45T",
-    "JW6lWn",
-    "DE3g4uw0i",
-    "18KxmYizv",
-    "8ji",
-    "JUDdNMnZ",
-    "oGpBippPgm",
-    "7De8Pg",
-    "Zv6",
-    "VHT9TVN",
-    "bYH6m",
-    "aK1",
-    "WcWH6jU",
-    "Q47YEMi4k",
-    "vRD3A",
-    "CGOsfJO",
-    "BLn8",
-    "RgK0drv7l",
-    "oPTfGCn3a",
-    "MkpMDkttW9",
-    "VNI1fPM",
-    "XNFi6",
-    "6cq",
-    "4LvTksXoEI",
-    "1rRa2KOZB0",
-    "zoOGRb8HT2",
-    "mhcXDtvz",
-    "NUmexFY2Ur",
-    "6BIMdvSZ",
-    "Tr0zU2vjRd",
-    "QPR",
-    "fhOqJR",
-    "R9VnFY",
-    "xkZ99D6S",
-    "umY7E",
-    "5Ds8qyDq",
-    "Cc6jy09y3",
-    "yvU3iR",
-    "Bg07zY",
-    "GccECglg",
-    "VYd",
-    "6vOiXqz",
-    "7xX",
-    "UdRrbEzF",
-    "fE6wc",
-    "BUd25Rb",
-    "lxq5Zum89o",
+    "oYRu3JJ5g1C",
+    "TRlWJIJXT",
+    "RuoyGA0udvsFVXr",
+    "Y4s2LNM4y",
+    "wHzuSgl0fD",
+    "MGLTaSGs",
+    "rr0rSBIYfwutV7E",
+    "ABJXC9c",
+    "W2BuY0yDB9CcK",
+    "3yvZP1OJuTM",
+    "YDoqbu6zdN0zT",
+    "rnNQ2a5OBaMu",
+    "eSKa1Uy",
+    "QsIV8J472Xa",
+    "cPfTgu27",
+    "j4mzadQCou9",
+    "qHLZbLrZQfB",
+    "8U9YP6hrTz4cJNQ",
+    "xbAbu4pzFEXz",
+    "dhuA9zvdw",
+    "k3A1JGmb",
+    "eVC3z4COdUNvvzA",
+    "dwMmuXnrb",
+    "AqpWzY9I1ZmGPR",
+    "VGXWUm0JTetmXs",
+    "gD4sH3CISTanpTs",
+    "d6w8dntV",
+    "iL6dvSNqEab4kd",
+    "mIB8NFtmPjnX1kM",
+    "F4PXdP0Hx3",
+    "5Fijua4Z7C",
+    "wPGnHJrkYa1Tu4P",
+    "pjrfBfTf",
+    "vswQDEbM0y64io",
+    "LAnpQuk6hR2bEWs",
+    "kX8orxNnkK",
+    "mRsZ5fjHbC8YuT",
+    "JnBr1jr",
+    "2twFGU5PgvDmKdP",
+    "3wCg6zYtHFjy",
+    "gaQSJhixHiy1pa8",
+    "pE2cXTP0GPX",
+    "xr0ONW3sOnCRdt",
+    "QZu43flHFsebX",
+    "yrvtqRTOnHo",
+    "kvXEs16lgj",
+    "AGwT2zpQVHCMb09",
+    "M4BxOh3z2JgC",
+    "5hbV7briYC7",
+    "YfHMsm0",
+    "jC9PAPfz34Vgc",
+    "ExoJ1tgEXpK",
+    "eD8WPA4Lmsyf4W",
+    "h7WSlhT7iNOj",
+    "RRP61kk",
+    "QtY0f1aN",
+    "TlatGjcOQjup",
+    "MfpeEGbjouYSOa",
+    "Zz0Qh8B0pwUkdRT",
+    "Y4SkLSQNU",
+    "hOk01KFeEVbNRZx",
+    "fyf4H8MXazm3oY",
+    "Z116B9F2p",
+    "GdxNJOnvdz",
+    "kqVNNHfP",
+    "IO3hhNu",
+    "qDdC9Lcllce",
+    "Et7lLOg",
+    "6ZlQrvfgZu",
+    "YXHLeZBF",
+    "NH6nAd7y",
+    "ARsut59gfK6j0v",
+    "jPE2KXiJjnSsjn",
+    "qYcG5HOJc3TtxM",
+    "C2w06YGj5C",
+    "kHx1pT7",
+    "2enXfHXw",
+    "koFHBiR054aizN",
+    "Uj53XTQ92Ntbq7K",
+    "QjC5euFYi2AuxWb",
+    "njLwvdMejA",
+    "NWMzrwTAVZEb",
+    "s4sVqC0AyTM5h",
+    "pu01jeZ6AoH",
+    "SgiOfwx9qkR",
+    "grjsLtBNn9eTQg",
+    "XABTTaYgihZk2mq",
+    "2vlSCZQc3HT27F4",
+    "kQZ7VQfEL3TC7P",
+    "MEzqVne021W",
+    "BLYPZp2SIO",
+    "5zDMVoqw4nH",
+    "t14S9uLuGKX7Lb5",
+    "4McODHAYTyp",
+    "EAoxL5UKvMPqjH3",
+    "hJpAbqp",
+    "tcj63Wpz",
+    "hGqEu0LxKkMv46P",
+    "u2wNvb8ou19N3",
+    "wUKY6Opi1kH",
   ];
 
-  // Handle undefined input
   if (id === undefined) {
     return "rive";
   }
 
   try {
-    let fragment, insertPos;
-    // Convert input to string
-    const idStr = String(id);
+    let t: string, n: number;
+    const r = String(id);
 
-    // Updated string hash function to match the new implementation
+    if (isNaN(Number(id))) {
+      const sum = r.split("").reduce((e, ch) => e + ch.charCodeAt(0), 0);
+      t = c[sum % c.length] || btoa(r);
+      n = Math.floor((sum % r.length) / 2);
+    } else {
+      const num = Number(id);
+      t = c[num % c.length] || btoa(r);
+      n = Math.floor((num % r.length) / 2);
+    }
+
+    const i = r.slice(0, n) + t + r.slice(n);
+
     /* eslint-disable no-bitwise */
-    const generateStringHash = function (input: string) {
-      input = String(input);
-      let hash = 0;
-      for (let i = 0; i < input.length; i++) {
-        const char = input.charCodeAt(i);
-        hash =
-          ((char + (hash << 6) + (hash << 16) - hash) ^ (char << i % 5)) >>> 0;
+    const innerHash = (e: string) => {
+      e = String(e);
+      let t = 0 >>> 0;
+      for (let n = 0; n < e.length; n++) {
+        const r = e.charCodeAt(n);
+        const i =
+          (((t = (r + (t << 6) + (t << 16) - t) >>> 0) << n % 5) |
+            (t >>> (32 - (n % 5)))) >>>
+          0;
+        t = (t ^ (i ^ (((r << n % 7) | (r >>> (8 - (n % 7)))) >>> 0))) >>> 0;
+        t = (t + ((t >>> 11) ^ (t << 3))) >>> 0;
       }
-      hash ^= hash >>> 13;
-      hash = (1540483477 * hash) >>> 0;
-      return (hash ^= hash >>> 15).toString(16).padStart(8, "0");
+      t ^= t >>> 15;
+      t = ((t & 65535) * 49842 + ((((t >>> 16) * 49842) & 65535) << 16)) >>> 0;
+      t ^= t >>> 13;
+      t = ((t & 65535) * 40503 + ((((t >>> 16) * 40503) & 65535) << 16)) >>> 0;
+      t ^= t >>> 16;
+      return t.toString(16).padStart(8, "0");
     };
 
-    // Updated MurmurHash-like function to match the new implementation
-    const applyMurmurHash = function (input: string) {
-      const str = String(input);
-      let hash = 3735928559 ^ str.length;
-      for (let i = 0; i < str.length; i++) {
-        let char = str.charCodeAt(i);
-        char ^= ((i + 31) * 131) & 255;
-        hash =
-          (668265261 *
-            (hash = (((hash << 7) | (hash >>> 25)) >>> 0) ^ char)) >>>
-          0;
+    const outerHash = (e: string) => {
+      const t = String(e);
+      let n = (3735928559 ^ t.length) >>> 0;
+      for (let idx = 0; idx < t.length; idx++) {
+        let r = t.charCodeAt(idx);
+        r ^= ((131 * idx + 89) ^ (r << idx % 5)) & 255;
+        n = (((n << 7) | (n >>> 25)) >>> 0) ^ r;
+        const i = ((n & 65535) * 60205) >>> 0;
+        const o = (((n >>> 16) * 60205) << 16) >>> 0;
+        n = (i + o) >>> 0;
+        n ^= n >>> 11;
       }
-      hash ^= hash >>> 16;
-      hash = (2246822507 * hash) >>> 0;
-      hash ^= hash >>> 13;
-      hash = (3266489909 * hash) >>> 0;
-      return (hash ^= hash >>> 16).toString(16).padStart(8, "0");
+      n ^= n >>> 15;
+      n = (((n & 65535) * 49842 + (((n >>> 16) * 49842) << 16)) >>> 0) >>> 0;
+      n ^= n >>> 13;
+      n = (((n & 65535) * 40503 + (((n >>> 16) * 40503) << 16)) >>> 0) >>> 0;
+      n ^= n >>> 16;
+      n = (((n & 65535) * 10196 + (((n >>> 16) * 10196) << 16)) >>> 0) >>> 0;
+      n ^= n >>> 15;
+      return n.toString(16).padStart(8, "0");
     };
     /* eslint-enable no-bitwise */
 
-    // Generate the encoded hash using the new implementation
-    const encodedHash = btoa(applyMurmurHash(generateStringHash(idStr)));
-
-    // Different handling for non-numeric vs numeric inputs
-    if (isNaN(Number(id))) {
-      // For non-numeric inputs, sum the character codes
-      const charSum = idStr
-        .split("")
-        .reduce((sum, char) => sum + char.charCodeAt(0), 0);
-      // Select array element or fallback to base64 encoded input
-      fragment = c[charSum % c.length] || btoa(idStr);
-      // Calculate insertion position
-      insertPos = Math.floor((charSum % encodedHash.length) / 2);
-    } else {
-      // For numeric inputs, use the number directly
-      const numId = Number(id);
-      fragment = c[numId % c.length] || btoa(idStr);
-      // Calculate insertion position
-      insertPos = Math.floor((numId % encodedHash.length) / 2);
-    }
-
-    // Construct the final key by inserting the selected value into the base64 string
-    return (
-      encodedHash.slice(0, insertPos) + fragment + encodedHash.slice(insertPos)
-    );
-  } catch (error) {
-    // Return fallback value if any errors occur
+    const o = outerHash(innerHash(i));
+    return btoa(o);
+  } catch (e) {
     return "topSecret";
   }
 }
