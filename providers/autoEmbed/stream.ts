@@ -87,25 +87,28 @@ export async function getRiveStream(
           headers: providerContext.commonHeaders,
         });
         const subtitles: TextTracks = [];
-        if (res.data?.data?.captions) {
-          res.data?.data?.captions.forEach((sub: any) => {
-            subtitles.push({
-              language: sub?.label?.slice(0, 2) || "Und",
-              uri: sub?.file,
-              title: sub?.label || "Undefined",
-              type: sub?.file?.endsWith(".vtt")
-                ? "text/vtt"
-                : "application/x-subrip",
-            });
-          });
-        }
+        // if (res.data?.data?.captions) {
+        //   res.data?.data?.captions.forEach((sub: any) => {
+        //     subtitles.push({
+        //       language: sub?.label?.slice(0, 2) || "Und",
+        //       uri: sub?.file,
+        //       title: sub?.label || "Undefined",
+        //       type: sub?.file?.endsWith(".vtt")
+        //         ? "text/vtt"
+        //         : "application/x-subrip",
+        //     });
+        //   });
+        // }
         res.data?.data?.sources.forEach((source: any) => {
           Streams.push({
             server: source?.source + "-" + source?.quality,
             link: source?.url,
             type: source?.format === "hls" ? "m3u8" : "mp4",
             quality: source?.quality,
-            subtitles: subtitles,
+            // subtitles: subtitles,
+            headers: {
+              referer: baseUrl,
+            },
           });
         });
       } catch (e) {
