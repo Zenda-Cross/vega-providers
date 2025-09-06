@@ -20,6 +20,8 @@ export const getStream = async function ({
     "Upgrade-Insecure-Requests": "1",
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    Cookie:
+      "61cn=1; 61wk=1; __cf_bm=wtv9Eoa2wrUDgevtAnJ6wUOZrxtVYBcddhUDtT0Wj_M-1757137848-1.0.1.1-8Tr7rV19zNgUcRYe_5567LKb2IZrKyxwrc1VWgTmMDd06Givhil3U2kMtUYTYkTnuD3sHUgfh8CO9Y5LrEcZACBbrPE.3Sq5F_JLXaK7Hrw; conv_tracking_data-2=%7B%22mf_source%22%3A%22regular_download-59%22%2C%22mf_content%22%3A%22Free%22%2C%22mf_medium%22%3A%22unknown%5C%2FDefault%20Browser%22%2C%22mf_campaign%22%3A%22616qpccbrq0y4oe%22%2C%22mf_term%22%3A%22d11b8f533377139aa38d757e5057630e%22%7D; ukey=pu2dyp35fyongstav3km969l8d6u2z82",
   };
 
   try {
@@ -110,7 +112,7 @@ export const getStream = async function ({
     try {
       const key =
         html.match(/formData\.append\('key',\s*'(\d+)'\);/)?.[1] || "";
-      console.log("key", key);
+      console.log("key", key, "url", url);
       const formData = new FormData();
       formData.append("key", key);
       const streamRes = await fetch(url, {
@@ -120,7 +122,10 @@ export const getStream = async function ({
       });
       data = await streamRes.json();
     } catch (err) {
-      console.log("error in world4uGetStream", err);
+      console.log(
+        "error in world4uGetStream",
+        err instanceof Error ? err.message : err
+      );
     }
 
     // console.log('streamRes', streamRes);
@@ -131,8 +136,12 @@ export const getStream = async function ({
       $(".input.popsok").attr("href");
     console.log("mediafireUrl", mediafireUrl);
     if (mediafireUrl) {
-      const directUrl = await axios.head(mediafireUrl);
-      const urlContentType = directUrl.headers["content-type"];
+      const directUrl = await fetch(mediafireUrl, {
+        headers: {
+          Referer: url,
+        },
+      });
+      const urlContentType = directUrl.headers.get("content-type");
       console.log("mfcontentType", urlContentType);
       if (urlContentType && urlContentType.includes("video")) {
         streamLinks.push({
@@ -142,19 +151,23 @@ export const getStream = async function ({
         });
         return streamLinks;
       } else {
-        const repairRes = await axios.get(mediafireUrl, {
+        const repairRes = await fetch(mediafireUrl, {
           headers: {
             Referer: url,
           },
         });
-        const repairHtml = repairRes.data;
+        const repairHtml = await repairRes.text();
 
         // Regex to match the window.location.href assignment in the script content
-        const hrefRegex = /window\.location\.href\s*=\s*['"]([^'"]+)['"]/;
-        const match = repairHtml.match(hrefRegex);
+        const base64Link = cheerio
+          .load(repairHtml)(".input.popsok")
+          .attr("data-scrambled-url");
+        console.log("base64Link", base64Link);
+        const href = base64Link ? atob(base64Link) : null;
+        console.log("href", href);
 
         // If a match is found, return the URL; otherwise return null
-        let downloadLInk = match ? match[1] : null;
+        let downloadLInk = href?.startsWith("https://") ? href : null;
         console.log("downloadLInk", downloadLInk);
 
         if (downloadLInk) {
@@ -168,8 +181,8 @@ export const getStream = async function ({
       }
     }
 
-    const requireRepairRes = await axios.head(data.download);
-    const contentType = requireRepairRes.headers["content-type"];
+    const requireRepairRes = await fetch(data.download);
+    const contentType = requireRepairRes.headers.get("content-type");
     console.log("contentType", contentType);
     if (contentType && contentType.includes("video")) {
       streamLinks.push({
@@ -179,19 +192,19 @@ export const getStream = async function ({
       });
       return streamLinks;
     } else {
-      const repairRes = await axios.get(data.download, {
+      const repairRes = await fetch(data.download, {
         headers: {
           Referer: url,
         },
       });
-      const repairHtml = repairRes.data;
+      const repairHtml = await repairRes.text();
       const $ = cheerio.load(repairHtml);
       const repairLink = $("#continue-btn").attr("href");
       console.log("repairLink", "https://www.mediafire.com" + repairLink);
-      const repairRequireRepairRes = await axios.get(
+      const repairRequireRepairRes = await fetch(
         "https://www.mediafire.com" + repairLink
       );
-      const $$ = cheerio.load(repairRequireRepairRes.data);
+      const $$ = cheerio.load(await repairRequireRepairRes.text());
       const repairDownloadLink = $$(".input.popsok").attr("href");
       console.log("repairDownloadLink", repairDownloadLink);
       if (repairDownloadLink) {
@@ -205,7 +218,7 @@ export const getStream = async function ({
 
     return streamLinks;
   } catch (err) {
-    console.log(err);
+    console.log(err instanceof Error ? err.message : err);
     return [];
   }
 };
