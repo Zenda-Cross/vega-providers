@@ -20,6 +20,8 @@ export const getStream = async function ({
     "Upgrade-Insecure-Requests": "1",
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    Cookie:
+      "61cn=1; 61wk=1; __cf_bm=wtv9Eoa2wrUDgevtAnJ6wUOZrxtVYBcddhUDtT0Wj_M-1757137848-1.0.1.1-8Tr7rV19zNgUcRYe_5567LKb2IZrKyxwrc1VWgTmMDd06Givhil3U2kMtUYTYkTnuD3sHUgfh8CO9Y5LrEcZACBbrPE.3Sq5F_JLXaK7Hrw; conv_tracking_data-2=%7B%22mf_source%22%3A%22regular_download-59%22%2C%22mf_content%22%3A%22Free%22%2C%22mf_medium%22%3A%22unknown%5C%2FDefault%20Browser%22%2C%22mf_campaign%22%3A%22616qpccbrq0y4oe%22%2C%22mf_term%22%3A%22d11b8f533377139aa38d757e5057630e%22%7D; ukey=pu2dyp35fyongstav3km969l8d6u2z82",
   };
 
   try {
@@ -43,6 +45,12 @@ export const getStream = async function ({
       fastilinksFormData.append(
         "_csrf_token_645a83a41868941e4692aa31e7235f2",
         fastilinksKey || ""
+      );
+      console.log(
+        "fastilinksFormData",
+        fastilinksFormData,
+        "fastilinksUrl",
+        url
       );
       const fastilinksRes2 = await fetch(url, {
         method: "POST",
@@ -142,8 +150,8 @@ export const getStream = async function ({
       }
     }
 
-    const res = await axios.get(url, { headers });
-    const html = res.data;
+    const res = await fetch(url, { headers: headers });
+    const html = await res.text();
     const streamLinks: Stream[] = [];
     let data = { download: "" };
     try {
@@ -170,7 +178,8 @@ export const getStream = async function ({
     // console.log('data', html);
     const mediafireUrl =
       $('h1:contains("Download")').find("a").attr("href") ||
-      $(".input.popsok").attr("href");
+      $(".input.popsok").attr("href") ||
+      url;
     console.log("mediafireUrl", mediafireUrl);
     if (mediafireUrl) {
       const directUrl = await fetch(mediafireUrl, {
