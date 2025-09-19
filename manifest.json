@@ -85,7 +85,7 @@
     "version": "1.3",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "FilmyFly",
@@ -302,11 +302,20 @@
     "icon": "",
     "type": "india",
     "disabled": false
+  },
+  {
+    "display_name": "Filmyzilla",
+    "value": "Filmyzilla",
+    "version": "1.0",
+    "icon": "",
+    "type": "india",
+    "disabled": false
   }
  
  
   
 ]
+
 
 
 
