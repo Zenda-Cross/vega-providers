@@ -266,7 +266,7 @@
 {
     "display_name": "HDMovie2",
     "value": "HDMovie2",
-    "version": "1.0",
+    "version": "1.2",
     "icon": "",
     "type": "india",
     "disabled": false
@@ -285,7 +285,7 @@
     "version": "1.0",
     "icon": "",
     "type": "india",
-    "disabled": false
+    "disabled": true 
   },
   {
     "display_name": "Rareanime",
@@ -315,6 +315,7 @@
  
   
 ]
+
 
 
 
