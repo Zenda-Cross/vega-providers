@@ -3,7 +3,7 @@ import { Info, Link, ProviderContext } from "../types";
 const hdbHeaders = {
   Referer: "https://google.com",
   "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
 };
 
 export const getMeta = async function ({
@@ -15,98 +15,101 @@ export const getMeta = async function ({
 }): Promise<Info> {
   try {
     const { axios, cheerio } = providerContext;
+
+    if (!link.startsWith("http")) {
+      link = new URL(link, "https://hdmovie2.srl").href;
+    }
+
     const res = await axios.get(link, { headers: hdbHeaders });
     const $ = cheerio.load(res.data);
 
-    const container = $("#single");
-
     // --- Title
     const title =
-      container.find("h1.entry-title").text().trim() ||
-      $("meta[property='og:title']")
-        .attr("content")
-        ?.replace(" - Hdmovie2", "")
-        .trim() ||
+      $("h1.entry-title").first().text().trim() ||
+      $("meta[property='og:title']").attr("content")?.replace(" - Hdmovie2", "").trim() ||
+      $("title").text().trim() ||
       "Unknown";
 
-    // --- Type
-    const type = title.toLowerCase().includes("season") ? "series" : "movie";
-
     // --- Image
-    const image =
-      container.find(".poster img").attr("src") ||
+    let image =
+      $(".poster img").attr("src") ||
       $("meta[property='og:image']").attr("content") ||
+      $("meta[name='twitter:image']").attr("content") ||
       "";
+    if (image && !image.startsWith("http")) image = new URL(image, link).href;
 
-    // --- Synopsis (first valid paragraph)
+    // --- Synopsis (multiple fallbacks)
     let synopsis = "";
-    container.find(".entry-content p").each((_, el) => {
+    // try content paragraphs
+    $(".wp-content p, .entry-content p, .description, .synopsis").each((_, el) => {
       const text = $(el).text().trim();
-      if (text && !text.includes("Watch Online HD Print")) {
+      if (text && text.length > 40 && !text.toLowerCase().includes("download")) {
         synopsis = text;
-        return false; // exit after first valid para
+        return false; // break loop
       }
     });
-
-    // --- Rating, IMDB ID, Tags, Cast
-    const rating =
-      container.find(".imdb span[itemprop='ratingValue']").text().trim() || "";
-    const imdbId =
-      container.find(".imdb a").attr("href")?.split("/")[4] || "";
-    const tags = container
-      .find(".sgeneros a")
-      .map((_, el) => $(el).text().trim())
-      .get();
-    const cast = container
-      .find(".cast .person a")
-      .map((_, el) => $(el).text().trim())
-      .get();
-
-    // --- Links
-    const linkList: Link[] = [];
-
-    // --- Play Button (all servers inside)
-    const playServers: Link["directLinks"] = [];
-    container.find("#playeroptionsul li").each((_, el) => {
-      const linkEl = $(el);
-      const linkTitle = linkEl.find(".title").text().trim() || "Server";
-      const linkDataPost = linkEl.attr("data-post");
-      const linkDataNume = linkEl.attr("data-nume");
-
-      if (linkDataPost && linkDataNume && linkDataNume !== "trailer") {
-        playServers.push({
-          title: linkTitle,
-          link: `https://hdmovie2.careers/wp-json/dooplayer/v2/${linkDataPost}/${linkDataNume}`,
-        });
-      }
-    });
-
-    if (playServers.length > 0) {
-      linkList.push({
-        title: "Play",
-        directLinks: playServers,
-      });
+    if (!synopsis) {
+      synopsis =
+        $("meta[property='og:description']").attr("content") ||
+        $("meta[name='description']").attr("content") ||
+        "";
     }
 
-    // --- Download Links
-    const downloadLinks: Link["directLinks"] = [];
-    container.find(".dooplay_player .downloads a").each((_, el) => {
-      const href = $(el).attr("href");
-      const text = $(el).text().trim();
-      if (href && text) {
-        downloadLinks.push({
-          title: text,
-          link: href,
-          quality:
-            text.match(/\b(480p|720p|1080p|2160p|4k|hd)\b/i)?.[0] || "AUTO",
-        });
-      }
+    // --- Genre, Cast
+    const tags =
+      $(".sgeneros a, .genres a, .genre a")
+        .map((_, el) => $(el).text().trim())
+        .get() || [];
+
+    const cast =
+      $(".cast .person a, .casting a, .actors a")
+        .map((_, el) => $(el).text().trim())
+        .get() || [];
+
+    // --- Rating & IMDB
+    let rating =
+      $(".imdb span[itemprop='ratingValue']").text().trim() ||
+      $(".ratingValue").text().trim() ||
+      $("meta[itemprop='ratingValue']").attr("content") ||
+      "";
+    if (rating && !rating.includes("/")) {
+      // normalize e.g. "7.5" -> "7.5/10"
+      rating = rating + "/10";
+    }
+
+    const imdbLink =
+      $(".imdb a[href*='imdb.com'], a[href*='imdb.com']").attr("href") || "";
+    const imdbId = imdbLink ? imdbLink.split("/tt")[1]?.split("/")[0] ? "tt" + imdbLink.split("/tt")[1].split("/")[0] : "" : "";
+
+    // --- Download links
+    const downloadCandidates: Array<{ href: string; text: string; quality?: string }> = [];
+    $(".download-container a[href], .downloads a[href], .dwnLink a[href]").each((_, el) => {
+      let href = ($(el).attr("href") || "").trim();
+      const text = ($(el).text() || "").trim();
+      if (!href || !text) return;
+
+      if (!href.startsWith("http")) href = new URL(href, link).href;
+
+      const qualityMatch = text.match(
+        /\b(240p|360p|480p|720p|1080p|2160p|4k|HDRip|HD|Full HD|BluRay|CAM|WEBRip)\b/i
+      );
+      const quality = qualityMatch ? qualityMatch[0] : "AUTO";
+
+      downloadCandidates.push({ href, text, quality });
     });
 
-    if (downloadLinks.length > 0) {
-      linkList.push({
-        title: "Download",
-        directLinks: downloadLinks,
+    const links: Link[] = [];
+    for (const d of downloadCandidates) {
+      links.push({
+        title: d.text,
+        directLinks: [
+          {
+            link: d.href,
+            title: d.text,
+            quality: d.quality,
+            type: "movie",
+          },
+        ],
       });
     }
 
@@ -115,11 +118,11 @@ export const getMeta = async function ({
       synopsis,
       image,
       imdbId,
-      type,
+      type: "movie",
       tags,
       cast,
       rating,
-      linkList,
+      linkList: links,
     };
   } catch (err) {
     console.error("HDMovie2 getMeta error:", err);

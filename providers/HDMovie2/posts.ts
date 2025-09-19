@@ -56,7 +56,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://hdmovie2.careers";
+    const baseUrl = "https://hdmovie2.srl";
     let url: string;
 
     // --- Build URL for category filter or search query
