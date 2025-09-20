@@ -1,45 +1,60 @@
-import { Stream } from "../types";
+import { Stream, ProviderContext } from "../types";
 
 export const getStream = async function ({
   link,
+  type,
+  providerContext,
 }: {
   link: string;
+  type: string;
+  providerContext: ProviderContext;
 }): Promise<Stream[]> {
   try {
+    const { axios, cheerio } = providerContext;
+
+    // Step 1: Page fetch karo
+    const res = await axios.get(link, {
+      headers: {
+        Referer: "https://ufilmywap.info",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      },
+    });
+
+    const $ = cheerio.load(res.data);
     const streams: Stream[] = [];
-    const headers = {
-      Connection: "Keep-Alive",
-      "User-Agent":
-        "Mozilla/5.0 (WindowsNT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.37",
-      Referer: "https://molop.art/",
-      Cookie:
-        "cf_clearance=M2_2Hy4lKRy_ruRX3dzOgm3iho1FHe2DUC1lq28BUtI-1737377622-1.2.1.1-6R8RaH94._H2BuNuotsjTZ3fAF6cLwPII0guemu9A5Xa46lpCJPuELycojdREwoonYS2kRTYcZ9_1c4h4epi2LtDvMM9jIoOZKE9pIdWa30peM1hRMpvffTjGUCraHsJNCJez8S_QZ6XkkdP7GeQ5iwiYaI6Grp6qSJWoq0Hj8lS7EITZ1LzyrALI6iLlYjgLmgLGa1VuhORWJBN8ZxrJIZ_ba_pqbrR9fjnyToqxZ0XQaZfk1d3rZyNWoZUjI98GoAxVjnKtcBQQG6b2jYPJuMbbYraGoa54N7E7BR__7o",
-    };
-    const response = await fetch(link, {
-      redirect: "manual",
-      headers: headers,
-    });
 
-    if (response.status >= 300 && response.status < 400) {
-      const redirectLink = response.headers.get("Location");
-      if (redirectLink) {
-        link = redirectLink;
-      }
-    }
-    if (response.url) {
-      link = response.url;
-    }
+    // Step 2: a.button, a.button2, a.button4 wale links scrape karo
+    $("a.button, a.button2, a.button4").each((_, el) => {
+  const hrefAttr = $(el).attr("href"); // string | undefined
+  if (!hrefAttr) return; // undefined ho to skip
+  let href: string = hrefAttr.trim(); // ab string guaranteed
 
-    streams.push({
-      server: "Dooflix",
-      link: link,
-      headers: headers,
-      type: "m3u8",
-    });
-    console.log("doo streams", streams);
+  let text = $(el).text().trim() || "";
+
+  // Agar unwanted source hai to skip
+  const unwantedPatterns = [
+    /direct download/i,
+    /telegram/i,
+    /gofile\.io/i,
+    /resumable/i,
+  ];
+  if (unwantedPatterns.some(pat => pat.test(text) || pat.test(href))) return;
+
+  // Agar relative URL hai to absolute banao
+  if (!href.startsWith("http")) href = new URL(href, link).href;
+
+  streams.push({
+    server: text,
+    link: href,
+    type: "mp4",
+  });
+});
+
+
     return streams;
   } catch (err) {
-    console.error(err);
+    console.error("FilesDL getStream error:", err);
     return [];
   }
 };

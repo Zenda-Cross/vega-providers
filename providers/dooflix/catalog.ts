@@ -1,12 +1,5 @@
 export const catalog = [
-  {
-    title: "Series",
-    filter: "/rest-api//v130/tvseries",
-  },
-  {
-    title: "Movies",
-    filter: "/rest-api//v130/movies",
-  },
+  { title: "Latest", filter: "" },
+  { title: "Hollywood", filter: "category/hollywood-movie/" },
+  { title: "Bollywood", filter: "category/uncategorized/" },
 ];
-
-export const genres = [];
