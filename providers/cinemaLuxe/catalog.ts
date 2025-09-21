@@ -1,12 +1,23 @@
 export const catalog = [
-  { title: "Trending", filter: "/genre/latest-trending-releases/" },
-  { title: "Netflix", filter: "/network/netflix/" },
-  { title: "Amazon Prime", filter: "/network/prime-video/" },
-  { title: "Hindi", filter: "/language/hindi/" },
-  { title: "English", filter: "/language/english/" },
-    {
-    title: "Animation",
-    filter: "/genre/anime/",
+  {
+    title: "Trending",
+    filter: "",
+  },
+  {
+    title: "Pakistani",
+    filter: "pakistani-movies/",
+  },
+  {
+    title: "Bengali",
+    filter: "bengali-movies/",
+  },
+  {
+    title: "Tamil",
+    filter: "tamil-movies/",
+  },
+  {
+    title: "Hollywood",
+    filter: "hollywood-movies/hollywood-movies-new/",
   },
 ];
 

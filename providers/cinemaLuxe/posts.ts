@@ -1,126 +1,132 @@
-import { ProviderContext } from "../types";
+import { Post, ProviderContext } from "../types";
 
-export const getPosts = async function ({
+const defaultHeaders = {
+  Referer: "https://www.google.com",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  Pragma: "no-cache",
+  "Cache-Control": "no-cache",
+};
+
+// --- Normal catalog posts ---
+export async function getPosts({
   filter,
-  query,
-  page,
+  page = 1,
   signal,
   providerContext,
 }: {
-  filter?: string; // category filter
-  query?: string; // search query
+  filter?: string;
   page?: number;
   signal?: AbortSignal;
   providerContext: ProviderContext;
-}) {
+}): Promise<Post[]> {
+  return fetchPosts({ filter, page, query: "", signal, providerContext });
+}
+
+// --- Search posts ---
+export async function getSearchPosts({
+  searchQuery,
+  page = 1,
+  signal,
+  providerContext,
+}: {
+  searchQuery: string;
+  page?: number;
+  signal?: AbortSignal;
+  providerContext: ProviderContext;
+}): Promise<Post[]> {
+  return fetchPosts({ filter: "", page, query: searchQuery, signal, providerContext });
+}
+
+// --- Core function ---
+async function fetchPosts({
+  filter,
+  query,
+  page = 1,
+  signal,
+  providerContext,
+}: {
+  filter?: string;
+  query?: string;
+  page?: number;
+  signal?: AbortSignal;
+  providerContext: ProviderContext;
+}): Promise<Post[]> {
   try {
-    // ✅ Safe Base URL handling
-    let baseUrl = "https://cinemalux.run";
-    try {
-      if (providerContext.getBaseUrl) {
-        const maybeBase: any = await providerContext.getBaseUrl("cinemalux");
-        if (typeof maybeBase === "string" && maybeBase.startsWith("http")) {
-          baseUrl = maybeBase;
-        } else if (maybeBase && typeof maybeBase.url === "string") {
-          baseUrl = maybeBase.url;
-        }
-      }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.warn("⚠️ getBaseUrl failed, using default:", errorMessage);
-    }
-
-    // ✅ Decide URL (Search vs Normal)
+    const baseUrl = "https://www.vegam0vies.com";
     let url: string;
-    if (query && query.trim().length > 0) {
-      // 🔎 Search mode
-      url = `${baseUrl.replace(/\/$/, "")}/search/${encodeURIComponent(
-        query
-      )}/`;
+
+    // --- Build URL for category filter or search query ---
+    if (query && query.trim()) {
+      // Updated for search.php HTML structure
+      const params = new URLSearchParams();
+      params.append("query", query);
+      if (page > 1) params.append("page", page.toString());
+      url = `${baseUrl}/search.php?${params.toString()}`;
+    } else if (filter) {
+      url = filter.startsWith("/")
+        ? `${baseUrl}${filter.replace(/\/$/, "")}${page > 1 ? `/page/${page}` : ""}`
+        : `${baseUrl}/${filter}${page > 1 ? `/page/${page}` : ""}`;
     } else {
-      // 📂 Normal category mode
-      const normalizedFilter = filter || "/";
-      url =
-        (normalizedFilter.startsWith("http") ||
-        normalizedFilter.startsWith("https"))
-          ? normalizedFilter
-          : `${baseUrl.replace(/\/$/, "")}${normalizedFilter}${
-              page && page > 1 ? `page/${page}/` : ""
-            }`;
+      url = `${baseUrl}${page > 1 ? `/page/${page}` : ""}`;
     }
 
-    const res = await providerContext.axios.get(url, {
-      headers: providerContext.commonHeaders,
-      signal,
-    });
+    const { axios, cheerio } = providerContext;
+    const res = await axios.get(url, { headers: defaultHeaders, signal });
+    const $ = cheerio.load(res.data || "");
 
-    const $ = providerContext.cheerio.load(res.data || "");
-    const catalog: { title: string; link: string; image: string }[] = [];
+    const resolveUrl = (href: string) =>
+      href?.startsWith("http") ? href : new URL(href, url).href;
 
-    // ✅ Main selectors
-    $(
-      "article, .result-item, .post, .movie, .item, .thumbnail, .result, .entry"
-    ).each((i: number, el: any) => {
-      const $el = $(el);
-      const a = $el.find("a").first();
+    const seen = new Set<string>();
+    const catalog: Post[] = [];
 
-      const title =
-        $el.find("h2").text().trim() ||
-        a.attr("title") ||
-        a.find("img").attr("alt") ||
-        a.text().trim() ||
-        $el.find(".title").text().trim();
+    // --- Post selectors (HDMovie2 style) ---
+    const POST_SELECTORS = [
+      ".pstr_box",
+      "article",
+      ".result-item",
+      ".post",
+      ".item",
+      ".thumbnail",
+      ".latest-movies",
+      ".movie-item",
+    ].join(",");
 
-      let link = a.attr("href") || a.attr("data-href") || "";
-      let image =
-        $el.find("img").attr("data-src") ||
-        $el.find("img").attr("src") ||
-        $el.find(".poster img").attr("data-src") ||
-        $el.find(".poster img").attr("src") ||
+    $(POST_SELECTORS).each((_, el) => {
+      const card = $(el);
+      let link = card.find("a[href]").first().attr("href") || "";
+      if (!link) return;
+      link = resolveUrl(link);
+      if (seen.has(link)) return;
+
+      let title =
+        card.find("h2").first().text().trim() ||
+        card.find("a[title]").first().attr("title")?.trim() ||
+        card.text().trim();
+      title = title.replace(/\[.*?\]/g, "").replace(/\(.+?\)/g, "").replace(/\s{2,}/g, " ").trim();
+      if (!title) return;
+
+      const img =
+        card.find("img").first().attr("src") ||
+        card.find("img").first().attr("data-src") ||
+        card.find("img").first().attr("data-original") ||
         "";
+      const image = img ? resolveUrl(img) : "";
 
-      if (link && link.startsWith("/")) {
-        link = baseUrl.replace(/\/$/, "") + link;
-      }
-      if (image && image.startsWith("/")) {
-        image = baseUrl.replace(/\/$/, "") + image;
-      }
-
-      if (title && link) {
-        catalog.push({ title, link, image });
-      }
+      seen.add(link);
+      catalog.push({ title, link, image });
     });
 
-    // ✅ Backup selectors
-    if (!catalog.length) {
-      $(".thumbnail, .poster, .result-item").each((i: number, el: any) => {
-        const $el = $(el);
-        const title =
-          $el.find("img").attr("alt") ||
-          $el.find("h3").text().trim() ||
-          $el.find(".title").text().trim();
-        let link = $el.find("a").attr("href") || "";
-        let image =
-          $el.find("img").attr("data-src") || $el.find("img").attr("src") || "";
-
-        if (link && link.startsWith("/")) {
-          link = baseUrl.replace(/\/$/, "") + link;
-        }
-        if (image && image.startsWith("/")) {
-          image = baseUrl.replace(/\/$/, "") + image;
-        }
-
-        if (title && link) {
-          catalog.push({ title, link, image });
-        }
-      });
-    }
-
-    return catalog;
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error("cinemalux getPosts error", errorMessage);
+    return catalog.slice(0, 100);
+  } catch (err) {
+    console.error(
+      "fetchPosts error:",
+      err instanceof Error ? err.message : String(err)
+    );
     return [];
   }
-};
-
+}

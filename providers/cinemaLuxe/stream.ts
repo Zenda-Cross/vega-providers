@@ -1,70 +1,99 @@
 import { Stream, ProviderContext } from "../types";
 
-export const getStream = async ({
+export const getStream = async function ({
   link,
   type,
-  signal,
   providerContext,
 }: {
   link: string;
-  type?: string;
-  signal: AbortSignal;
+  type: string;
   providerContext: ProviderContext;
-}): Promise<Stream[]> => {
+}): Promise<Stream[]> {
   try {
-    let newLink = link;
-    const log = (...args: any[]) => console.log("[cinemalux:getStream]", ...args);
+    const { axios, cheerio } = providerContext;
 
-    log("initial link", link);
+    const res = await axios.get(link, {
+      headers: {
+        Referer: "https://google.com",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      },
+    });
 
-    // Normalize relative links
-    const base = (await providerContext.getBaseUrl?.("cinemalux")) || "https://cinemalux.run";
-    if (newLink.startsWith("/")) newLink = base.replace(/\/$/, "") + newLink;
+    const $ = cheerio.load(res.data);
+    const streams: { priority: number; stream: Stream }[] = [];
 
-    // Fetch the page
-    const res = await providerContext.axios.get(newLink, { signal });
-    const html = res.data || "";
+    const excludeServers = ["DropGalaxy", "DropGalaxy[Instant]", "Watch Online"];
+    const excludeDomains = ["gofile.io", "mengaup", "vikingfile.com/f/6fdsb9d1tz"];
 
-    // Detect hubcloud / gdflix / drive links
-    const hubMatch = html.match(
-      /https?:\/\/[^'"\s]+(?:hubcloud|hubdrive|luxedrive|drive|gdflix|gdrv|googleapis|drive\.google\.com)[^'"\s]*/i
-    );
+    const links = $("section[aria-label*='Download'] a[href]").toArray();
 
-    if (hubMatch) {
-      const hubLink = hubMatch[0];
-      log("found hub-like link", hubLink);
+    for (const el of links) {
+      const $el = $(el);
+      let href = ($el.attr("href") || "").trim();
+      let serverName = ($el.text() || "").trim() || "Direct";
 
-      if (hubLink.includes("gdflix") && providerContext.extractors?.gdFlixExtracter) {
-        return await providerContext.extractors.gdFlixExtracter(hubLink, signal);
+      if (!href) continue;
+      if (!href.startsWith("http")) href = new URL(href, link).href;
+      if (excludeServers.some((s) => serverName.includes(s))) continue;
+      if (excludeDomains.some((d) => href.includes(d))) continue;
+
+      // ✅ V-Cloud conversion
+      if (serverName.includes("V-Cloud")) {
+        try {
+          const encodedId = new URLSearchParams(new URL(href, link).search).get("id");
+          if (encodedId) {
+            const dlPage = await axios.get(`https://www.9xlinks.xyz/dl.php?id=${encodedId}`, {
+              headers: { Referer: link, "User-Agent": "Mozilla/5.0" },
+            });
+            const $dl = cheerio.load(dlPage.data);
+
+            $dl("div.mt-6 a[href]").each((_, a) => {
+              const aEl = $dl(a);
+              const realHref = aEl.attr("href")?.trim();
+              const text = aEl.find("span").text().trim() || "Direct";
+
+              if (realHref) {
+                let priority = 3;
+                if (text.toLowerCase().includes("direct")) {
+                  priority = 1; // ✅ V-Cloud Direct sabse upar
+                } else if (text.toLowerCase().includes("pixeldrain")) {
+                  priority = 2; // Pixeldrain baad me
+                }
+                streams.push({
+                  priority,
+                  stream: { server: text, link: realHref, type: "file" },
+                });
+              }
+            });
+
+            continue; // skip default push
+          }
+        } catch (e) {
+          console.error("V-Cloud conversion error:", e);
+        }
       }
-      if (providerContext.extractors?.hubcloudExtracter) {
-        return await providerContext.extractors.hubcloudExtracter(hubLink, signal);
+
+      // ✅ Default links
+      const parentText = $el.parent().text() || "";
+      const sizeMatch = parentText.match(/\[(.*?)\]/);
+      const size = sizeMatch ? ` [${sizeMatch[1]}]` : "";
+
+      let priority = 3;
+      if (serverName.toLowerCase().includes("direct")) {
+        priority = 2; // ✅ Direct (Instant) second
       }
+
+      streams.push({
+        priority,
+        stream: { server: serverName + size, link: href, type: "file" },
+      });
     }
 
-    // ✅ Generic extractor
-    if (providerContext.extractors && "genericExtractor" in providerContext.extractors) {
-      const extractor = (providerContext.extractors as any).genericExtractor;
-      if (typeof extractor === "function") {
-        const generic: Stream[] = await extractor(newLink, signal);
-        if (generic && generic.length) return generic;
-      }
-    }
-
-    // ✅ Last fallback
-    log("No extractor matched, fallback to direct link:", newLink);
-
-    const fallbackStream = {
-      link: newLink, // 👈 name adjust karenge jab types.ts mil जाएगा
-      quality: (["360", "480", "720", "1080", "2160", "auto"].includes(type || "auto")
-        ? type
-        : "auto"),
-      type: "url",
-    } as Stream; // 👈 force cast so TS stops error
-
-    return [fallbackStream];
+    // ✅ Sort by priority: 1 → 2 → 3
+    return streams.sort((a, b) => a.priority - b.priority).map((s) => s.stream);
   } catch (err) {
-    console.error("cinemalux getStream error", err);
+    console.error("getStream error:", err);
     return [];
   }
 };
