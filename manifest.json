@@ -170,7 +170,7 @@
   {
     "display_name": "ShowBox",
     "value": "showbox",
-    "version": "1.1",
+    "version": "1.2",
     "icon": "",
     "type": "english",
     "disabled": false
@@ -315,6 +315,7 @@
  
   
 ]
+
 
 
 
