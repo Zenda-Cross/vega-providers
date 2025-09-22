@@ -1,59 +1,87 @@
-import { ProviderContext, Stream } from "../types";
+import { Stream, ProviderContext } from "../types";
 
 export const getStream = async function ({
-  link: id,
+  link,
+  type,
   providerContext,
 }: {
   link: string;
+  type: string;
   providerContext: ProviderContext;
 }): Promise<Stream[]> {
   try {
-    const { getBaseUrl } = providerContext;
-    const episodeId = id.split("*")[0];
-    const mediaId = id.split("*")[1];
-    const baseUrl = await getBaseUrl("consumet");
-    const serverUrl = `${baseUrl}/movies/flixhq/servers?episodeId=${episodeId}&mediaId=${mediaId}`;
-    const res = await fetch(serverUrl);
-    const servers = await res.json();
-    const streamLinks: Stream[] = [];
-    for (const server of servers) {
-      const streamUrl =
-        `${baseUrl}/movies/flixhq/watch?server=` +
-        server.name +
-        "&episodeId=" +
-        episodeId +
-        "&mediaId=" +
-        mediaId;
-      const streamRes = await fetch(streamUrl);
-      const streamData = await streamRes.json();
-      const subtitles: Stream["subtitles"] = [];
-      if (streamData?.sources?.length > 0) {
-        if (streamData.subtitles) {
-          streamData.subtitles.forEach((sub: { lang: string; url: string }) => {
-            subtitles.push({
-              language: sub?.lang?.slice(0, 2) as any,
-              uri: sub?.url,
-              type: "text/vtt",
-              title: sub?.lang,
-            });
+    const { axios, cheerio } = providerContext;
+    const streams: Stream[] = [];
+
+    // --- GDFlix type link handling
+    if (link.toLowerCase().includes("gdlink") || link.toLowerCase().includes("gdflix")) {
+      const res = await axios.get(link, {
+        headers: {
+          Referer: "https://google.com",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        },
+      });
+
+      const $ = cheerio.load(res.data);
+
+      $("a[href]").each((_, el) => {
+        const $el = $(el);
+        const href = ($el.attr("href") || "").trim();
+        if (!href.toLowerCase().includes("pixeldrain")) return;
+
+        const text = ($el.text() || "").trim() || "PixelDrain";
+        const parentText = $el.parent().text() || "";
+        const sizeMatch = parentText.match(/\[(.*?)\]/);
+        const size = sizeMatch ? ` [${sizeMatch[1]}]` : "";
+
+        streams.push({
+          server: `${text}${size}`,
+          link: href,
+          type: "file",
+        });
+      });
+    }
+
+    // --- V-Cloud type link handling
+    if (link.toLowerCase().includes("vcloud.lol")) {
+      const res = await axios.get(link, {
+        headers: {
+          Referer: "https://google.com",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        },
+      });
+
+      const $ = cheerio.load(res.data);
+
+      // 1️⃣ Find Pixeldrain embed URL in V-Cloud page
+      const embedAnchor = $("a[href*='pixeldrain.dev/u/']");
+      embedAnchor.each((_, el) => {
+        const $el = $(el);
+        const embedUrl = ($el.attr("href") || "").trim();
+        if (!embedUrl) return;
+
+        // 2️⃣ Extract file ID and construct direct download link
+        const fileIdMatch = embedUrl.match(/\/u\/([a-zA-Z0-9]+)/);
+        if (fileIdMatch) {
+          const downloadLink = `https://pixeldrain.dev/api/file/${fileIdMatch[1]}?download`;
+          const text = ($el.text() || "PixelDrain").trim();
+          streams.push({
+            server: text,
+            link: downloadLink,
+            type: "file",
           });
         }
-        streamData.sources.forEach((source: any) => {
-          streamLinks.push({
-            server:
-              server?.name +
-              "-" +
-              source?.quality?.replace("auto", "MultiQuality"),
-            link: source.url,
-            type: source.isM3U8 ? "m3u8" : "mp4",
-            subtitles: subtitles,
-          });
-        });
-      }
+      });
     }
-    return streamLinks;
+
+    return streams;
   } catch (err) {
-    console.error(err);
+    console.error(
+      "vgmlinks getStream error:",
+      err instanceof Error ? err.message : String(err)
+    );
     return [];
   }
 };
