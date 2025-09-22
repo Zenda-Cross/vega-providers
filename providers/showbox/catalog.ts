@@ -1,15 +1,11 @@
 export const catalog = [
   {
     title: "Home",
-    filter: "",
+    filter: "category/movies-by-quality/1080p/",
   },
   {
     title: "Movies",
-    filter: "/movie",
-  },
-  {
-    title: "TV Shows",
-    filter: "/tv",
+    filter: "category/hindi-dubbed-movies/",
   },
 ];
 
