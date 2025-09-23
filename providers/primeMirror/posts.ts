@@ -1,135 +1,141 @@
 import { Post, ProviderContext } from "../types";
 
-export const getPosts = async function ({
+const defaultHeaders = {
+  Referer: "https://www.google.com",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  Pragma: "no-cache",
+  "Cache-Control": "no-cache",
+};
+
+// --- Fetch normal posts ---
+export async function getPosts({
   filter,
-  page,
-  providerValue,
+  page = 1,
   signal,
   providerContext,
 }: {
-  filter: string;
-  page: number;
-  providerValue: string;
-  signal: AbortSignal;
+  filter?: string;
+  page?: number;
+  signal?: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  try {
-    const { getBaseUrl, cheerio } = providerContext;
-    const baseUrl = await getBaseUrl("nfMirror");
-    const catalog: Post[] = [];
-    if (page > 1) {
-      return [];
-    }
-    // console.log(filter);
-    const isPrime =
-      providerValue === "primeMirror" ? "isPrime=true" : "isPrime=false";
+  return fetchPosts({ filter, page, query: "", signal, providerContext });
+}
 
-    const url = `https://netmirror.8man.dev/api/net-proxy?${isPrime}&url=${
-      baseUrl + filter
-    }`;
-
-    const res = await fetch(url, {
-      signal: signal,
-      method: "GET",
-      credentials: "omit",
-    });
-    const data = await res.text();
-    // console.log('nfPost', data);
-    const $ = cheerio.load(data);
-    $("a.post-data").map((i, element) => {
-      const title = "";
-      const id = $(element).attr("data-post");
-      // console.log('id', id);
-      const image = $(element).find("img").attr("data-src") || "";
-      if (id) {
-        catalog.push({
-          title: title,
-          link:
-            baseUrl +
-            `${
-              providerValue === "netflixMirror"
-                ? "/post.php?id="
-                : "/pv/post.php?id="
-            }` +
-            id +
-            "&t=" +
-            Math.round(new Date().getTime() / 1000),
-          image: image,
-        });
-      }
-    });
-    // console.log(catalog);
-    return catalog;
-  } catch (err) {
-    console.error("nf error ", err);
-    return [];
-  }
-};
-
-export const getSearchPosts = async function ({
+// --- Fetch search posts ---
+export async function getSearchPosts({
   searchQuery,
-  page,
-  providerValue,
+  page = 1,
   signal,
   providerContext,
 }: {
   searchQuery: string;
-  page: number;
-  providerValue: string;
-  signal: AbortSignal;
+  page?: number;
+  signal?: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { getBaseUrl } = providerContext;
+  return fetchPosts({ filter: "", page, query: searchQuery, signal, providerContext });
+}
+
+// --- Core fetch function ---
+async function fetchPosts({
+  filter,
+  query,
+  page = 1,
+  signal,
+  providerContext,
+}: {
+  filter?: string;
+  query?: string;
+  page?: number;
+  signal?: AbortSignal;
+  providerContext: ProviderContext;
+}): Promise<Post[]> {
   try {
-    if (page > 1) {
-      return [];
+    const baseUrl = "https://filmycab.media";
+    let url: string;
+
+    // --- Updated search URL
+    if (query && query.trim()) {
+      url = `${baseUrl}/site-search.html?to-search=${encodeURIComponent(query)}${page > 1 ? `&paged=${page}` : ""}`;
+    } else if (filter) {
+      url = filter.startsWith("/")
+        ? `${baseUrl}${filter.replace(/\/$/, "")}${page > 1 ? `/page/${page}` : ""}`
+        : `${baseUrl}/${filter}${page > 1 ? `/page/${page}` : ""}`;
+    } else {
+      url = `${baseUrl}${page > 1 ? `/page/${page}` : ""}`;
     }
+
+    const { axios, cheerio } = providerContext;
+    const res = await axios.get(url, { headers: defaultHeaders, signal });
+    const $ = cheerio.load(res.data || "");
+
+    const resolveUrl = (href: string) =>
+      href?.startsWith("http") ? href : new URL(href, url).href;
+
+    const seen = new Set<string>();
     const catalog: Post[] = [];
-    const baseUrl = await getBaseUrl("nfMirror");
-    const isPrime =
-      providerValue === "primeMirror" ? "isPrime=true" : "isPrime=false";
 
-    const url = `https://netmirror.8man.dev/api/net-proxy?${isPrime}&url=${baseUrl}${
-      providerValue === "netflixMirror" ? "" : "/pv"
-    }/search.php?s=${encodeURI(searchQuery)}`;
+    // --- Detect search page
+    const isSearchPage = $("form.search").length > 0;
 
-    const res = await fetch(url, {
-      signal: signal,
-      method: "GET",
-      credentials: "omit",
-    });
+    $(".thumb.rsz, article.post").each((_, el) => {
+      const card = $(el);
+      let link = card.find("a[href]").attr("href") || "";
+      if (!link) return;
+      link = resolveUrl(link);
+      if (seen.has(link)) return;
 
-    const data = await res.json();
-
-    data?.searchResult?.forEach((result: any) => {
-      const title = result?.t || "";
-      const id = result?.id;
-      const image =
-        providerValue === "netflixMirror"
-          ? `https://imgcdn.media/poster/v/${id}.jpg`
-          : `https://imgcdn.media/pv/341/${id}.jpg`;
-
-      if (id) {
-        catalog.push({
-          title: title,
-          link:
-            baseUrl +
-            `${
-              providerValue === "netflixMirror"
-                ? "/mobile/post.php?id="
-                : "/mobile/pv/post.php?id="
-            }` +
-            id +
-            "&t=" +
-            Math.round(new Date().getTime() / 1000),
-          image: image,
-        });
+      // --- Title extraction
+      let title = "";
+      if (isSearchPage) {
+        title =
+          card.find("img").attr("alt")?.trim() ||
+          card.find("figcaption").text().trim() ||
+          "";
       }
+      if (!title) {
+        title =
+          card.find("p").first().text().trim() ||
+          card.find("h2.entry-title a").text().trim() ||
+          card.find("img").attr("alt")?.trim() ||
+          "";
+      }
+      if (!title) return;
+
+      // --- Image extraction
+      const img =
+        card.find("img").attr("src") ||
+        card.find("img").attr("data-src") ||
+        card.find("img").attr("data-original") ||
+        "";
+      const image = img ? resolveUrl(img) : "";
+
+      // --- Optional fields
+      const quality = card.find(".quality").text().trim();
+      const lang = card.find(".lang").text().trim();
+
+      seen.add(link);
+      catalog.push({
+        title,
+        link,
+        image,
+        // @ts-ignore -> extra fields
+        quality,
+        lang,
+      });
     });
 
-    return catalog;
+    return catalog.slice(0, 100);
   } catch (err) {
-    console.error("Search error:", err);
+    console.error(
+      "Filmycab fetchPosts error:",
+      err instanceof Error ? err.message : err
+    );
     return [];
   }
-};
+}

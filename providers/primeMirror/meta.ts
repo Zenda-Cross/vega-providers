@@ -1,62 +1,146 @@
-import { Info, Link } from "../types";
+import { Info, Link, ProviderContext } from "../types";
+
+const hdbHeaders = {
+  Referer: "https://google.com",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+};
 
 export const getMeta = async function ({
   link,
+  providerContext,
 }: {
   link: string;
+  providerContext: ProviderContext;
 }): Promise<Info> {
-  let providerValue = "primeMirror";
   try {
-    const isPrime =
-      providerValue === "primeMirror" ? "isPrime=true" : "isPrime=false";
-    const url = `https://netmirror.8man.dev/api/net-proxy?${isPrime}&url=${encodeURIComponent(
-      link
-    )}`;
-    console.log("nfifo", url);
-    const res = await fetch(url, {
-      credentials: "omit",
-    });
-    const data = await res.json();
-    const id = link.split("id=")[1]?.split("&")[0];
-    const meta = {
-      title: data.title,
-      synopsis: data.desc,
-      image: `https://img.nfmirrorcdn.top/poster/h/${id}.jpg`,
-      cast: data?.short_cast?.split(","),
-      tags: [data?.year, data?.hdsd, ...data?.thismovieis?.split(",")],
-      imdbId: "",
-      type: "series",
-    };
-    console.log("nfinfo", meta);
+    const { axios, cheerio } = providerContext;
 
-    const linkList: Link[] = [];
-    if (data?.season?.length > 0) {
-      data.season.map((season: any) => {
-        linkList.push({
-          title: "Season " + season?.s,
-          episodesLink: season?.id,
+    if (!link.startsWith("http")) {
+      link = new URL(link, "https://filmycab.media").href;
+    }
+
+    const res = await axios.get(link, { headers: hdbHeaders });
+    const $ = cheerio.load(res.data);
+
+    // --- Title
+    const title =
+      $("h1.entry-title").first().text().trim() ||
+      $("meta[property='og:title']")
+        .attr("content")
+        ?.replace(" - Filmycab", "")
+        .trim() ||
+      $("title").text().trim() ||
+      "Unknown";
+
+    // --- Image with fallback
+    let image =
+      $(".poster img").attr("src") ||
+      $("meta[property='og:image']").attr("content") ||
+      $("meta[name='twitter:image']").attr("content") ||
+      "";
+    if (!image || !image.startsWith("http")) {
+      image = new URL(image || "/placeholder.png", link).href; // fallback image
+    }
+
+    // --- Synopsis
+    let synopsis = "";
+    $(".wp-content p, .entry-content p, .description, .synopsis").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 40 && !text.toLowerCase().includes("download")) {
+        synopsis = text;
+        return false;
+      }
+    });
+    if (!synopsis) {
+      synopsis =
+        $("meta[property='og:description']").attr("content") ||
+        $("meta[name='description']").attr("content") ||
+        "";
+    }
+
+    // --- Genre, Cast
+    const tags =
+      $(".sgeneros a, .genres a, .genre a")
+        .map((_, el) => $(el).text().trim())
+        .get() || [];
+
+    const cast =
+      $(".cast .person a, .casting a, .actors a")
+        .map((_, el) => $(el).text().trim())
+        .get() || [];
+
+    // --- Rating & IMDB
+    let rating =
+      $(".imdb span[itemprop='ratingValue']").text().trim() ||
+      $(".ratingValue").text().trim() ||
+      $("meta[itemprop='ratingValue']").attr("content") ||
+      "";
+    if (rating && !rating.includes("/")) rating = rating + "/10";
+
+    const imdbLink =
+      $(".imdb a[href*='imdb.com'], a[href*='imdb.com']").attr("href") || "";
+    const imdbId =
+      imdbLink && imdbLink.includes("/tt")
+        ? "tt" + imdbLink.split("/tt")[1].split("/")[0]
+        : "";
+
+    // --- Download links
+    const links: Link[] = [];
+
+    const singleLink = $(".dlbtn a[href]").attr("href");
+    if (singleLink) {
+      try {
+        const subRes = await axios.get(singleLink, { headers: hdbHeaders });
+        const _$ = cheerio.load(subRes.data);
+
+        _$(".dlink.dl a[href]").each((_, a) => {
+          const href = (_$(a).attr("href") || "").trim();
+          const text = _$(a).find(".dll").text().trim() || _$(a).text().trim();
+          if (!href || !text) return;
+
+          const qualityMatch = text.match(/\b(240p|360p|480p|720p|1080p|2160p|4k)\b/i);
+          const quality = qualityMatch ? qualityMatch[0] : "AUTO";
+
+          links.push({
+            title: text,
+            directLinks: [
+              {
+                link: href,
+                title: text,
+                quality,
+                type: "movie",
+              },
+            ],
+          });
         });
-      });
-    } else {
-      linkList.push({
-        title: meta.title,
-        directLinks: [{ link: id, title: "Movie", type: "movie" }],
-      });
+      } catch (err) {
+        console.error("Error fetching sublink:", err);
+      }
     }
 
     return {
-      ...meta,
-
-      linkList: linkList,
+      title,
+      synopsis,
+      image,
+      imdbId,
+      type: "movie",
+      tags,
+      cast,
+      rating,
+      linkList: links,
     };
   } catch (err) {
-    console.error(err);
+    console.error("Filmycab getMeta error:", err);
     return {
       title: "",
       synopsis: "",
-      image: "",
+      image: "https://via.placeholder.com/300x450", // fallback
       imdbId: "",
-      type: "",
+      type: "movie",
+      tags: [],
+      cast: [],
+      rating: "",
       linkList: [],
     };
   }

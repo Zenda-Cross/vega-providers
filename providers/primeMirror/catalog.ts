@@ -1,15 +1,19 @@
 export const catalog = [
   {
-    title: "Home",
-    filter: "/mobile/home?app=1",
+    title: "Latest",
+    filter: "",
   },
   {
-    title: "Series",
-    filter: "/mobile/series",
+    title: "Bhojpuri",
+    filter: "page-cat/11/Bhojpuri-Movies.html",
   },
   {
-    title: "Movies",
-    filter: "/mobile/movies",
+    title: "Panjabi",
+    filter: "page-cat/3/Punjabi-Movies.html",
+  },
+  {
+    title: "Animation",
+    filter: "page-cat/6/Animation-Movies.html",
   },
 ];
 
