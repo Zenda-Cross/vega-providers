@@ -38,16 +38,32 @@ export const getStream = async function ({
       if (excludeServers.some((s) => serverName.includes(s))) continue;
       if (excludeDomains.some((d) => href.includes(d))) continue;
 
-      // ✅ V-Cloud conversion
+      // ✅ V-Cloud special conversion (fzlinks.xyz)
       if (serverName.includes("V-Cloud")) {
         try {
           const encodedId = new URLSearchParams(new URL(href, link).search).get("id");
           if (encodedId) {
-            const dlPage = await axios.get(`https://www.9xlinks.xyz/dl.php?id=${encodedId}`, {
+            const dlPage = await axios.get(`https://www.fzlinks.xyz/dl.php?id=${encodedId}`, {
               headers: { Referer: link, "User-Agent": "Mozilla/5.0" },
             });
             const $dl = cheerio.load(dlPage.data);
 
+            // ✅ Sabse pehle Direct Download link scrape karo
+            const directBtn = $dl("a[href] span:contains('Direct Download link')")
+              .parent("a")
+              .first();
+
+            if (directBtn.length) {
+              const directHref = directBtn.attr("href")?.trim();
+              if (directHref) {
+                streams.push({
+                  priority: 0, // Sabse pehle
+                  stream: { server: "V-Cloud Direct", link: directHref, type: "file" },
+                });
+              }
+            }
+
+            // ✅ Agar aur bhi links ho to unhe bhi scrape karo
             $dl("div.mt-6 a[href]").each((_, a) => {
               const aEl = $dl(a);
               const realHref = aEl.attr("href")?.trim();
@@ -56,9 +72,9 @@ export const getStream = async function ({
               if (realHref) {
                 let priority = 3;
                 if (text.toLowerCase().includes("direct")) {
-                  priority = 1; // ✅ V-Cloud Direct sabse upar
+                  priority = 1;
                 } else if (text.toLowerCase().includes("pixeldrain")) {
-                  priority = 2; // Pixeldrain baad me
+                  priority = 2;
                 }
                 streams.push({
                   priority,
@@ -67,7 +83,7 @@ export const getStream = async function ({
               }
             });
 
-            continue; // skip default push
+            continue; // default push skip
           }
         } catch (e) {
           console.error("V-Cloud conversion error:", e);
@@ -81,7 +97,7 @@ export const getStream = async function ({
 
       let priority = 3;
       if (serverName.toLowerCase().includes("direct")) {
-        priority = 2; // ✅ Direct (Instant) second
+        priority = 2;
       }
 
       streams.push({
@@ -90,7 +106,7 @@ export const getStream = async function ({
       });
     }
 
-    // ✅ Sort by priority: 1 → 2 → 3
+    // ✅ Sort by priority: 0 → 1 → 2 → 3
     return streams.sort((a, b) => a.priority - b.priority).map((s) => s.stream);
   } catch (err) {
     console.error("getStream error:", err);
