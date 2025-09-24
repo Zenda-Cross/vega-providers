@@ -1,10 +1,10 @@
 import { Info, Link, ProviderContext } from "../types";
 
-const headers = {
+const hdbHeaders = {
   Referer: "https://google.com",
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-    "(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
 };
 
 export const getMeta = async function ({
@@ -13,139 +13,132 @@ export const getMeta = async function ({
 }: {
   link: string;
   providerContext: ProviderContext;
-}): Promise<Info> {
+}): Promise<Info & { extraInfo?: Record<string, string> }> {
   try {
     const { axios, cheerio } = providerContext;
-    const res = await axios.get(link, { headers });
+
+    if (!link.startsWith("http")) {
+      link = new URL(link, "https://allmovieshub.games").href;
+    }
+
+    const res = await axios.get(link, { headers: hdbHeaders });
     const $ = cheerio.load(res.data);
 
-    // Title Cleaner
-    let rawTitle =
-      $("h1").first().text().trim() ||
+    // --- Title
+    const title =
+      $("h1.entry-title").first().text().trim() ||
       $("meta[property='og:title']").attr("content")?.trim() ||
-      $("title").text().trim();
+      $("title").text().trim() ||
+      "Unknown";
 
-    const title = rawTitle
-      .replace(/Bolly4u/gi, "")
-      .replace(/WB\s*DL/gi, "")
-      .replace(/\[.*?\]/g, "")
-      .replace(/\(.+?\)/g, "")
-      .replace(/\s{2,}/g, " ")
-      .trim();
-
-    // Detect type
-    const type: "movie" | "series" = /season/i.test(title) ? "series" : "movie";
-
-    // Synopsis
-    const synopsis =
-      $("article p")
-        .map((i, el) => $(el).text().trim())
-        .get()
-        .join(" ") ||
-      $("meta[name='description']").attr("content") ||
-      $("meta[property='og:description']").attr("content") ||
-      "";
-
-    // Image
-    const image =
-      $("article img").first().attr("src") ||
-      $("article img").first().attr("data-src") ||
+    // --- Image
+    let image =
+      $(".poster img").attr("src") ||
       $("meta[property='og:image']").attr("content") ||
-      $("img").first().attr("src") ||
+      $("meta[name='twitter:image']").attr("content") ||
       "";
+    if (image && !image.startsWith("http")) image = new URL(image, link).href;
 
-    // IMDb Id
-    const imdbId =
-      $('a[href*="imdb.com/title/tt"]')
-        .attr("href")
-        ?.match(/tt\d+/)?.[0] || "";
-
-    const links: Link[] = [];
-    const directLink: Link["directLinks"] = [];
-
-    // --- Series episodes
-    $('a:contains("Episode"), a:contains("EPiSODE")').each((_, el) => {
-      const epTitle = $(el).text().trim();
-      const epLink = $(el).attr("href");
-      if (epLink) {
-        directLink.push({
-          title: epTitle,
-          link: epLink.startsWith("http") ? epLink : new URL(epLink, link).href,
-          type: "episode",
-        });
+    // --- Synopsis
+    let synopsis = "";
+    $(".wp-content p, .entry-content p, .description, .synopsis").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 40 && !text.toLowerCase().includes("download")) {
+        synopsis = text;
+        return false;
       }
     });
-
-    // --- Movie / Quality links
-    if (directLink.length === 0) {
-      $('a')
-        .filter((_, el) => /480|720|1080|2160|4K|mp4|m3u8/i.test($(el).text()))
-        .each((_, el) => {
-          const movieLink = $(el).attr("href");
-          const linkTitle = $(el).text().trim();
-
-          if (movieLink) {
-            links.push({
-              title: linkTitle,
-              quality:
-                $(el).text().match(/\b(480p|720p|1080p|2160p|4K|mp4|m3u8)\b/i)?.[0] || "",
-              directLinks: [
-                {
-                  link: movieLink.startsWith("http") ? movieLink : new URL(movieLink, link).href,
-                  title: "Movie",
-                  type: "movie",
-                },
-              ],
-            });
-          }
-        });
+    if (!synopsis) {
+      synopsis =
+        $("meta[property='og:description']").attr("content") ||
+        $("meta[name='description']").attr("content") ||
+        "";
     }
 
-    // If series links found
-    if (directLink.length > 0) {
+    // --- Tags / Genre
+    const tags =
+      $(".sgeneros a, .genres a, .genre a")
+        .map((_, el) => $(el).text().trim())
+        .get() || [];
+
+    // --- Cast
+    const cast =
+      $(".cast .person a, .casting a, .actors a")
+        .map((_, el) => $(el).text().trim())
+        .get() || [];
+
+    // --- Rating
+    let rating =
+      $(".imdb span[itemprop='ratingValue']").text().trim() ||
+      $(".ratingValue").text().trim() ||
+      $("meta[itemprop='ratingValue']").attr("content") ||
+      "";
+    if (rating && !rating.includes("/")) rating += "/10";
+
+    // --- IMDb ID
+    const imdbLink =
+      $(".imdb a[href*='imdb.com'], a[href*='imdb.com']").attr("href") || "";
+    const imdbId = imdbLink ? "tt" + imdbLink.split("/tt")[1]?.split("/")[0] : "";
+
+    // --- Extra Info
+    const extra: Record<string, string> = {};
+    $("p, .info").each((_, el) => {
+      const html = $(el).html() || "";
+      const txt = $(el).text() || "";
+      if (html.includes("Language")) extra.language = txt.split(":")[1]?.trim();
+      if (html.includes("Release")) extra.year = txt.split(":")[1]?.trim();
+      if (html.includes("Quality")) extra.quality = txt.split(":")[1]?.trim();
+      if (html.includes("Format")) extra.format = txt.split(":")[1]?.trim();
+      if (html.includes("Size")) extra.size = txt.split(":")[1]?.trim();
+    });
+
+    // --- Download / Episode Links
+    const links: Link[] = [];
+    $("h3 a[href], .download a[href]").each((_, el) => {
+      let href = $(el).attr("href")?.trim() || "";
+      let text = $(el).text().trim() || "";
+      if (!href || !text) return;
+
+      if (!href.startsWith("http")) href = new URL(href, link).href;
+
       links.push({
-        title,
-        directLinks: directLink,
+        title: text,
+        directLinks: [
+          {
+            link: href,
+            title: text,
+            quality: text.match(/\b(480p|720p|1080p|HDTC|HDRip|BluRay)\b/i)?.[0] || "",
+            type: "movie",
+          },
+        ],
       });
-    }
-
-    // --- Check for JS embedded streaming links
-    const scriptData = $("script")
-      .map((i, el) => $(el).html())
-      .get()
-      .join(" ");
-
-    const jsLinks: { link: string; title: string; type: "movie" | "series" | "episode"; quality?: string }[] =
-      [...scriptData.matchAll(/https?:\/\/[^'"]+\.(mp4|m3u8)/gi)].map(m => ({
-        link: m[0],
-        title: "Stream",
-        type: "movie",
-      }));
-
-    if (jsLinks.length > 0) {
-      links.push({
-        title,
-        directLinks: jsLinks,
-      });
-    }
+    });
 
     return {
       title,
       synopsis,
       image,
       imdbId,
-      type,
+      type: "movie",
+      tags,
+      cast,
+      rating,
       linkList: links,
+      extraInfo: extra,
     };
   } catch (err) {
-    console.error("❌ Meta fetch error:", err);
+    console.error("HDMovie2 getMeta error:", err);
     return {
       title: "",
       synopsis: "",
       image: "",
       imdbId: "",
       type: "movie",
+      tags: [],
+      cast: [],
+      rating: "",
       linkList: [],
+      extraInfo: {},
     };
   }
 };
