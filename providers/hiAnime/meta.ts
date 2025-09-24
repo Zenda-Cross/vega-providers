@@ -29,7 +29,7 @@ async function fetchEpisodesFromSelectedLink(
 
   const episodes: Episode[] = [];
 
-  $("h4").each((_: any, h4El: any) => {
+  $("h4").each((_, h4El) => {
     const epTitle = $(h4El).text().trim();
     if (!epTitle) return;
 
@@ -38,7 +38,7 @@ async function fetchEpisodesFromSelectedLink(
     $(h4El)
       .nextUntil("h4, hr")
       .find("a[href]")
-      .each((_: any, linkEl: any) => {
+      .each((_, linkEl) => {
         let href = ($(linkEl).attr("href") || "").trim();
         if (!href) return;
         if (!href.startsWith("http")) href = new URL(href, url).href;
@@ -66,47 +66,23 @@ async function fetchEpisodesFromSelectedLink(
     }
   });
 
-  return episodes;
-}
-
-// --- Fetch movie links from provided HTML snippet
-function fetchMovieLinksFromHTML(html: string): Link[] {
-  const cheerio = require("cheerio");
-  const $ = cheerio.load(html);
-  const links: Link[] = [];
-
-  $("a[href]").each((_: any, aEl: any) => {
-    let href = ($(aEl).attr("href") || "").trim();
-    if (!href) return;
-    if (!href.startsWith("http")) return;
-
-    const btnText = $(aEl).text().trim() || "Download";
-    links.push({
-      title: btnText,
-      directLinks: [
-        {
-          link: href,
-          title: btnText,
-          quality: "AUTO",
-          type: "movie",
-        },
-      ],
-      episodesLink: href,
-    });
+  // Sort by episode number
+  episodes.sort((a, b) => {
+    const numA = parseInt(a.title.match(/\d+/)?.[0] || "0");
+    const numB = parseInt(b.title.match(/\d+/)?.[0] || "0");
+    return numA - numB;
   });
 
-  return links;
+  return episodes;
 }
 
 // --- Main getMeta function
 export const getMeta = async function ({
   link,
   providerContext,
-  movieHTML = "",
 }: {
   link: string;
   providerContext: ProviderContext;
-  movieHTML?: string;
 }): Promise<Info & { extraInfo: Record<string, string>; episodeList: Episode[] }> {
   const { axios, cheerio } = providerContext;
 
@@ -128,8 +104,9 @@ export const getMeta = async function ({
       "";
     if (image && !image.startsWith("http")) image = new URL(image, link).href;
 
+    // Synopsis
     let synopsis = "";
-    $(".entry-content p").each((_: any, el: any) => {
+    $(".entry-content p").each((_, el) => {
       const txt = $(el).text().trim();
       if (txt.length > 40 && !txt.toLowerCase().includes("download")) {
         synopsis = txt;
@@ -137,24 +114,21 @@ export const getMeta = async function ({
       }
     });
 
+    // IMDB
     const imdbLink = $("a[href*='imdb.com']").attr("href") || "";
-    const imdbId = imdbLink
-      ? "tt" + (imdbLink.split("/tt")[1]?.split("/")[0] || "")
-      : "";
+    const imdbId = imdbLink ? "tt" + (imdbLink.split("/tt")[1]?.split("/")[0] || "") : "";
 
+    // Tags
     const tags: string[] = [];
-    $(".entry-content p strong").each((_: any, el: any) => {
+    $(".entry-content p strong").each((_, el) => {
       const txt = $(el).text().trim();
-      if (
-        txt.match(
-          /drama|biography|action|thriller|romance|adventure|animation/i
-        )
-      )
+      if (txt.match(/drama|biography|action|thriller|romance|adventure|animation/i))
         tags.push(txt);
     });
 
+    // Extra Info
     const extra: Record<string, string> = {};
-    $("p").each((_: any, el: any) => {
+    $("p").each((_, el) => {
       const html = $(el).html() || "";
       if (html.includes("Series Name")) extra.name = $(el).text().split(":")[1]?.trim();
       if (html.includes("Language")) extra.language = $(el).text().split(":")[1]?.trim();
@@ -164,52 +138,41 @@ export const getMeta = async function ({
       if (html.includes("Format")) extra.format = $(el).text().split(":")[1]?.trim();
     });
 
-    let links: Link[] = [];
-    let episodeList: Episode[] = [];
+    // Fetch episode list
+    const episodeList: Episode[] = await fetchEpisodesFromSelectedLink(link, providerContext);
 
-    if (movieHTML) {
-      // --- Movie page: fetch all links from given HTML
-      links = fetchMovieLinksFromHTML(movieHTML);
-    } else {
-      // --- Series page: fetch episodes normally
-      episodeList = await fetchEpisodesFromSelectedLink(link, providerContext);
+    // Fetch top links (NexDrive / V-Cloud / G-Direct / DGDrive)
+    const links: Link[] = [];
+    $("a[href]").each((_, aEl) => {
+      let href = ($(aEl).attr("href") || "").trim();
+      if (!href) return;
+      if (!href.startsWith("http")) href = new URL(href, link).href;
 
-      $("a[href]").each((_: any, aEl: any) => {
-        let href = ($(aEl).attr("href") || "").trim();
-        if (!href) return;
-        if (!href.startsWith("http")) href = new URL(href, link).href;
+      const btnText = $(aEl).text().trim() || "Link";
+      const lowerHref = href.toLowerCase();
 
-        const btnText = $(aEl).text().trim() || "Link";
-        const lowerHref = href.toLowerCase();
-
-        if (
-          lowerHref.includes("nexdrive.top") ||
-          lowerHref.includes("vcloud.lol") ||
-          lowerHref.includes("dgdrive") ||
-          lowerHref.includes("fastdl.icu")
-        ) {
-          links.unshift({
-            title: btnText,
-            directLinks: [
-              {
-                link: href,
-                title: btnText,
-                quality: "AUTO",
-                type: "movie",
-              },
-            ],
-            episodesLink: href,
-          });
-        }
-      });
-    }
+      if (
+        lowerHref.includes("nexdrive.top") ||
+        lowerHref.includes("vcloud.lol") ||
+        lowerHref.includes("dgdrive") ||
+        lowerHref.includes("fastdl.icu")
+      ) {
+        links.unshift({ // Always push top
+          title: btnText,
+          directLinks: [
+            { link: href, title: btnText, quality: "AUTO", type: "movie" },
+          ],
+          episodesLink: href,
+        });
+      }
+    });
 
     return {
       title,
       synopsis,
       image,
       imdbId,
-      type: episodeList.length > 0 ? "series" : "movie",
+      type: "series",
       tags,
       cast: [],
       rating: $(".entry-meta .entry-date").text().trim() || "",
