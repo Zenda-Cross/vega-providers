@@ -310,11 +310,20 @@
     "icon": "",
     "type": "india",
     "disabled": false
+  },
+   {
+    "display_name": "bolly4u",
+    "value": "bolly4u",
+    "version": "1.2",
+    "icon": "",
+    "type": "global",
+    "disabled": false
   }
  
  
   
 ]
+
 
 
 
