@@ -202,10 +202,10 @@
   {
     "display_name": "HiAnime",
     "value": "hiAnime",
-    "version": "1.0",
+    "version": "1.2",
     "icon": "",
-    "type": "english",
-    "disabled": true
+    "type": "global",
+    "disabled": false
   },
   {
     "display_name": "Animetsu",
@@ -315,6 +315,7 @@
  
   
 ]
+
 
 
 
