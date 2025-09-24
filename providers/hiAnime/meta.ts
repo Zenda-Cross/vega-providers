@@ -1,3 +1,4 @@
+
 import { Info, Link, ProviderContext } from "../types";
 
 interface DirectLink {
@@ -18,8 +19,8 @@ const headers = {
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
 };
 
-// --- Fetch episodes from selected page
-async function fetchEpisodesFromSelectedLink(
+// --- Fetch episodes from VGMLINKS page
+export async function fetchEpisodesFromSelectedLink(
   url: string,
   providerContext: ProviderContext
 ): Promise<Episode[]> {
@@ -44,33 +45,20 @@ async function fetchEpisodesFromSelectedLink(
         if (!href.startsWith("http")) href = new URL(href, url).href;
 
         const btnText = $(linkEl).text().trim() || "Watch Episode";
-        const lowerHref = href.toLowerCase();
-
-        if (
-          lowerHref.includes("nexdrive.top") ||
-          lowerHref.includes("vcloud.lol") ||
-          lowerHref.includes("dgdrive") ||
-          lowerHref.includes("fastdl.icu")
-        ) {
-          directLinks.push({
-            link: href,
-            title: btnText,
-            quality: "AUTO",
-            type: "episode",
-          });
-        }
+        directLinks.push({
+          link: href,
+          title: btnText,
+          quality: "AUTO",
+          type: "episode",
+        });
       });
 
     if (directLinks.length > 0) {
-      episodes.push({ title: epTitle, directLinks });
+      episodes.push({
+        title: epTitle,
+        directLinks,
+      });
     }
-  });
-
-  // Sort by episode number
-  episodes.sort((a, b) => {
-    const numA = parseInt(a.title.match(/\d+/)?.[0] || "0");
-    const numB = parseInt(b.title.match(/\d+/)?.[0] || "0");
-    return numA - numB;
   });
 
   return episodes;
@@ -85,7 +73,6 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info & { extraInfo: Record<string, string>; episodeList: Episode[] }> {
   const { axios, cheerio } = providerContext;
-
   if (!link.startsWith("http")) link = new URL(link, "https://vgmlinks.click").href;
 
   try {
@@ -104,7 +91,6 @@ export const getMeta = async function ({
       "";
     if (image && !image.startsWith("http")) image = new URL(image, link).href;
 
-    // Synopsis
     let synopsis = "";
     $(".entry-content p").each((_, el) => {
       const txt = $(el).text().trim();
@@ -114,19 +100,22 @@ export const getMeta = async function ({
       }
     });
 
-    // IMDB
     const imdbLink = $("a[href*='imdb.com']").attr("href") || "";
-    const imdbId = imdbLink ? "tt" + (imdbLink.split("/tt")[1]?.split("/")[0] || "") : "";
+    const imdbId = imdbLink
+      ? "tt" + (imdbLink.split("/tt")[1]?.split("/")[0] || "")
+      : "";
 
-    // Tags
     const tags: string[] = [];
     $(".entry-content p strong").each((_, el) => {
       const txt = $(el).text().trim();
-      if (txt.match(/drama|biography|action|thriller|romance|adventure|animation/i))
+      if (
+        txt.match(
+          /drama|biography|action|thriller|romance|adventure|animation/i
+        )
+      )
         tags.push(txt);
     });
 
-    // Extra Info
     const extra: Record<string, string> = {};
     $("p").each((_, el) => {
       const html = $(el).html() || "";
@@ -138,33 +127,41 @@ export const getMeta = async function ({
       if (html.includes("Format")) extra.format = $(el).text().split(":")[1]?.trim();
     });
 
-    // Fetch episode list
-    const episodeList: Episode[] = await fetchEpisodesFromSelectedLink(link, providerContext);
-
-    // Fetch top links (NexDrive / V-Cloud / G-Direct / DGDrive)
     const links: Link[] = [];
-    $("a[href]").each((_, aEl) => {
-      let href = ($(aEl).attr("href") || "").trim();
-      if (!href) return;
-      if (!href.startsWith("http")) href = new URL(href, link).href;
+    let episodeList: Episode[] = [];
 
-      const btnText = $(aEl).text().trim() || "Link";
-      const lowerHref = href.toLowerCase();
+    // --- Fetch links including h3/button text
+    $("h3").each((_, h3El) => {
+      const seasonText = $(h3El).text().trim();
+      $(h3El)
+        .nextUntil("h3, hr")
+        .find("a[href]")
+        .each((_, aEl) => {
+          let href = ($(aEl).attr("href") || "").trim();
+          if (!href) return;
+          if (!href.startsWith("http")) href = new URL(href, link).href;
 
-      if (
-        lowerHref.includes("nexdrive.top") ||
-        lowerHref.includes("vcloud.lol") ||
-        lowerHref.includes("dgdrive") ||
-        lowerHref.includes("fastdl.icu")
-      ) {
-        links.unshift({ // Always push top
-          title: btnText,
-          directLinks: [
-            { link: href, title: btnText, quality: "AUTO", type: "movie" },
-          ],
-          episodesLink: href,
+          const btnText = $(aEl).text().trim() || "Link";
+
+          // --- Hide unwanted texts
+          if (
+            btnText.toLowerCase().includes("imdb rating") ||
+            btnText.toLowerCase().includes("winding up")
+          ) return;
+
+          links.push({
+            title: `${seasonText} - ${btnText}`,
+            directLinks: [
+              {
+                link: href,
+                title: btnText,
+                quality: "AUTO",
+                type: "movie",
+              },
+            ],
+            episodesLink: href,
+          });
         });
-      }
     });
 
     return {
@@ -178,14 +175,14 @@ export const getMeta = async function ({
       rating: $(".entry-meta .entry-date").text().trim() || "",
       linkList: links,
       extraInfo: extra,
-      episodeList,
+      episodeList, // episodes bhi show honge
     };
   } catch (err) {
     console.error("getMeta error:", err);
     return {
       title: "",
       synopsis: "",
-      image: "https://via.placeholder.com/300x450",
+      image: "",
       imdbId: "",
       type: "movie",
       tags: [],
