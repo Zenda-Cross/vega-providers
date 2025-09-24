@@ -1,69 +1,62 @@
-import { Stream, ProviderContext } from "../types";
+import { ProviderContext, Stream } from "../types";
 
-export const getStream = async function ({
+const headers = {
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Cache-Control": "no-store",
+  "Accept-Language": "en-US,en;q=0.9",
+  DNT: "1",
+  "sec-ch-ua":
+    '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+};
+
+export async function getStream({
   link,
   type,
+  signal,
   providerContext,
 }: {
   link: string;
   type: string;
+  signal: AbortSignal;
   providerContext: ProviderContext;
-}): Promise<Stream[]> {
-  const streams: Stream[] = [];
+}) {
+  const { axios, cheerio } = providerContext;
 
   try {
-    const { axios, cheerio } = providerContext;
+    const streamLinks: Stream[] = [];
 
-    console.log("Fetching HubCloud page:", link);
-    // 1️⃣ HubCloud page fetch
-    const res = await axios.get(link, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      },
-    });
-
+    // Fetch the page HTML
+    const res = await axios.get(link, { headers, signal });
     const $ = cheerio.load(res.data);
 
-    // 2️⃣ GamerXYT intermediate link dhundo
-    const gamerXYTLink = $("span:contains('HubCloud Download')")
-      .closest("button")
-      .next("button a")
-      .attr("href");
+    // --- Scrape all <a class="download-button"> links
+    $("a.download-button").each((_, el) => {
+      const btn = $(el);
+      const href = btn.attr("href")?.trim();
+      const serverName = btn.text().trim() || "Unknown Server";
 
-    if (!gamerXYTLink) {
-      console.log("GamerXYT link not found!");
-      return streams;
-    }
-
-    console.log("Found GamerXYT link:", gamerXYTLink);
-
-    // 3️⃣ GamerXYT page fetch
-    const gamerRes = await axios.get(gamerXYTLink, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      },
+      if (href) {
+        streamLinks.push({
+          server: serverName,
+          link: href,
+          type: "mkv", // Boss, mostly KMMOVIES MKV hota hai
+        });
+      }
     });
 
-    const $$ = cheerio.load(gamerRes.data);
-
-    // 4️⃣ Direct download link dhundo
-    const directLink = $$("#download").attr("href");
-    if (directLink) {
-      console.log("Direct download link found:", directLink);
-      streams.push({
-        server: "HubCloud / GamerXYT Direct",
-        link: directLink,
-        type: "file",
-      });
-    } else {
-      console.log("Direct download link not found on GamerXYT page!");
-    }
-
-    return streams;
-  } catch (err) {
-    console.error("Error in getStream:", err);
-    return streams;
+    return streamLinks;
+  } catch (error: any) {
+    console.log("getStream error: ", error.message);
+    return [];
   }
-};
+}

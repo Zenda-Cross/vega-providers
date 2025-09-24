@@ -56,7 +56,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://1cinevood.co";
+    const baseUrl = "https://kmmovies.art";
     let url: string;
 
     // --- Build URL for category filter or search query
@@ -120,7 +120,7 @@ async function fetchPosts({
     return catalog.slice(0, 100);
   } catch (err) {
     console.error(
-      "cinevood2 fetchPosts error:",
+      "HDMovie2 fetchPosts error:",
       err instanceof Error ? err.message : String(err)
     );
     return [];
