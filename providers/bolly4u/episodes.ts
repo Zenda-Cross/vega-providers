@@ -1,56 +1,43 @@
 import { EpisodeLink, ProviderContext } from "../types";
 
-export async function getEpisodeLinks({
+export const getEpisodes = async function ({
   url,
   providerContext,
 }: {
   url: string;
   providerContext: ProviderContext;
 }): Promise<EpisodeLink[]> {
+  const { axios, cheerio, getBaseUrl } = providerContext;
   try {
-    const res = await providerContext.axios.get(url);
-    const $ = providerContext.cheerio.load(res.data || "");
-    const episodes: EpisodeLink[] = [];
+    const res = await axios.get(url);
+    const baseUrl = await getBaseUrl("moviezwap");
+    const html = res.data;
+    const $ = cheerio.load(html);
 
-    // --- Har <h3> ke andar ya just after <hr> me <a> tags ke links ko pick karo
-    $("h3").each((_, h3El) => {
-      // h3 ke andar direct <a> tag
-      const aTag = $(h3El).find("a[href]");
-      if (aTag.length) {
-        aTag.each((_, aEl) => {
-          const rawHref = $(aEl).attr("href");
-          if (!rawHref) return;
-          let href = rawHref.trim();
-          if (!href) return;
-          if (!href.startsWith("http")) href = new URL(href, url).href;
+    const episodeLinks: EpisodeLink[] = [];
 
-          const title = $(aEl).text()?.trim() || "Episode";
-          episodes.push({ title, link: href });
-        });
+    $('a[href*="download.php?file="], a[href*="dwload.php?file="]').each(
+      (i, el) => {
+        const downloadPage =
+          $(el).attr("href")?.replace("dwload.php", "download.php") || "";
+        let text = $(el).text().trim();
+        if (text.includes("Download page")) {
+          // Remove "Download" from the text
+          text = "Play";
+        }
+        if (downloadPage && text) {
+          // Only add links with quality in text
+          episodeLinks.push({
+            title: text,
+            link: baseUrl + downloadPage,
+          });
+        }
       }
-    });
+    );
 
-    // --- Optional: sort by episode number
-    episodes.sort((a, b) => {
-      const numA = parseInt(a.title.match(/\d+/)?.[0] || "0");
-      const numB = parseInt(b.title.match(/\d+/)?.[0] || "0");
-      return numA - numB;
-    });
-
-    return episodes;
+    return episodeLinks;
   } catch (err) {
-    console.error("getEpisodeLinks error:", err);
+    console.error(err);
     return [];
   }
-}
-
-// --- Wrapper function
-export async function getEpisodes({
-  url,
-  providerContext,
-}: {
-  url: string;
-  providerContext: ProviderContext;
-}): Promise<EpisodeLink[]> {
-  return await getEpisodeLinks({ url, providerContext });
-}
+};

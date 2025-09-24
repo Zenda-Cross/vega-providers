@@ -1,117 +1,84 @@
 import { Info, Link, ProviderContext } from "../types";
 
-const hdbHeaders = {
-  Referer: "https://google.com",
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-};
-
 export const getMeta = async function ({
   link,
   providerContext,
 }: {
   link: string;
   providerContext: ProviderContext;
-}): Promise<Info & { extraInfo?: Record<string, string> }> {
+}): Promise<Info> {
   try {
-    const { axios, cheerio } = providerContext;
+    const { axios, cheerio, getBaseUrl } = providerContext;
+    const baseUrl = await getBaseUrl("moviezwap");
+    const url = link.startsWith("http") ? link : `${baseUrl}${link}`;
+    const res = await axios.get(url);
+    const data = res.data;
+    const $ = cheerio.load(data);
 
-    if (!link.startsWith("http")) {
-      link = new URL(link, "https://allmovieshub.games").href;
+    // 1. Poster image find  image with width 260
+    let image = $('img[width="260"]').attr("src") || "";
+    if (image && !image.startsWith("http")) {
+      image = baseUrl + image;
     }
 
-    const res = await axios.get(link, { headers: hdbHeaders });
-    const $ = cheerio.load(res.data);
+    const tags = $("font[color='steelblue']")
+      .map((i, el) => $(el).text().trim())
+      .get()
+      .slice(0, 2);
 
-    // --- Title
-    const title =
-      $("h1.entry-title").first().text().trim() ||
-      $("meta[property='og:title']").attr("content")?.trim() ||
-      $("title").text().trim() ||
-      "Unknown";
+    // 2. Title
+    const title = $("title").text().replace(" - MoviezWap", "").trim() || "";
 
-    // --- Image
-    let image =
-      $(".poster img").attr("src") ||
-      $("meta[property='og:image']").attr("content") ||
-      $("meta[name='twitter:image']").attr("content") ||
-      "";
-    if (image && !image.startsWith("http")) image = new URL(image, link).href;
-
-    // --- Synopsis
+    // 3. Info table
     let synopsis = "";
-    $(".wp-content p, .entry-content p, .description, .synopsis").each((_, el) => {
-      const text = $(el).text().trim();
-      if (text && text.length > 40 && !text.toLowerCase().includes("download")) {
-        synopsis = text;
-        return false;
-      }
-    });
+    let imdbId = "";
+    let type = "movie";
+    let infoRows: string[] = [];
+    $("td:contains('Movie Information')")
+      .parent()
+      .nextAll("tr")
+      .each((i, el) => {
+        const tds = $(el).find("td");
+        if (tds.length === 2) {
+          const key = tds.eq(0).text().trim();
+          const value = tds.eq(1).text().trim();
+          infoRows.push(`${key}: ${value}`);
+          if (key.toLowerCase().includes("plot")) synopsis = value;
+          if (key.toLowerCase().includes("imdb")) imdbId = value;
+        }
+      });
     if (!synopsis) {
-      synopsis =
-        $("meta[property='og:description']").attr("content") ||
-        $("meta[name='description']").attr("content") ||
-        "";
+      // fallback: try to find a <p> with plot
+      synopsis = $("p:contains('plot')").text().trim();
     }
 
-    // --- Tags / Genre
-    const tags =
-      $(".sgeneros a, .genres a, .genre a")
-        .map((_, el) => $(el).text().trim())
-        .get() || [];
-
-    // --- Cast
-    const cast =
-      $(".cast .person a, .casting a, .actors a")
-        .map((_, el) => $(el).text().trim())
-        .get() || [];
-
-    // --- Rating
-    let rating =
-      $(".imdb span[itemprop='ratingValue']").text().trim() ||
-      $(".ratingValue").text().trim() ||
-      $("meta[itemprop='ratingValue']").attr("content") ||
-      "";
-    if (rating && !rating.includes("/")) rating += "/10";
-
-    // --- IMDb ID
-    const imdbLink =
-      $(".imdb a[href*='imdb.com'], a[href*='imdb.com']").attr("href") || "";
-    const imdbId = imdbLink ? "tt" + imdbLink.split("/tt")[1]?.split("/")[0] : "";
-
-    // --- Extra Info
-    const extra: Record<string, string> = {};
-    $("p, .info").each((_, el) => {
-      const html = $(el).html() || "";
-      const txt = $(el).text() || "";
-      if (html.includes("Language")) extra.language = txt.split(":")[1]?.trim();
-      if (html.includes("Release")) extra.year = txt.split(":")[1]?.trim();
-      if (html.includes("Quality")) extra.quality = txt.split(":")[1]?.trim();
-      if (html.includes("Format")) extra.format = txt.split(":")[1]?.trim();
-      if (html.includes("Size")) extra.size = txt.split(":")[1]?.trim();
-    });
-
-    // --- Download / Episode Links
+    // 4. Download links (multiple qualities)
     const links: Link[] = [];
-    $("h3 a[href], .download a[href]").each((_, el) => {
-      let href = $(el).attr("href")?.trim() || "";
-      let text = $(el).text().trim() || "";
-      if (!href || !text) return;
-
-      if (!href.startsWith("http")) href = new URL(href, link).href;
-
-      links.push({
-        title: text,
-        directLinks: [
-          {
-            link: href,
+    $('a[href*="download.php?file="], a[href*="dwload.php?file="]').each(
+      (i, el) => {
+        const downloadPage =
+          $(el).attr("href")?.replace("dwload.php", "download.php") || "";
+        const text = $(el).text().trim();
+        if (downloadPage && /\d+p/i.test(text)) {
+          // Only add links with quality in text
+          links.push({
             title: text,
-            quality: text.match(/\b(480p|720p|1080p|HDTC|HDRip|BluRay)\b/i)?.[0] || "",
-            type: "movie",
-          },
-        ],
-      });
+            directLinks: [{ title: "Movie", link: baseUrl + downloadPage }],
+          });
+        }
+      }
+    );
+
+    $("img[src*='/images/play.png']").each((i, el) => {
+      const downloadPage = $(el).siblings("a").attr("href");
+      const text = $(el).siblings("a").text().trim();
+      console.log("Found link:🔥🔥", text, downloadPage);
+      if (downloadPage && text) {
+        links.push({
+          title: text,
+          episodesLink: baseUrl + downloadPage,
+        });
+      }
     });
 
     return {
@@ -119,26 +86,20 @@ export const getMeta = async function ({
       synopsis,
       image,
       imdbId,
-      type: "movie",
       tags,
-      cast,
-      rating,
+      type,
       linkList: links,
-      extraInfo: extra,
+      //info: infoRows.join("\n"),
     };
   } catch (err) {
-    console.error("HDMovie2 getMeta error:", err);
+    console.error(err);
     return {
       title: "",
       synopsis: "",
       image: "",
       imdbId: "",
       type: "movie",
-      tags: [],
-      cast: [],
-      rating: "",
       linkList: [],
-      extraInfo: {},
     };
   }
 };

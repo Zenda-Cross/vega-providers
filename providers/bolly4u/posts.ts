@@ -1,129 +1,70 @@
 import { Post, ProviderContext } from "../types";
 
-const defaultHeaders = {
-  Referer: "https://www.google.com",
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-    "(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
-  Pragma: "no-cache",
-  "Cache-Control": "no-cache",
-};
-
-// --- Normal catalog posts ---
-export async function getPosts({
+export const getPosts = async function ({
   filter,
-  page = 1,
+  page,
   signal,
   providerContext,
 }: {
-  filter?: string;
-  page?: number;
-  signal?: AbortSignal;
+  filter: string;
+  page: number;
+  providerValue: string;
+  signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  return fetchPosts({ filter, page, query: "", signal, providerContext, isSearch: false });
-}
+  const { getBaseUrl, cheerio } = providerContext;
+  const baseUrl = await getBaseUrl("moviezwap");
+  const url = `${baseUrl}${filter}`;
+  return posts({ url, signal, cheerio });
+};
 
-// --- Search posts ---
-export async function getSearchPosts({
+export const getSearchPosts = async function ({
   searchQuery,
-  page = 1,
+  page,
   signal,
   providerContext,
 }: {
   searchQuery: string;
-  page?: number;
-  signal?: AbortSignal;
+  page: number;
+  providerValue: string;
+  signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  return fetchPosts({ filter: "", page, query: searchQuery, signal, providerContext, isSearch: true });
-}
+  const { getBaseUrl, cheerio } = providerContext;
+  const baseUrl = await getBaseUrl("moviezwap");
+  const url = `${baseUrl}/search.php?q=${encodeURIComponent(searchQuery)}`;
+  return posts({ url, signal, cheerio });
+};
 
-// --- Core function to fetch posts ---
-async function fetchPosts({
-  filter,
-  query,
-  page = 1,
+async function posts({
+  url,
   signal,
-  providerContext,
-  isSearch = false,
+  cheerio,
 }: {
-  filter?: string;
-  query?: string;
-  page?: number;
-  signal?: AbortSignal;
-  providerContext: ProviderContext;
-  isSearch?: boolean;
+  url: string;
+  signal: AbortSignal;
+  cheerio: ProviderContext["cheerio"];
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://allmovieshub.games";
-    const { axios, cheerio } = providerContext;
-    let res;
-
-    if (isSearch && query) {
-      // --- POST request for search
-      res = await axios.post(
-        baseUrl,
-        new URLSearchParams({
-          do: "search",
-          subaction: "search",
-          story: query.trim(),
-        }),
-        { headers: { ...defaultHeaders, "Content-Type": "application/x-www-form-urlencoded" }, signal }
-      );
-    } else {
-      // --- Normal catalog GET request
-      let url: string;
-      if (filter) {
-        url = filter.startsWith("/")
-          ? `${baseUrl}${filter.replace(/\/$/, "")}${page > 1 ? `/page/${page}` : ""}`
-          : `${baseUrl}/${filter}${page > 1 ? `/page/${page}` : ""}`;
-      } else {
-        url = `${baseUrl}${page > 1 ? `/page/${page}` : ""}`;
-      }
-      res = await axios.get(url, { headers: defaultHeaders, signal });
-    }
-
-    const $ = cheerio.load(res.data || "");
-    const resolveUrl = (href: string) => (href?.startsWith("http") ? href : new URL(href, baseUrl).href);
-
-    const seen = new Set<string>();
+    const res = await fetch(url, { signal });
+    const data = await res.text();
+    const $ = cheerio.load(data);
     const catalog: Post[] = [];
-
-    // --- Possible post selectors
-    const POST_SELECTORS = [".pstr_box", ".post", ".movie-item", "article"].join(",");
-
-    $(POST_SELECTORS).each((_, el) => {
-      const card = $(el);
-      let link = card.find("a").first().attr("href");
-      if (!link) return;
-      link = resolveUrl(link);
-      if (seen.has(link)) return;
-
-      let title =
-        card.find("h2").first().text().trim() ||
-        card.find("a[title]").first().attr("title")?.trim() ||
-        card.text().trim();
-      if (!title) return;
-      title = title.replace(/^Download\s*[:-]?/i, "").trim();
-      title = title.replace(/\s{2,}/g, " ");
-
-      const img =
-        card.find("img").first().attr("data-src") ||
-        card.find("img").first().attr("src") ||
-        card.find("img").first().attr("data-original") ||
-        "";
-      const image = img ? resolveUrl(img) : "";
-
-      seen.add(link);
-      catalog.push({ title, link, image });
+    $('a[href^="/movie/"]').each((i, el) => {
+      const title = $(el).text().trim();
+      const link = $(el).attr("href");
+      const image = "";
+      if (title && link) {
+        catalog.push({
+          title: title,
+          link: link,
+          image: image,
+        });
+      }
     });
-
-    return catalog.slice(0, 100);
+    return catalog;
   } catch (err) {
-    console.error("fetchPosts error:", err instanceof Error ? err.message : String(err));
+    console.error("moviezwapGetPosts error ", err);
     return [];
   }
 }
