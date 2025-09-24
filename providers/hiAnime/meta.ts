@@ -1,4 +1,3 @@
-
 import { Info, Link, ProviderContext } from "../types";
 
 interface DirectLink {
@@ -127,7 +126,7 @@ export const getMeta = async function ({
       if (html.includes("Format")) extra.format = $(el).text().split(":")[1]?.trim();
     });
 
-    const links: Link[] = [];
+    let links: Link[] = [];
     let episodeList: Episode[] = [];
 
     // --- Fetch links including h3/button text
@@ -147,7 +146,8 @@ export const getMeta = async function ({
           if (
             btnText.toLowerCase().includes("imdb rating") ||
             btnText.toLowerCase().includes("winding up")
-          ) return;
+          )
+            return;
 
           links.push({
             title: `${seasonText} - ${btnText}`,
@@ -164,6 +164,20 @@ export const getMeta = async function ({
         });
     });
 
+    // --- Reorder links: put V-Cloud & Source 2 first
+    links = [
+      ...links.filter(
+        (l) =>
+          l.title.toLowerCase().includes("v-cloud") ||
+          l.title.toLowerCase().includes("source 2")
+      ),
+      ...links.filter(
+        (l) =>
+          !l.title.toLowerCase().includes("v-cloud") &&
+          !l.title.toLowerCase().includes("source 2")
+      ),
+    ];
+
     return {
       title,
       synopsis,
@@ -175,7 +189,7 @@ export const getMeta = async function ({
       rating: $(".entry-meta .entry-date").text().trim() || "",
       linkList: links,
       extraInfo: extra,
-      episodeList, // episodes bhi show honge
+      episodeList,
     };
   } catch (err) {
     console.error("getMeta error:", err);
