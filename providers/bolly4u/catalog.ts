@@ -1,4 +1,4 @@
 export const catalog = [
   { title: "Latest", filter: "" },
-  { title: "Hollywood", filter: "sonyliv/" },
+  { title: "Netflix", filter: "sonyliv/" },
 ];
