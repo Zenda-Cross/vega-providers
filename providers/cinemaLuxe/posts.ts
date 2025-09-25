@@ -56,16 +56,15 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://www.vegam0vies.com";
+    const baseUrl = "https://www.vegamovies-nl.yoga";
     let url: string;
 
-    // --- Build URL for category filter or search query ---
     if (query && query.trim()) {
-      // Updated for search.php HTML structure
+      // ✅ Correct search URL
       const params = new URLSearchParams();
-      params.append("query", query);
-      if (page > 1) params.append("page", page.toString());
-      url = `${baseUrl}/search.php?${params.toString()}`;
+      params.append("s", query.trim());
+      if (page > 1) params.append("paged", page.toString());
+      url = `${baseUrl}/?${params.toString()}`;
     } else if (filter) {
       url = filter.startsWith("/")
         ? `${baseUrl}${filter.replace(/\/$/, "")}${page > 1 ? `/page/${page}` : ""}`
@@ -79,12 +78,12 @@ async function fetchPosts({
     const $ = cheerio.load(res.data || "");
 
     const resolveUrl = (href: string) =>
-      href?.startsWith("http") ? href : new URL(href, url).href;
+      href?.startsWith("http") ? href : new URL(href, baseUrl).href;
 
     const seen = new Set<string>();
     const catalog: Post[] = [];
 
-    // --- Post selectors (HDMovie2 style) ---
+    // --- Post selectors
     const POST_SELECTORS = [
       ".pstr_box",
       "article",

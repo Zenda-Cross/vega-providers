@@ -4,8 +4,12 @@ export const catalog = [
     filter: "",
   },
   {
-    title: "Hollywood",
-    filter: "hollywood-movies/hollywood-movies-new/",
+    title: "Animation",
+    filter: "animation/",
+  },
+  {
+    title:  "Apple-TV",
+    filter: "web-series/apple-tv/",
   },
 ];
 
