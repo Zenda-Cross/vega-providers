@@ -19,7 +19,7 @@ export async function getEpisodeLinks({
       // Next until next <h4> or <hr> ke andar saare <a> links
       $(h4El)
         .nextUntil("h4, hr")
-        .find("a[href]")
+        .find("a[href]") // sirf <a> tags
         .each((_, linkEl) => {
           let href = ($(linkEl).attr("href") || "").trim();
           if (!href) return;
@@ -27,13 +27,9 @@ export async function getEpisodeLinks({
 
           const btnText = $(linkEl).text().trim() || "Watch Episode";
 
-          // --- Include G-Direct (fastdl.icu), V-Cloud, DropGalaxy
+          // --- Sirf SkyDrop links include karo
           const lowerHref = href.toLowerCase();
-          if (
-            lowerHref.includes("fastdl.icu") || // G-Direct
-            lowerHref.includes("vcloud.lol") || 
-            lowerHref.includes("dgdrive")
-          ) {
+          if (lowerHref.includes("skydro") || lowerHref.includes("flexplayer.buzz")) {
             episodes.push({
               title: `${epTitle} - ${btnText}`,
               link: href,

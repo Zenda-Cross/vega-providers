@@ -80,7 +80,6 @@ export const getMeta = async function ({
     // --- Rating
     let rating =
       $("p").text().match(/IMDb Rating[:\s]*([0-9.]+)/i)?.[1] || "";
-
     if (rating && !rating.includes("/")) rating = rating + "/10";
 
     // --- IMDb ID
@@ -91,38 +90,66 @@ export const getMeta = async function ({
         : "";
 
     // --- Download Links
-    const links: Link[] = [];
-    $("a.modern-download-button").each((_, a) => {
-      const parent = $(a).closest(".modern-option-card");
-      const quality = parent.find(".modern-badge").text().trim() || "AUTO";
-      const href = $(a).attr("href") || "";
-      const titleText = `Download ${quality}`;
+    const linkList: Link[] = [];
+    const isSeries = $(".download-options-grid").length > 0; // Series tab structure
 
-      if (href) {
-        links.push({
-          title: titleText,
-          directLinks: [
-            {
-              link: href,
-              title: titleText,
-              quality,
-              type: "movie",
-            },
-          ],
-        });
-      }
-    });
+    if (isSeries) {
+      // --- Series: loop through each download-card
+      $(".download-card").each((_, card) => {
+        const card$ = $(card);
+        const quality = card$.find(".download-quality-text").text().trim() || "AUTO";
+        const size = card$.find(".download-size-info").text().trim() || "";
+        const href = card$.find("a.tabs-download-button").attr("href") || "";
+        if (href) {
+          const titleText = `Download ${quality} ${size}`.trim();
+          linkList.push({
+            title: titleText,
+            episodesLink: href,
+            directLinks: [
+              {
+                link: href,
+                title: titleText,
+                quality,
+                type: "series",
+              },
+            ],
+          });
+        }
+      });
+    } else {
+      // --- Movie: same as before
+      $("a.modern-download-button").each((_, a) => {
+        const parent = $(a).closest(".modern-option-card");
+        const quality = parent.find(".modern-badge").text().trim() || "AUTO";
+        const href = $(a).attr("href") || "";
+        const titleText = `Download ${quality}`;
+        if (href) {
+          linkList.push({
+            title: titleText,
+            episodesLink: href,
+            directLinks: [
+              {
+                link: href,
+                title: titleText,
+                quality,
+                type: "movie",
+              },
+            ],
+          });
+        }
+      });
+    }
 
     return {
       title,
       synopsis,
       image,
       imdbId,
-      type: "movie",
+      type: isSeries ? "series" : "movie",
       tags,
       cast,
       rating,
-      linkList: links,
+      linkList,
     };
   } catch (err) {
     console.error("KMMOVIES getMeta error:", err);
