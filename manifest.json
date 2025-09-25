@@ -82,10 +82,10 @@
   {
     "display_name": "CinemaLuxe",
     "value": "cinemaLuxe",
-    "version": "1.6",
+    "version": "1.7",
     "icon": "",
     "type": "global",
-    "disabled": true
+    "disabled": false 
   },
   {
     "display_name": "FilmyFly",
@@ -323,6 +323,7 @@
  
   
 ]
+
 
 
 
