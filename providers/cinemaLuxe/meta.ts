@@ -1,201 +1,105 @@
-import { Info, Link, ProviderContext } from "../types";
+import { Info, ProviderContext, Link } from "../types";
 
-// Define the DirectLink interface locally to resolve the import error
-interface DirectLink {
-  link: string;
-  title: string;
-  quality: string;
-  type: "movie" | "episode";
-}
-
-const hdbHeaders = {
-  Referer: "https://google.com",
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+const headers = {
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Cache-Control": "no-store",
+  "Accept-Language": "en-US,en;q=0.9",
+  DNT: "1",
+  "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
 };
 
-export const getMeta = async function ({
+export const getMeta = ({
   link,
   providerContext,
 }: {
   link: string;
   providerContext: ProviderContext;
-}): Promise<Info> {
-  try {
-    const { axios, cheerio } = providerContext;
+}): Promise<Info> => {
+  const { axios, cheerio } = providerContext;
+  const baseUrl = link.split("/").slice(0, 3).join("/");
 
-    if (!link.startsWith("http")) {
-      link = new URL(link, "https://www.vegam0vies.com").href;
-    }
+  return axios
+    .get(link, { headers: { ...headers, Referer: baseUrl } })
+    .then((response) => {
+      const $ = cheerio.load(response.data);
+      const infoContainer = $(".entry-content,.post-inner");
 
-    const res = await axios.get(link, { headers: hdbHeaders });
-    const $ = cheerio.load(res.data);
+      const title = $("h1.entry-title").text().trim() || "";
 
-    // --- Title
-    const title =
-      $("h1.entry-title").first().text().trim() ||
-      $("meta[property='og:title']").attr("content")?.trim() ||
-      $("title").text().trim() ||
-      "Unknown";
+      let imdbId = "";
+      const imdbMatch = infoContainer.html()?.match(/tt\d+/);
+      if (imdbMatch) imdbId = imdbMatch[0];
 
-    // --- Image
-    let image =
-      $(".poster img").attr("src") ||
-      $("meta[property='og:image']").attr("content") ||
-      $("meta[name='twitter:image']").attr("content") ||
-      $("p img").first().attr("src") ||
-      "";
-    if (image && !image.startsWith("http")) image = new URL(image, link).href;
+      const synopsis =
+        infoContainer
+          .find("h3:contains('SYNOPSIS'), h3:contains('synopsis'), h3:contains('Series-SYNOPSIS')")
+          .next("p")
+          .text()
+          .trim() || "";
 
-    // --- Synopsis
-    let synopsis = "";
-    $("h4:contains('Movie synopsis'), h4:contains('PLOT'), h3:contains('SYNOPSIS/PLOT')")
-      .next("p")
-      .each((_, el) => {
-        const text = $(el).text().trim();
-        if (text && text.length > 20) synopsis = text;
-      });
-    if (!synopsis) {
-      $(".entry-content p").each((_, el) => {
-        const text = $(el).text().trim();
-        if (
-          text &&
-          text.length > 40 &&
-          !text.toLowerCase().includes("download")
-        ) {
-          synopsis = text;
-          return false;
-        }
-      });
-    }
+      let image = "";
+      const firstImg = infoContainer.find("img").first();
+      if (firstImg.length) {
+        image = firstImg.attr("src") || "";
+        if (image.startsWith("//")) image = "https:" + image;
+      }
 
-    // --- IMDb
-    const imdbLink = $("a[href*='imdb.com']").attr("href") || "";
-    const imdbId = imdbLink
-      ? imdbLink.split("/tt")[1]?.split("/")[0]
-        ? "tt" + imdbLink.split("/tt")[1].split("/")[0]
-        : ""
-      : "";
+      const linkList: Link[] = [];
+      const type: "movie" | "series" = /Season \d+/i.test(infoContainer.text()) ? "series" : "movie";
 
-    // --- Rating
-    let rating =
-      $(".imdb span[itemprop='ratingValue']").text().trim() ||
-      $(".ratingValue").text().trim() ||
-      "";
-    if (rating && !rating.includes("/")) rating = rating + "/10";
+      if (type === "series") {
+        infoContainer.find("h3").each((_, el) => {
+          const el$ = $(el);
+          const seasonText = el$.text().trim();
+          if (/Season \d+/i.test(seasonText)) {
+            let vCloudLink = "";
+            el$.nextUntil("h3").find("a").each((_, aEl) => {
+              const href = $(aEl).attr("href") || "";
+              const text = $(aEl).text();
+              if (href.includes("fzlinks.xyz/archive") && text.includes("V-Cloud")) {
+                vCloudLink = href;
+                return false; // stop at first V-Cloud
+              }
+            });
 
-    // --- Extra Info
-    const extra: Record<string, string> = {};
-    $("p").each((_, el) => {
-      const html = $(el).html() || "";
-      if (html.includes("Movie Name") || html.includes("Series Name"))
-        extra.name = $(el).text().split(":")[1]?.trim();
-      if (html.includes("Language"))
-        extra.language = $(el).text().split(":")[1]?.trim();
-      if (html.includes("Released Year"))
-        extra.year = $(el).text().split(":")[1]?.trim();
-      if (html.includes("Quality"))
-        extra.quality = $(el).text().split(":")[1]?.trim();
-      if (html.includes("Size"))
-        extra.size = $(el).text().split(":")[1]?.trim();
-      if (html.includes("Format"))
-        extra.format = $(el).text().split(":")[1]?.trim();
-    });
-
-    // --- Tags
-    const tags: string[] = [];
-    $(".entry-content p strong").each((_, el) => {
-      const txt = $(el).text().trim();
-      if (txt.match(/drama|biography|action|thriller|romance|reality/i)) tags.push(txt);
-    });
-
-    // --- Detect if Series (based on a common heading)
-    const isSeries = $("h4:contains('Episode:')").length > 0;
-    
-    const links: Link[] = [];
-    
-    // Series or Movie logic
-    if (isSeries) {
-      // ✅ Series Mode: Find episode links
-      $("h4:contains('Episode:'), h5:contains('Episode:')").each((_, episodeHeading) => {
-        const episodeTitle = $(episodeHeading).text().trim();
-        const directLinks: DirectLink[] = [];
-        
-        let currentElement = $(episodeHeading).next();
-        while (currentElement.length > 0 && !currentElement.is("h4, h5")) {
-          currentElement.find("a[href]").each((_, linkEl) => {
-            let href = ($(linkEl).attr("href") || "").trim();
-            const title = ($(linkEl).text() || "").trim();
-            if (href) {
-              if (!href.startsWith("http")) href = new URL(href, link).href;
-              directLinks.push({
-                link: href,
-                title: title,
-                quality: "AUTO",
-                type: "episode",
+            if (vCloudLink) {
+              linkList.push({
+                title: seasonText,
+                episodesLink: vCloudLink,
+                directLinks: [],
               });
             }
-          });
-          currentElement = currentElement.next();
-        }
-
-        if (directLinks.length > 0) {
-          links.push({
-            title: episodeTitle,
-            directLinks: directLinks,
-            episodesLink: "", // All episodes are on this page, so no external link is needed.
-          });
-        }
-      });
-    } else {
-      // ✅ Movie Mode
-      $("h5 + p a[href]").each((_, el) => {
-        let href = ($(el).attr("href") || "").trim();
-        const text = $(el).closest("p").prev("h5").text().trim();
-        if (!href) return;
-        if (!href.startsWith("http")) href = new URL(href, link).href;
-
-        const qMatch = text.match(/\b(480p|720p|1080p|2160p|4k)\b/i);
-        const quality = qMatch ? qMatch[0] : "AUTO";
-
-        links.push({
-          title: text,
-          directLinks: [
-            {
-              link: href,
-              title: text,
-              quality,
-              type: "movie",
-            },
-          ],
+          }
         });
-      });
-    }
+      } else {
+        // Movie: sab links collect
+        infoContainer.find("h5").each((_, h5El) => {
+          const h5Text = $(h5El).text().trim();
+          const directLinks: Link["directLinks"] = [];
+          $(h5El)
+            .next("p")
+            .find("a")
+            .each((_, aEl) => {
+              const linkHref = $(aEl).attr("href") || "";
+              if (linkHref) directLinks.push({ title: h5Text, link: linkHref, type: "movie" });
+            });
 
-    return {
-      title,
-      synopsis,
-      image,
-      imdbId,
-      type: isSeries ? "series" : "movie",
-      tags,
-      cast: [],
-      rating,
-      linkList: links,
-      extraInfo: extra,
-    } as Info & { extraInfo: Record<string, string> };
-  } catch (err) {
-    console.error("getMeta error:", err);
-    return {
-      title: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "movie",
-      tags: [],
-      cast: [],
-      rating: "",
-      linkList: [],
-    };
-  }
+          if (directLinks.length) linkList.push({ title: h5Text, directLinks });
+        });
+      }
+
+      return { title, synopsis, image, imdbId, type, linkList };
+    })
+    .catch((err) => {
+      console.error("getMeta error:", err);
+      return { title: "", synopsis: "", image: "", imdbId: "", type: "movie", linkList: [] };
+    });
 };

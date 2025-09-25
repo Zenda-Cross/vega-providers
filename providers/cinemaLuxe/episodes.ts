@@ -1,68 +1,65 @@
 import { EpisodeLink, ProviderContext } from "../types";
 
-export const getEpisodes = async function ({
+const headers = {
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Cache-Control": "no-store",
+  "Accept-Language": "en-US,en;q=0.9",
+  DNT: "1",
+  "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+};
+
+export const getEpisodes = ({
   url,
   providerContext,
 }: {
   url: string;
   providerContext: ProviderContext;
-}): Promise<EpisodeLink[]> {
-  try {
-    const { axios, cheerio, commonHeaders: headers } = providerContext;
-    console.log("getEpisodeLinks", url);
-    
-    // Add cookies if necessary to bypass security like Cloudflare
-    const res = await axios.get(url, { headers: { ...headers, cookie: "..." } });
-    const $ = cheerio.load(res.data);
+}): Promise<EpisodeLink[]> => {
+  const { axios, cheerio } = providerContext;
+  console.log("Fetching episodes from:", url);
 
-    const episodes: EpisodeLink[] = [];
-    
-    // Find the section that contains episode links
-    $("section[aria-label*='Download links for episodes']")
-      .find("h4")
-      .each((index, element) => {
-        const el = $(element);
-        // Extract the title from the h4 tag, e.g., "-:Episode: 1:-"
-        const episodeTitle = el.text().trim().replace(/^-:|-:$/g, "").trim();
+  return axios
+    .get(url, { headers })
+    .then((res) => {
+      const $ = cheerio.load(res.data);
+      const episodes: EpisodeLink[] = [];
 
-        // Find all links in the next p tag
-        el.next("p").find("a[href]").each((_, linkEl) => {
-          let link = $(linkEl).attr("href");
-          
-          if (episodeTitle && link) {
-            // Check if the link is relative and convert it to an absolute URL
-            if (!link.startsWith("http")) {
-              link = new URL(link, url).href;
+      // Series ke liye: section aria-label="Download links for episodes"
+      $('section[aria-label*="Download links for episodes"]').each((_, section) => {
+        const section$ = $(section);
+
+        section$.find("p a").each((_, aEl) => {
+          const anchor = $(aEl);
+          const btnText = anchor.text().trim();
+          const href = anchor.attr("href") || "";
+
+          // sirf V-Cloud wale link
+          if (btnText.includes("V-Cloud") && href) {
+            let finalLink = href;
+
+            // agar href relative hai (starting with /dl.php) to absolute bana do
+            if (href.startsWith("/")) {
+              const base = url.split("/").slice(0, 3).join("/");
+              finalLink = base + href;
             }
-            episodes.push({ title: episodeTitle, link });
+
+            episodes.push({ title: btnText, link: finalLink });
           }
         });
       });
-      
-    // A fallback to look for another common pattern if the first one fails
-    // This is optional but good practice for robustness
-    if (episodes.length === 0) {
-        $(".entry-content,.entry-inner").find("h4").each((index, element) => {
-            const el = $(element);
-            const episodeTitle = el.text().replace(/-/g, "").replace(/:/g, "");
-            
-            // Find all links in the next p tag
-            el.next("p").find("a[href]").each((_, linkEl) => {
-              let link = $(linkEl).attr("href");
-              if (episodeTitle && link) {
-                // Check if the link is relative and convert it to an absolute URL
-                if (!link.startsWith("http")) {
-                  link = new URL(link, url).href;
-                }
-                episodes.push({ title: episodeTitle, link });
-              }
-            });
-        });
-    }
 
-    return episodes;
-  } catch (err) {
-    console.error("getEpisodeLinks error:", err);
-    return [];
-  }
+      return episodes;
+    })
+    .catch((err) => {
+      console.log("getEpisodes error:", err);
+      return [];
+    });
 };
