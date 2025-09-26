@@ -17,7 +17,7 @@ export const getMeta = async function ({
     const { axios, cheerio } = providerContext;
 
     if (!link.startsWith("http")) {
-      link = new URL(link, "https://hdmovie2.srl").href;
+      link = new URL(link, "https://hdmovie2.bayern").href;
     }
 
     const res = await axios.get(link, { headers: hdbHeaders });
@@ -139,3 +139,4 @@ export const getMeta = async function ({
     };
   }
 };
+
