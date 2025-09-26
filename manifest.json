@@ -318,11 +318,20 @@
     "icon": "",
     "type": "global",
     "disabled": false
+  },
+  {
+    "display_name": "streamflix",
+    "value": "streamflix",
+    "version": "1.0",
+    "icon": "",
+    "type": "india",
+    "disabled": false
   }
  
  
   
 ]
+
 
 
 
