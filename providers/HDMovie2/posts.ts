@@ -56,7 +56,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://hdmovie2.srl";
+    const baseUrl = "https://hdmovie2.bayern";
     let url: string;
 
     // --- Build URL for category filter or search query
@@ -125,4 +125,5 @@ async function fetchPosts({
     );
     return [];
   }
+
 }
