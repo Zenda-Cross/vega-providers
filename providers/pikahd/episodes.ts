@@ -12,17 +12,36 @@ export async function getEpisodeLinks({
     const $ = providerContext.cheerio.load(res.data || "");
     const episodes: EpisodeLink[] = [];
 
-    $("a.episode-link").each((i: number, el: any) => {
+    // Agar anchor tag me episode links diye hain
+    $("a").each((i, el) => {
       const $el = $(el);
-      const title = $el.text().trim();
-      const link = $el.attr("href") || "";
-      if (!link || !title) return;
-      episodes.push({ title, link });
+      const href = ($el.attr("href") || "").trim();
+      const text = $el.text().trim();
+
+      if (href && (text.includes("Episode") || /E\d+/i.test(text) || href.includes("vcloud.lol"))) {
+        let epNum = text.match(/E\d+/i)?.[0] || text;
+        if (/^\d+$/.test(epNum)) epNum = `Episode ${epNum}`;
+        episodes.push({
+          title: epNum,
+          link: href,
+        });
+      }
     });
 
     return episodes;
   } catch (err) {
-    console.error("pikahd getEpisodeLinks error:", err);
+    console.error("getEpisodeLinks error:", err);
     return [];
   }
+}
+
+// ✅ Ye wrapper export karna zaroori hai
+export async function getEpisodes({
+  url,
+  providerContext,
+}: {
+  url: string;
+  providerContext: ProviderContext;
+}): Promise<EpisodeLink[]> {
+  return await getEpisodeLinks({ url, providerContext });
 }

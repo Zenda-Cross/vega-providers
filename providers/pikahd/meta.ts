@@ -1,135 +1,113 @@
 import { Info, Link, ProviderContext } from "../types";
 
 const headers = {
-  Referer: "https://google.com",
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Cache-Control": "no-store",
+  "Accept-Language": "en-US,en;q=0.9",
+  DNT: "1",
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-    "(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
 };
 
-export const getMeta = async function ({
+// --- getMeta using Promise ---
+export const getMeta = function ({
   link,
   providerContext,
 }: {
   link: string;
   providerContext: ProviderContext;
 }): Promise<Info> {
-  try {
-    const { axios, cheerio } = providerContext;
-    const res = await axios.get(link, { headers });
-    const $ = cheerio.load(res.data);
+  const { axios, cheerio } = providerContext;
 
-    const container = $("article, .entry-content").first();
+  return axios
+    .get(link, { headers })
+    .then((response) => {
+      const $ = cheerio.load(response.data);
+      const infoContainer = $(".entry-content,.post-inner");
 
-    // --- Title
-    let rawTitle =
-      container.find("h1.entry-title").first().text().trim() ||
-      $("meta[property='og:title']").attr("content")?.trim() ||
-      $("title").text().trim();
-    const title = rawTitle
-      .replace(/PikaHD/gi, "")
-      .replace(/\[.*?\]/g, "")
-      .replace(/\(.+?\)/g, "")
-      .replace(/\s{2,}/g, " ")
-      .trim();
+      const title =
+        $("h1.entry-title").text().trim() ||
+        $("h2.entry-title").text().trim() ||
+        "";
 
-    // --- Type
-    const type: "movie" | "series" = /season|episode|ep\s*\d+/i.test(rawTitle)
-      ? "series"
-      : "movie";
+      const imdbMatch = infoContainer.html()?.match(/tt\d+/);
+      const imdbId = imdbMatch ? imdbMatch[0] : "";
 
-    // --- Synopsis
-    const synopsis =
-      $('h2:contains("Storyline")').next('p').text().trim() ||
-      $("meta[name='description']").attr("content") ||
-      $("meta[property='og:description']").attr("content") ||
-      "";
+      const synopsis =
+        infoContainer
+          .find("h3:contains('SYNOPSIS'), h3:contains('synopsis')")
+          .next("p")
+          .text()
+          .trim() || "";
 
-    // --- Image
-    let image =
-      $("meta[property='og:image']").attr("content") ||
-      container.find("img[fetchpriority='high']").attr("src") ||
-      container.find("img").first().attr("src") ||
-      "";
-    if (image.startsWith("/")) image = `https://pikahd.eu${image}`;
+      let image = infoContainer.find("img").first().attr("src") || "";
+      if (image.startsWith("//")) image = "https:" + image;
 
-    // --- IMDb Id
-    const imdbId =
-      $('a[href*="imdb.com/title/tt"]', container)
-        .attr("href")
-        ?.match(/tt\d+/)?.[0] || "";
+      const type = /Season \d+/i.test(infoContainer.text()) ? "series" : "movie";
+      const linkList: Link[] = [];
 
-    // --- Links
-    const links: Link[] = [];
-    const seenLinks = new Set<string>();
-
-    const episodeNumberMatch = rawTitle.match(/Episode\s*(\d+)/i);
-    const seasonNumberMatch = rawTitle.match(/S(\d+)/i);
-    let episodeNumber = episodeNumberMatch ? episodeNumberMatch[1] : "Unknown";
-    let seasonNumber = seasonNumberMatch ? seasonNumberMatch[1] : "Unknown";
-
-    // --- Iframe embedded streams (Primary Stream)
-    const episodeLinks: Link["directLinks"] = [];
-    $("iframe", container).each((_, el) => {
-      const src = $(el).attr("src");
-      if (!src) return;
-      const finalLink = src.startsWith("http") ? src : new URL(src, link).href;
-      if (!seenLinks.has(finalLink)) {
-        seenLinks.add(finalLink);
-        episodeLinks.push({
-          title: `Main Stream (Season ${seasonNumber}, Episode ${episodeNumber})`,
-          link: finalLink,
+      if (type === "series") {
+        // Single Episode Links
+        infoContainer.find("h2 a").each((_, el) => {
+          const el$ = $(el);
+          const href = el$.attr("href")?.trim();
+          const linkText = el$.text().trim();
+          if (href && linkText.includes("Single Episode")) {
+            linkList.push({ title: linkText, episodesLink: href, directLinks: [] });
+          }
+        });
+      } else {
+        // Movies
+        infoContainer.find("a[href]").each((_, aEl) => {
+          const el$ = $(aEl);
+          const href = el$.attr("href")?.trim() || "";
+          if (!href) return;
+          const btnText = el$.text().trim() || "Download";
+          linkList.push({
+            title: btnText,
+            directLinks: [{ title: btnText, link: href, type: "movie" }],
+            episodesLink: "",
+          });
         });
       }
+
+      return { title, synopsis, image, imdbId, type, linkList };
+    })
+    .catch((err) => {
+      console.error("getMeta error:", err);
+      return { title: "", synopsis: "", image: "", imdbId: "", type: "movie", linkList: [] };
     });
+};
 
-    // --- Episode Download Links (Structured in <h3> tags)
-    container.find('h3 a[href*="links.kmhd.net"]').each((_, el) => {
-      const href = $(el).attr("href");
-      if (!href) return;
+// --- scrapeEpisodePage using Promise ---
+export const scrapeEpisodePage = function ({
+  link,
+  providerContext,
+}: {
+  link: string;
+  providerContext: ProviderContext;
+}): Promise<{ title: string; link: string; type: "series" }[]> {
+  const { axios, cheerio } = providerContext;
+  const result: { title: string; link: string; type: "series" }[] = [];
 
-      const finalLink = href.startsWith("http") ? href : new URL(href, link).href;
-      if (seenLinks.has(finalLink)) return;
-      seenLinks.add(finalLink);
-
-      const linkText = $(el).text().trim(); // e.g., "E01: 1080p"
-      const epMatch = linkText.match(/E(\d+)/i);
-      const qualityMatch = linkText.match(/(1080p|720p|480p)/i);
-
-      episodeNumber = epMatch ? epMatch[1] : episodeNumber;
-      const quality = qualityMatch ? qualityMatch[0] : "HD";
-
-      episodeLinks.push({
-        title: `Season ${seasonNumber}, Episode ${episodeNumber} (${quality})`,
-        link: finalLink,
-        quality,
-      });
+  return axios
+    .get(link, { headers })
+    .then((response) => {
+      const $ = cheerio.load(response.data);
+      $(".entry-content,.post-inner")
+        .find("h3 a")
+        .each((_, el) => {
+          const el$ = $(el);
+          const href = el$.attr("href")?.trim();
+          const btnText = el$.text().trim() || "Download";
+          if (href) result.push({ title: btnText, link: href, type: "series" });
+        });
+      return result;
+    })
+    .catch((err) => {
+      console.error("scrapeEpisodePage error:", err);
+      return result;
     });
-
-    if (episodeLinks.length > 0) {
-      links.push({
-        title: "Episodes",
-        directLinks: episodeLinks,
-      });
-    }
-
-    return {
-      title,
-      synopsis,
-      image,
-      imdbId,
-      type,
-      linkList: links || [],
-    };
-  } catch (err) {
-    console.error("❌ PikaHD meta fetch error:", err);
-    return {
-      title: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "movie",
-      linkList: [],
-    };
-  }
 };
