@@ -186,7 +186,7 @@
   {
     "display_name": "FlixHQ",
     "value": "flixhq",
-    "version": "1.2",
+    "version": "1.3",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -339,6 +339,7 @@
  
   
 ]
+
 
 
 
