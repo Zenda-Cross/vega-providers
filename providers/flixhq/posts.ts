@@ -11,6 +11,9 @@ const defaultHeaders = {
   "Cache-Control": "no-cache",
 };
 
+// Hard-coded base URL
+const baseUrl = "https://vegamovies.or.ke";
+
 // --- Normal catalog posts ---
 export async function getPosts({
   filter,
@@ -56,13 +59,11 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://vegamovies.or.ke";
     let url: string;
 
-    // --- Build URL for search or category filter ---
     if (query && query.trim()) {
       const params = new URLSearchParams();
-      params.append("s", query); // search query parameter from HTML form
+      params.append("s", query);
       if (page > 1) params.append("page", page.toString());
       url = `${baseUrl}/?${params.toString()}`;
     } else if (filter) {
@@ -78,12 +79,11 @@ async function fetchPosts({
     const $ = cheerio.load(res.data || "");
 
     const resolveUrl = (href: string) =>
-      href?.startsWith("http") ? href : new URL(href, url).href;
+      href?.startsWith("http") ? href : new URL(href, baseUrl).href;
 
     const seen = new Set<string>();
     const catalog: Post[] = [];
 
-    // --- Post selectors (HDMovie2 style) ---
     const POST_SELECTORS = [
       ".pstr_box",
       "article",
@@ -97,6 +97,7 @@ async function fetchPosts({
 
     $(POST_SELECTORS).each((_, el) => {
       const card = $(el);
+
       let link = card.find("a[href]").first().attr("href") || "";
       if (!link) return;
       link = resolveUrl(link);
@@ -116,16 +117,30 @@ async function fetchPosts({
         "";
       const image = img ? resolveUrl(img) : "";
 
-      seen.add(link);
-      catalog.push({ title, link, image });
+      card.find("h3").each((_, h3) => {
+        const hText = $(h3).text().trim();
+        if (hText && !/download/i.test(hText)) {
+          const finalTitle = `${title} – ${hText}`;
+          if (!seen.has(finalTitle)) {
+            seen.add(finalTitle);
+            catalog.push({
+              title: finalTitle,
+              link,
+              image,
+            });
+          }
+        }
+      });
+
+      if (!catalog.find((c) => c.link === link)) {
+        seen.add(link);
+        catalog.push({ title, link, image });
+      }
     });
 
-    return catalog.slice(0, 100); // max 100 posts
+    return catalog.slice(0, 100);
   } catch (err) {
-    console.error(
-      "fetchPosts error:",
-      err instanceof Error ? err.message : String(err)
-    );
+    console.error("fetchPosts error:", err instanceof Error ? err.message : String(err));
     return [];
   }
 }

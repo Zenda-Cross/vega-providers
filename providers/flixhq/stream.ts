@@ -32,120 +32,85 @@ export async function getStream({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }) {
-  // Removed hubcloudExtracter from destructuring as requested
-  const { axios, cheerio } = providerContext;
-
+  const { axios, cheerio, extractors } = providerContext;
+  const { hubcloudExtracter } = extractors;
   try {
     const streamLinks: Stream[] = [];
-    console.log("DotLink page URL:", link);
+    console.log("dotlink", link);
+    if (type === "movie") {
+      // vlink
+      const dotlinkRes = await axios(`${link}`, { headers });
+      const dotlinkText = dotlinkRes.data;
+      // console.log('dotlinkText', dotlinkText);
+      const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
+      // console.log('vLink', vlink[1]);
+      link = vlink[1];
 
-    const dotlinkRes = await axios(link, { headers, signal });
-    const dotlinkText = dotlinkRes.data;
-    const $ = cheerio.load(dotlinkText);
-
-    // --- GDFlix Link Extraction (Scrape GDFlix for final PixelDrain link) ---
-    try {
-      // 1. Get the GDFlix intermediary link from the DotLink page
-      const gdflixButton = $(
-        'a[href*="gdflix.dev"] button:contains("GDFlix")'
-      )
-        .first()
-        .parent(); // Get the parent <a> tag
-
-      const gdflixLink = gdflixButton.attr("href");
-
-      if (gdflixLink) {
-        console.log("GDFlix Intermediary Link Found:", gdflixLink);
-
-        // 2. Fetch the GDFlix page content
-        const gdflixRes = await axios(gdflixLink, {
-          headers: { ...headers, Referer: gdflixLink.split("/").slice(0, 3).join("/") },
-          signal,
-        });
-        const gdflix$ = cheerio.load(gdflixRes.data);
-
-        // 3. Scrape the GDFlix page for the final PixelDrain link
-        const pixeldrainButton = gdflix$('a.btn.btn-success:contains("PixelDrain")').first();
-        const pixeldrainLink = pixeldrainButton.attr("href");
-
-        if (pixeldrainLink) {
-          console.log("Final PixelDrain Link Found:", pixeldrainLink);
-          streamLinks.push({
-            server: "PixelDrain (Final Download)",
-            link: pixeldrainLink,
-            type: "download", // Explicitly mark as download type
-          });
-        }
-      }
-    } catch (error) {
-      console.log("GDFlix/PixelDrain extraction error.");
-      // console.error(error);
-    }
-
-    // --- Filepress Link Extraction (Existing complex API logic) ---
-    // This logic attempts to follow a specific Filepress API flow to get a final download link.
-    try {
-      // Selector matching the Filepress button style from previous iteration
-      const filepressLink = $(
-        '.btn.btn-sm.btn-outline[style="background:linear-gradient(135deg,rgb(252,185,0) 0%,rgb(0,0,0)); color: #fdf8f2;"]'
-      )
-        .parent()
-        .attr("href");
-
-      if (filepressLink && filepressLink.includes("filepress")) {
-        // Safety check
-        console.log("Filepress Link Found:", filepressLink);
-
+      // filepress link
+      try {
+        const $ = cheerio.load(dotlinkText);
+        const filepressLink = $(
+          '.btn.btn-sm.btn-outline[style="background:linear-gradient(135deg,rgb(252,185,0) 0%,rgb(0,0,0)); color: #fdf8f2;"]'
+        )
+          .parent()
+          .attr("href");
+        // console.log('filepressLink', filepressLink);
         const filepressID = filepressLink?.split("/").pop();
-        const filepressBaseUrl = filepressLink?.split("/").slice(0, -2).join("/");
-
-        if (filepressID && filepressBaseUrl) {
-          // Step 1: Get Token
-          const filepressTokenRes = await axios.post(
-            `${filepressBaseUrl}/api/file/downlaod/`,
-            { id: filepressID, method: "indexDownlaod", captchaValue: null },
+        const filepressBaseUrl = filepressLink
+          ?.split("/")
+          .slice(0, -2)
+          .join("/");
+        // console.log('filepressID', filepressID);
+        // console.log('filepressBaseUrl', filepressBaseUrl);
+        const filepressTokenRes = await axios.post(
+          filepressBaseUrl + "/api/file/downlaod/",
+          {
+            id: filepressID,
+            method: "indexDownlaod",
+            captchaValue: null,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Referer: filepressBaseUrl,
+            },
+          }
+        );
+        // console.log('filepressTokenRes', filepressTokenRes.data);
+        if (filepressTokenRes.data?.status) {
+          const filepressToken = filepressTokenRes.data?.data;
+          const filepressStreamLink = await axios.post(
+            filepressBaseUrl + "/api/file/downlaod2/",
             {
-              headers: { "Content-Type": "application/json", Referer: filepressBaseUrl },
-              signal,
+              id: filepressToken,
+              method: "indexDownlaod",
+              captchaValue: null,
+            },
+            {
+              headers: {
+                "Content-Type": "application/json",
+                Referer: filepressBaseUrl,
+              },
             }
           );
-
-          if (filepressTokenRes.data?.status && filepressTokenRes.data?.data) {
-            const filepressToken = filepressTokenRes.data.data;
-
-            // Step 2: Get Stream Link using Token
-            const filepressStreamLinkRes = await axios.post(
-              `${filepressBaseUrl}/api/file/downlaod2/`,
-              { id: filepressToken, method: "indexDownlaod", captchaValue: null },
-              {
-                headers: { "Content-Type": "application/json", Referer: filepressBaseUrl },
-                signal,
-              }
-            );
-
-            if (filepressStreamLinkRes.data?.data?.[0]) {
-              streamLinks.push({
-                server: "Filepress (Direct Download)",
-                link: filepressStreamLinkRes.data.data[0],
-                type: "mkv",
-              });
-            }
-          }
+          // console.log('filepressStreamLink', filepressStreamLink.data);
+          streamLinks.push({
+            server: "filepress",
+            link: filepressStreamLink.data?.data?.[0],
+            type: "mkv",
+          });
         }
+      } catch (error) {
+        console.log("filepress error: ");
+        // console.error(error);
       }
-    } catch (error) {
-      console.log("Filepress API extraction error. Skipping.");
-      // console.error(error);
     }
 
-    // Return all collected download links (PixelDrain and Filepress)
-    return streamLinks;
+    return await hubcloudExtracter(link, signal);
   } catch (error: any) {
-    console.log("getStream error: ", error.message);
+    console.log("getStream error: ", error);
     if (error.message.includes("Aborted")) {
-      // Request was intentionally cancelled
     } else {
-      // Log other errors
     }
     return [];
   }
