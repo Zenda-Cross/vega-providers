@@ -62,7 +62,8 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = providerContext.getBaseUrl("kmmovies");
+    const baseUrl = await providerContext.getBaseUrl("kmmovies");
+    console.log("KM Movies baseUrl:", baseUrl);
     let url: string;
 
     // --- Build URL for category filter or search query
