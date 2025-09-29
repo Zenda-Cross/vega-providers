@@ -12,7 +12,7 @@ const headers = {
 };
 
 // --- getMeta using Promise ---
-export const getMeta = function ({
+export const getMeta = async function ({
   link,
   providerContext,
 }: {
@@ -45,7 +45,9 @@ export const getMeta = function ({
       let image = infoContainer.find("img").first().attr("src") || "";
       if (image.startsWith("//")) image = "https:" + image;
 
-      const type = /Season \d+/i.test(infoContainer.text()) ? "series" : "movie";
+      const type = /Season \d+/i.test(infoContainer.text())
+        ? "series"
+        : "movie";
       const linkList: Link[] = [];
 
       if (type === "series") {
@@ -55,7 +57,11 @@ export const getMeta = function ({
           const href = el$.attr("href")?.trim();
           const linkText = el$.text().trim();
           if (href && linkText.includes("Single Episode")) {
-            linkList.push({ title: linkText, episodesLink: href, directLinks: [] });
+            linkList.push({
+              title: linkText,
+              episodesLink: href,
+              directLinks: [],
+            });
           }
         });
       } else {
@@ -77,7 +83,14 @@ export const getMeta = function ({
     })
     .catch((err) => {
       console.error("getMeta error:", err);
-      return { title: "", synopsis: "", image: "", imdbId: "", type: "movie", linkList: [] };
+      return {
+        title: "",
+        synopsis: "",
+        image: "",
+        imdbId: "",
+        type: "movie",
+        linkList: [],
+      };
     });
 };
 
