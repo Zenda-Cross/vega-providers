@@ -56,7 +56,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://hdbolly4u.me";
+    const baseUrl = "https://hdbolly4u.ro";
     let url: string;
 
     const params = new URLSearchParams();
@@ -115,3 +115,4 @@ async function fetchPosts({
     return [];
   }
 }
+
