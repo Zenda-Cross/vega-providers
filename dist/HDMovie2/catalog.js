@@ -1,1 +1,1 @@
-"use strict";Object.defineProperty(exports,"__esModule",{value:!0}),exports.catalog=void 0,exports.catalog=[{title:"Latest",filter:"genre/bollywood"},{title:"Hollywood",filter:"genre/hollywood/"},{title:"Bollywood",filter:"genre/bollywood/"},{title:"Anime",filter:"genre/animation/"},{title:"Bangali",filter:"genre/bengali/"}];
+"use strict";Object.defineProperty(exports,"__esModule",{value:!0}),exports.catalog=void 0,exports.catalog=[{title:"Trending",filter:""},{title:"Anime",filter:"category/animation/"}];
