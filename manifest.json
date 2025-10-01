@@ -334,11 +334,20 @@
     "icon": "",
     "type": "global",
     "disabled": false
+  },
+  {
+    "display_name": "skyMovieHD",
+    "value": "skyMovieHD",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
   }
  
  
   
 ]
+
 
 
 
