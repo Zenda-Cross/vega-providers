@@ -342,11 +342,20 @@
     "icon": "",
     "type": "global",
     "disabled": false
+  },
+  {
+    "display_name": "Joya9tv",
+    "value": "Joya9tv",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
   }
  
  
   
 ]
+
 
 
 
