@@ -56,12 +56,15 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://hdmovie2.bayern";
+    const baseUrl = "https://themoviesflix.food";
     let url: string;
 
-    // --- Build URL for category filter or search query
-    if (query && query.trim()) {
-      url = `${baseUrl}/?s=${encodeURIComponent(query)}${page > 1 ? `&paged=${page}` : ""}`;
+    // Search URL
+    if (query && query.trim() && query.trim().toLowerCase() !== "what are you looking for?") {
+      const params = new URLSearchParams();
+      params.append("s", query.trim());
+      if (page > 1) params.append("paged", page.toString());
+      url = `${baseUrl}/?${params.toString()}`;
     } else if (filter) {
       url = filter.startsWith("/")
         ? `${baseUrl}${filter.replace(/\/$/, "")}${page > 1 ? `/page/${page}` : ""}`
@@ -75,41 +78,32 @@ async function fetchPosts({
     const $ = cheerio.load(res.data || "");
 
     const resolveUrl = (href: string) =>
-      href?.startsWith("http") ? href : new URL(href, url).href;
+      href?.startsWith("http") ? href : new URL(href, baseUrl).href;
 
     const seen = new Set<string>();
     const catalog: Post[] = [];
 
-    // --- HDMovie2 selectors
-    const POST_SELECTORS = [
-      ".pstr_box",
-      "article",
-      ".result-item",
-      ".post",
-      ".item",
-      ".thumbnail",
-      ".latest-movies",
-      ".movie-item",
-    ].join(",");
-
-    $(POST_SELECTORS).each((_, el) => {
+    // ✅ Fetch posts
+    $("article.latestpost").each((_, el) => {
       const card = $(el);
-      let link = card.find("a[href]").first().attr("href") || "";
+
+      // Link
+      let link = card.find("header.entry-header h1.entry-title a, header.entry-header h2.entry-title a").attr("href") || "";
       if (!link) return;
       link = resolveUrl(link);
       if (seen.has(link)) return;
 
-      let title =
-        card.find("h2").first().text().trim() ||
-        card.find("a[title]").first().attr("title")?.trim() ||
-        card.text().trim();
-      title = title.replace(/\[.*?\]/g, "").replace(/\(.+?\)/g, "").replace(/\s{2,}/g, " ").trim();
+      // Title: remove "Download"
+      let title = card.find("header.entry-header h1.entry-title a, header.entry-header h2.entry-title a")
+        .text()
+        .replace(/^Download\s*/i, "")
+        .trim();
       if (!title) return;
 
-      const img =
-        card.find("img").first().attr("src") ||
-        card.find("img").first().attr("data-src") ||
-        card.find("img").first().attr("data-original") ||
+      // Image
+      let img =
+        card.find("a#featured-thumbnail img").attr("src") ||
+        card.find("a#featured-thumbnail img").attr("data-src") ||
         "";
       const image = img ? resolveUrl(img) : "";
 
@@ -119,11 +113,7 @@ async function fetchPosts({
 
     return catalog.slice(0, 100);
   } catch (err) {
-    console.error(
-      "HDMovie2 fetchPosts error:",
-      err instanceof Error ? err.message : String(err)
-    );
+    console.error("fetchPosts error:", err instanceof Error ? err.message : String(err));
     return [];
   }
-
 }
