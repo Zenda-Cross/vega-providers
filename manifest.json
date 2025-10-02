@@ -350,11 +350,21 @@
     "icon": "",
     "type": "global",
     "disabled": false
-  }
+  },
+  {
+    "display_name": "mkvcinema",
+    "value": "mkvcinema",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  
  
  
   
 ]
+
 
 
 
