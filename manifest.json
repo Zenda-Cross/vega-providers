@@ -357,11 +357,20 @@
     "version": "1.0",
     "icon": "",
     "type": "global",
+    "disabled": true
+  },
+  {
+    "display_name": "ssrmovies",
+    "value": "ssrmovies",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
     "disabled": false
   }
  
   
 ]
+
 
 
 
