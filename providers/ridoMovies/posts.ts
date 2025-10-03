@@ -58,7 +58,7 @@ async function fetchPosts({
   isSearch?: boolean;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://zinkmovies.cam";
+    const baseUrl = "https://zinkmovies.pics";
     const { axios, cheerio } = providerContext;
     let res;
 
@@ -121,3 +121,4 @@ async function fetchPosts({
     return [];
   }
 }
+
