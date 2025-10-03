@@ -56,7 +56,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://www.vegamovies-nl.yoga";
+    const baseUrl = "https://www.vegamovies-nl.today";
     let url: string;
 
     if (query && query.trim()) {
@@ -129,3 +129,4 @@ async function fetchPosts({
     return [];
   }
 }
+
