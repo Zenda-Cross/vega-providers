@@ -129,11 +129,11 @@
   },
   {
     "display_name": "KatMovieFix",
-    "value": "katmoviefix",
+    "value": "katMovieFix",
     "version": "1.2",
     "icon": "",
     "type": "global",
-    "disabled": true
+    "disabled": false
   },
   {
     "display_name": "Ringz",
@@ -293,6 +293,22 @@
     "version": "1.0",
     "icon": "",
     "type": "italy",
+    "disabled": false
+  },
+  {
+    "display_name": "SkyMovieHD",
+    "value": "skyMovieHD",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "display_name": "Joya9tv",
+    "value": "Joya9tv",
+    "version": "1.0",
+    "icon": "",
+    "type": "india",
     "disabled": false
   }
 ]
