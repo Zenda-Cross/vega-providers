@@ -382,10 +382,19 @@
     "icon": "",
     "type": "global",
     "disabled": false
+  },
+  {
+    "display_name": "moviesflix",
+    "value": "moviesflix",
+    "version": "1.0",
+    "icon": "",
+    "type": "india",
+    "disabled": false
   }
  
   
 ]
+
 
 
 
