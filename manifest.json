@@ -390,10 +390,19 @@
     "icon": "",
     "type": "india",
     "disabled": false
+  },
+  {
+    "display_name": "animica",
+    "value": "animica",
+    "version": "1.0",
+    "icon": "",
+    "type": "india",
+    "disabled": false
   }
  
   
 ]
+
 
 
 
