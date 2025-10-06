@@ -56,7 +56,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://themoviesflix.ae";
+    const baseUrl = "https://themoviesflix.love";
     let url: string;
 
     // --- Build URL for category filter or search query
@@ -125,5 +125,6 @@ async function fetchPosts({
     );
     return [];
   }
+
 
 }
