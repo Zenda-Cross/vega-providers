@@ -42,7 +42,7 @@ export const getEpisodes = function ({
             let $ = cheerio.load(res.data);
             const episodes: EpisodeLink[] = [];
 
-            // 1. Extract the Base64 encoded string from the client-side script
+            // 1. Extract and decode the Base64 content
             const scriptContent = $("script")
                 .filter((i, el) => {
                     return $(el).html()?.includes('const encoded = "') ?? false;
@@ -57,32 +57,28 @@ export const getEpisodes = function ({
                 }
             }
 
-            // 2. Decode the Base64 string
             let decodedContent = "";
             if (encodedContent) {
                 decodedContent = base64Decode(encodedContent);
             }
 
-            // 3. Load the original HTML AND the decoded content into Cheerio.
-            // This makes the dynamically loaded links available for parsing.
+            // 2. Load the original HTML AND the decoded content into Cheerio for full DOM
             const fullHtml = res.data + decodedContent;
             $ = cheerio.load(fullHtml);
 
             const container = $(".entry-content, .entry-inner");
 
-            // 4. Parse the episode links
+            // 3. Parse individual episode links (V-Cloud only, title: Episode N)
             container.find("h4, h3").each((_, element) => {
                 const el = $(element);
 
-                // Use a regex to extract the clean episode number
-                let titleMatch = el.text().match(/-:Episodes: (\d+):-/);
+                // Check for individual episode header pattern: -:Episode: 1:-
+                let titleMatch = el.text().match(/-:Episodes?: (\d+):-/i);
                 
-                // Get the raw episode number only (e.g., "1", "2", etc.)
                 const episodeNumber = titleMatch ? titleMatch[1] : ''; 
                 
                 if (!episodeNumber) return;
 
-                // Set the final desired title format
                 const finalTitle = `Episode ${episodeNumber}`;
 
                 // Find only V-Cloud links in the paragraph immediately following the episode title
@@ -91,10 +87,11 @@ export const getEpisodes = function ({
                     .each((_, a) => {
                         const anchor = $(a);
                         const href = anchor.attr("href")?.trim();
+                        const linkText = anchor.text();
 
-                        if (href) {
+                        if (href && (href.includes('vcloud') || linkText.includes('V-Cloud'))) {
                             episodes.push({ 
-                                // Use the simplified title format as requested
+                                // Title is simple "Episode N"
                                 title: finalTitle, 
                                 link: href 
                             });
@@ -102,9 +99,79 @@ export const getEpisodes = function ({
                     });
             });
 
-            // Remove potential duplicate links
-            const uniqueEpisodes = Array.from(new Set(episodes.map(e => e.link)))
-                                    .map(link => episodes.find(e => e.link === link)!);
+            // --- CHANGES START HERE (Step 4) ---
+
+            // 4. Parse "Season Complete" or "Complete Pack" links 
+            container.find("h3, h4").each((_, element) => {
+                const el = $(element);
+                const headerText = el.text().trim();
+
+                // Regex for Season Complete patterns
+                const seasonCompleteMatch = headerText.match(/(Season\s*(\d+)\s*Complete|Season\s*(\d+).*?Complete\s*Pack)/i);
+                
+                if (seasonCompleteMatch) {
+                    const seasonNumber = seasonCompleteMatch[2] || seasonCompleteMatch[3];
+
+                    // Base title for the season complete pack
+                    // Example: "S1 Complete"
+                    let baseTitle = `S${seasonNumber} Complete`;
+                    
+                    // Optionally, include resolution/details in the title for better clarity
+                    const detailsMatch = headerText.match(/(\d+p WEB-DL.*|Complete Pack.*)/i);
+                    if (detailsMatch) {
+                        // Example: "S1 Complete [720p WEB-DL]"
+                        baseTitle += ` [${detailsMatch[1].trim()}]`;
+                    } else if (headerText.includes("Complete Pack")) {
+                        baseTitle += " [Complete Pack]";
+                    }
+                    
+                    // Find ALL links in the immediately following paragraph
+                    el.next("p").find("a").each((_, a) => {
+                        const anchor = $(a);
+                        const href = anchor.attr("href")?.trim();
+                        
+                        let providerName = 'Download';
+                        const linkText = anchor.text().replace(/[\s\u26a1\ud83d\udd06\u27a1\u2b50\u2b07]/g, '').trim();
+                        
+                        // Determine the provider name
+                        if (linkText.includes('V-Cloud')) providerName = 'V-Cloud';
+                        else if (linkText.includes('GDToT')) providerName = 'GDToT';
+                        else if (linkText.includes('Filepress')) providerName = 'Filepress';
+                        else if (linkText.includes('DropGalaxy')) providerName = 'DropGalaxy';
+                        else if (linkText.toLowerCase().includes('download')) providerName = 'Download';
+
+                        if (href) {
+                            // Only add the link if the provider is NOT "Download" (to filter out generic buttons)
+                            if (providerName !== 'Download') { 
+                                episodes.push({ 
+                                    // Title format is made similar to episode links: "S1 Complete (V-Cloud)"
+                                    title: `${baseTitle} (${providerName})`, 
+                                    link: href 
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+
+            // --- CHANGES END HERE (Step 4) ---
+
+            // 5. Remove potential duplicate links based on the URL
+            const uniqueEpisodes: EpisodeLink[] = [];
+            const seenLinks = new Set<string>();
+
+            for (const episode of episodes) {
+                const existingEpisodeIndex = uniqueEpisodes.findIndex(e => e.link === episode.link);
+                
+                if (existingEpisodeIndex === -1) {
+                    uniqueEpisodes.push(episode);
+                } else {
+                    // Keep the entry with the more descriptive title
+                    if (uniqueEpisodes[existingEpisodeIndex].title.length < episode.title.length) {
+                         uniqueEpisodes[existingEpisodeIndex].title = episode.title;
+                    }
+                }
+            }
             
             return uniqueEpisodes;
         })
