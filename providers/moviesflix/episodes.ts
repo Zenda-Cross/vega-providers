@@ -1,8 +1,32 @@
 import { EpisodeLink, ProviderContext } from "../types";
 
+/**
+ * Decodes a Base64-encoded string using the native atob() function.
+ * This implementation mirrors the client-side JavaScript's logic 
+ * to correctly handle UTF-8 characters.
+ * @param str The Base64 string from the HTML script.
+ * @returns The decoded HTML content.
+ */
+function base64Decode(str: string): string {
+    // 1. Remove any potential whitespace from the Base64 string
+    const cleanedStr = str.replace(/\s/g, "");
+    
+    try {
+        // 2. Decode the Base64 string to a binary string using atob()
+        const binaryStr = atob(cleanedStr);
+        
+        // 3. Convert the binary string (Latin-1/raw bytes) into a proper UTF-8 string
+        return decodeURIComponent(binaryStr.split("").map(function(c) {
+            // Encode each character's charCode as a percent-encoded hexadecimal byte
+            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(""));
+    } catch (e) {
+        console.error("Base64 decode failed with atob():", e);
+        return "";
+    }
+}
 
-
-export const getEpisodes = async function ({
+export const getEpisodes = function ({
     url,
     providerContext,
 }: {
@@ -11,74 +35,81 @@ export const getEpisodes = async function ({
 }): Promise<EpisodeLink[]> {
     const { axios, cheerio, commonHeaders: headers } = providerContext;
     console.log("getEpisodeLinks", url);
-    try {
-       
-        const fixedHeaders = {
-            ...headers,
-            cookie:
-                "ext_name=ojplmecpdpgccookcobabopnaifgidhf; cf_clearance=Zl2yiOCN3pzGUd0Bgs.VyBXniJooDbG2Tk1g7DEoRnw-1756381111-1.2.1.1-RVPZoWGCAygGNAHavrVR0YaqASWZlJyYff8A.oQfPB5qbcPrAVud42BzsSwcDgiKAP0gw5D92V3o8XWwLwDRNhyg3DuL1P8wh2K4BCVKxWvcy.iCCxczKtJ8QSUAsAQqsIzRWXk29N6X.kjxuOTYlfB2jrlq12TRDld_zTbsskNcTxaA.XQekUcpGLseYqELuvlNOQU568NZD6LiLn3ICyFThMFAx6mIcgXkxVAvnxU; xla=s4t",
-        };
 
-        const res = await axios.get(url, {
-            headers: fixedHeaders,
-        });
+    return axios
+        .get(url, { headers })
+        .then((res) => {
+            let $ = cheerio.load(res.data);
+            const episodes: EpisodeLink[] = [];
 
-        const $ = cheerio.load(res.data);
-     
-        const container = $(".entry-content, .entry-inner, .download-links-div").first(); 
-        
-       
-        $(".unili-content, .code-block-1").remove(); 
-        
-        const episodes: EpisodeLink[] = [];
+            // 1. Extract the Base64 encoded string from the client-side script
+            const scriptContent = $("script")
+                .filter((i, el) => {
+                    return $(el).html()?.includes('const encoded = "') ?? false;
+                })
+                .html();
 
-       
-        
-        container.find("h5").each((index, element) => {
-            const el = $(element);
-            const rawTitle = el.text().trim(); // e.g., "-:Episodes: 1:- (Grand Premiere)"
-          
-            const linkElement = el
-                .next(".downloads-btns-div")
-                .find(
-                    'a[style*="#e629d0"][style*="#007bff"]' 
-                ).first(); 
-
-            const hubCloudLink = linkElement.attr("href");
-            
-            if (rawTitle && hubCloudLink) {
-              
-                let cleanedTitle = rawTitle
-                    .replace(/[-:]/g, "")
-                    .replace(/Episodes/i, "") 
-                    .trim();
-
-              
-                const match = cleanedTitle.match(/(\d+)\s*\((.+?)\)/i);
-                if (match) {
-                    // e.g., "Episode 1: Grand Premiere"
-                    cleanedTitle = `Episode ${match[1]}: ${match[2]}`;
-                } else {
-                    
-                    cleanedTitle = cleanedTitle.replace(/\s+/g, " ");
-                }
-                
-                // Final Check and push
-                if (cleanedTitle.length > 0) {
-                    episodes.push({ 
-                        title: cleanedTitle, 
-                        link: hubCloudLink, 
-                      
-                    });
+            let encodedContent = "";
+            if (scriptContent) {
+                const match = scriptContent.match(/const encoded = "([^"]+)"/);
+                if (match && match[1]) {
+                    encodedContent = match[1];
                 }
             }
+
+            // 2. Decode the Base64 string
+            let decodedContent = "";
+            if (encodedContent) {
+                decodedContent = base64Decode(encodedContent);
+            }
+
+            // 3. Load the original HTML AND the decoded content into Cheerio.
+            // This makes the dynamically loaded links available for parsing.
+            const fullHtml = res.data + decodedContent;
+            $ = cheerio.load(fullHtml);
+
+            const container = $(".entry-content, .entry-inner");
+
+            // 4. Parse the episode links
+            container.find("h4, h3").each((_, element) => {
+                const el = $(element);
+
+                // Use a regex to extract the clean episode number
+                let titleMatch = el.text().match(/-:Episodes: (\d+):-/);
+                
+                // Get the raw episode number only (e.g., "1", "2", etc.)
+                const episodeNumber = titleMatch ? titleMatch[1] : ''; 
+                
+                if (!episodeNumber) return;
+
+                // Set the final desired title format
+                const finalTitle = `Episode ${episodeNumber}`;
+
+                // Find only V-Cloud links in the paragraph immediately following the episode title
+                el.next("p")
+                    .find("a[href*='vcloud']") // Filter links specifically for 'vcloud' in the href
+                    .each((_, a) => {
+                        const anchor = $(a);
+                        const href = anchor.attr("href")?.trim();
+
+                        if (href) {
+                            episodes.push({ 
+                                // Use the simplified title format as requested
+                                title: finalTitle, 
+                                link: href 
+                            });
+                        }
+                    });
+            });
+
+            // Remove potential duplicate links
+            const uniqueEpisodes = Array.from(new Set(episodes.map(e => e.link)))
+                                    .map(link => episodes.find(e => e.link === link)!);
+            
+            return uniqueEpisodes;
+        })
+        .catch((err) => {
+            console.log("getEpisodeLinks error:", err);
+            return [];
         });
-
-        return episodes;
-    } catch (err) {
-        console.log("getEpisodeLinks error:", url);
-        // console.error(err);
-        return [];
-    }
-
 };

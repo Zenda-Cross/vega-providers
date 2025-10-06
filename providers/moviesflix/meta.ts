@@ -1,141 +1,268 @@
 import { Info, Link, ProviderContext } from "../types";
 
-// Headers (kept for external API interaction context, though not strictly needed for this internal logic)
+interface DirectLink {
+  link: string;
+  title: string;
+  quality: string;
+  type: "movie" | "episode";
+}
+
+interface Episode {
+  title: string;
+  directLinks: DirectLink[];
+}
+
 const headers = {
-  Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-  "Cache-Control": "no-store",
-  "Accept-Language": "en-US,en;q=0.9",
-  DNT: "1",
-  "sec-ch-ua":
-    '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
-  "sec-ch-ua-mobile": "?0",
-  "sec-ch-ua-platform": '"Windows"',
-  "Sec-Fetch-Dest": "document",
-  "Sec-Fetch-Mode": "navigate",
-  "Sec-Fetch-Site": "none",
-  "Sec-Fetch-User": "?1",
-  Cookie:
-    "xla=s4t; _ga=GA1.1.1081149560.1756378968; _ga_BLZGKYN5PF=GS2.1.s1756378968$o1$g1$t1756378984$j44$l0$h0",
-  "Upgrade-Insecure-Requests": "1",
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+  Referer: "https://google.com",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
 };
 
+
+export async function fetchEpisodesFromSelectedLink(
+  url: string,
+  providerContext: ProviderContext
+): Promise<Episode[]> {
+  const { axios, cheerio } = providerContext;
+  const res = await axios.get(url, { headers });
+  const $ = cheerio.load(res.data);
+
+  const episodes: Episode[] = [];
+
+  $("h4").each((_, h4El) => {
+    const epTitle = $(h4El).text().trim();
+    if (!epTitle) return;
+
+    const directLinks: DirectLink[] = [];
+
+    $(h4El)
+      .nextUntil("h4, hr")
+      .find("a[href]")
+      .each((_, linkEl) => {
+        let href = ($(linkEl).attr("href") || "").trim();
+        if (!href) return;
+        if (!href.startsWith("http")) href = new URL(href, url).href;
+
+        const btnText = $(linkEl).text().trim() || "Watch Episode";
+        directLinks.push({
+          link: href,
+          title: btnText,
+          quality: "AUTO",
+          type: "episode",
+        });
+      });
+
+    if (directLinks.length > 0) {
+      episodes.push({
+        title: epTitle,
+        directLinks,
+      });
+    }
+  });
+
+  return episodes;
+}
+
+// --- Main getMeta function
 export const getMeta = async function ({
-  link,
-  providerContext,
+  link,
+  providerContext,
 }: {
-  link: string;
-  providerContext: ProviderContext;
-}): Promise<Info> {
-  const { axios, cheerio } = providerContext;
-  const url = link;
-  const baseUrl = url.split("/").slice(0, 3).join("/");
+  link: string;
+  providerContext: ProviderContext;
+}): Promise<Info & { extraInfo: Record<string, string>; episodeList: Episode[] }> {
+  const { axios, cheerio } = providerContext;
+  if (!link.startsWith("http")) link = new URL(link, "https://vgmlinks.click").href;
 
-  const emptyResult: Info = {
-    title: "",
-    synopsis: "",
-    image: "",
-    imdbId: "",
-    type: "movie",
-    linkList: [],
-  };
+  try {
+    const res = await axios.get(link, { headers });
+    const $ = cheerio.load(res.data);
+    const content = $(".entry-content, .post-inner").length
+      ? $(".entry-content, .post-inner")
+      : $("body");
 
-  try {
-    const response = await axios.get(url, {
-      headers: { ...headers, Referer: baseUrl },
-    });
+    const title =
+      $("h1.entry-title").first().text().trim() ||
+      $("meta[property='og:title']").attr("content")?.trim() ||
+      "Unknown";
 
-    const $ = cheerio.load(response.data);
-    const infoContainer = $(".post-single-content.box.mark-links.entry-content").first();
+    // --- Type Detect --- 
+    const pageText = content.text();
+    const type = 
+        (/Season\s*\d+/i.test(pageText) || /Episode\s*\d+/i.test(pageText))
+        ? "series"
+        : "movie";
 
-    const result: Info = {
-      title: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "movie", 
-      linkList: [],
+
+    let image =
+      $(".poster img").attr("src") ||
+      $("meta[property='og:image']").attr("content") ||
+      $("meta[name='twitter:image']").attr("content") ||
+      "";
+    if (image && !image.startsWith("http")) image = new URL(image, link).href;
+
+    let synopsis = "";
+    $(".entry-content p").each((_, el) => {
+      const txt = $(el).text().trim();
+      if (txt.length > 40 && !txt.toLowerCase().includes("download")) {
+        synopsis = txt;
+        return false;
+      }
+    });
+
+    const imdbLink = $("a[href*='imdb.com']").attr("href") || "";
+    const imdbId = imdbLink
+      ? "tt" + (imdbLink.split("/tt")[1]?.split("/")[0] || "")
+      : "";
+
+    const tags: string[] = [];
+    $(".entry-content p strong").each((_, el) => {
+      const txt = $(el).text().trim();
+      if (
+        txt.match(
+          /drama|biography|action|thriller|romance|adventure|animation/i
+        )
+      )
+        tags.push(txt);
+    });
+
+    const extra: Record<string, string> = {};
+    $("p").each((_, el) => {
+      const html = $(el).html() || "";
+      if (html.includes("Series Name")) extra.name = $(el).text().split(":")[1]?.trim();
+      if (html.includes("Language")) extra.language = $(el).text().split(":")[1]?.trim();
+      if (html.includes("Released Year")) extra.year = $(el).text().split(":")[1]?.trim();
+      if (html.includes("Quality")) extra.quality = $(el).text().split(":")[1]?.trim();
+      if (html.includes("Episode Size")) extra.size = $(el).text().split(":")[1]?.trim();
+      if (html.includes("Format")) extra.format = $(el).text().split(":")[1]?.trim();
+    });
+
+    const links: Link[] = [];
+    const episodeList: Episode[] = []; 
+
+   
+    const isInformationalHeading = (text: string) => {
+        const lowerText = text.toLowerCase();
+        return (
+            lowerText.includes("series info") || 
+            lowerText.includes("series name") ||
+            lowerText.includes("language") ||
+            lowerText.includes("released year") ||
+            lowerText.includes("episode size") ||
+            lowerText.includes("format") ||
+            lowerText.includes("imdb rating") ||
+            lowerText.includes("winding up") ||
+            (lowerText.length < 5 && !/\d/.test(lowerText)) 
+        );
     };
 
-    // --- Title ---
-    // The main title is in the H1 tag
-    let finalTitle = $(".title.single-title.entry-title").text().trim();
-    // Clean up title (remove quality/year info)
-    finalTitle = finalTitle.split(/\s*\(\d{4}\)/)[0].split(/HDTC/i)[0].trim();
-    result.title = finalTitle || "Kantara A Legend Chapter 1 (2025)";
+    // --- Download Links Extraction ---
+    if (type === "series") {
+        // Series case: h3 text as title + episode link button (V-Cloud)
+        content.find("h3").each((_, h3) => {
+            const h3Text = $(h3).text().trim();
+            
+            
+            if (isInformationalHeading(h3Text)) return;
+            
+            const qualityMatch = h3Text.match(/\d+p/)?.[0] || "AUTO";
 
-    // --- Information Extraction from P tags ---
-    // Extract metadata block to find Rating, Released Date, Director, etc.
-    const metadataText = infoContainer.find("p").eq(1).html() || "";
-    
-    // --- Synopsis (Plot) ---
-    // Target the text next to 'Plot:'
-    const plotParagraph = infoContainer.find("p:contains('Plot:')").first();
-    let synopsisText = plotParagraph.text().trim();
-    if (synopsisText) {
-        // Extract the part after "Plot: "
-        result.synopsis = synopsisText.replace(/Plot:\s*/, "").trim();
-    } else {
-         // Fallback to searching the whole metadata block
-         const plotMatch = metadataText.match(/Plot: (.*?)\./i);
-         result.synopsis = plotMatch ? plotMatch[1].trim() + '.' : "";
-    }
-    
-    // --- IMDb ID ---
-    // IMDb ID is not explicitly present (no ttXXXXXXX) but rating is.
-    // We'll search for tt\d+ in the content.
-    const imdbMatch = infoContainer.html()?.match(/tt\d+/i) || null;
-    result.imdbId = imdbMatch ? imdbMatch[0] : "";
-    
-    // Optional: Extract IMDB Rating from the metadata text for internal logging/display
-    // const ratingMatch = metadataText.match(/IMDB Ratings: ([\d\.]+)/i);
-    // const imdbRating = ratingMatch ? ratingMatch[1] : "";
-    
-    // --- Image ---
-    // Target the main image inside the content
-    let image = infoContainer.find("p:first-of-type img[src]").first().attr("src") || "";
-    result.image = image.startsWith("//") ? "https:" + image : image;
+            
+            const vcloudLink = $(h3)
+                .nextUntil("h3, hr")
+                .find("a")
+                .filter((_, a) => /v-cloud|mega|gdrive|download/i.test($(a).text()))
+                .first();
 
-    // --- LinkList extraction (Crucially, keeping the link text) ---
-    const links: Link[] = [];
-    
-    // The download links are structured as <h3><a class="..." href="..."> Link Text </a></h3>
-    const downloadH3s = infoContainer.find("h3:has(a.wo, a.hsl, a.sdl)");
+            const href = vcloudLink.attr("href");
+            if (href) {
+                // Hide unwanted texts
+                const btnText = vcloudLink.text().trim() || "Link";
+                if (
+                    btnText.toLowerCase().includes("imdb rating") ||
+                    btnText.toLowerCase().includes("winding up")
+                ) return;
 
-    downloadH3s.each((index, element) => {
-      const el = $(element);
-      const linkAnchor = el.find("a").first();
-      const downloadLink = linkAnchor.attr("href");
-      const linkText = linkAnchor.text().trim(); // This captures the desired text like " 1080p [2.74GB] "
-      
-      if (downloadLink) {
-          const qualityMatch = linkText.match(/\d+p\b/)?.[0] || "Unknown Quality";
-          
-          const directLinks: Link["directLinks"] = [
-              {
-                  // Use the exact text from the <a> tag as the title
-                  title: linkText, 
-                  link: downloadLink,
-                  type: "movie", 
-              }
-          ];
+                links.push({
+                    title: h3Text,
+                    quality: qualityMatch,
+                    episodesLink: href, 
+                });
+            }
+        });
+    } else {
+        // Movie case: h5/h3 text as title + direct download link
+        content.find("h3, h5").each((_, heading) => {
+            const headingText = $(heading).text().trim();
 
-          links.push({
-              // Title is the link text for the quality/size block
-              title: linkText, 
-              quality: qualityMatch,
-              episodesLink: downloadLink, // Single link represents the "episode" (the movie)
-              directLinks,
-          });
-      }
-    });
+            
+            if (isInformationalHeading(headingText)) return;
+            
+            const qualityMatch = headingText.match(/\d+p/)?.[0] || "AUTO";
+            
+            
+            const linkEl = $(heading)
+                .nextUntil("h3, h5, hr")
+                .find("a[href]")
+                .first();
 
-    result.linkList = links;
-    return result;
-  } catch (err) {
-    console.error("getMeta error:", err);
-    return emptyResult;
-  }
+            const href = linkEl.attr("href");
+            if (href) {
+                let finalHref = href.trim();
+                if (!finalHref.startsWith("http")) finalHref = new URL(finalHref, link).href;
+
+                const btnText = linkEl.text().trim() || "Download Link";
+
+                // Hide unwanted texts
+                if (
+                    btnText.toLowerCase().includes("imdb rating") ||
+                    btnText.toLowerCase().includes("winding up")
+                ) return;
+
+                links.push({
+                    title: headingText,
+                    quality: qualityMatch,
+                    episodesLink: "", 
+                    directLinks: [
+                        { 
+                            title: btnText, 
+                            link: finalHref, 
+                            quality: qualityMatch,
+                            type: "movie" 
+                        },
+                    ],
+                });
+            }
+        });
+    }
+
+    return {
+      title,
+      synopsis,
+      image,
+      imdbId,
+      type: type as "movie" | "series", 
+      tags,
+      cast: [],
+      rating: $(".entry-meta .entry-date").text().trim() || "",
+      linkList: links, 
+      extraInfo: extra,
+      episodeList, 
+    };
+  } catch (err) {
+    console.error("getMeta error:", err);
+    return {
+      title: "",
+      synopsis: "",
+      image: "",
+      imdbId: "",
+      type: "movie",
+      tags: [],
+      cast: [],
+      rating: "",
+      linkList: [],
+      extraInfo: {},
+      episodeList: [],
+    };
+  }
 };

@@ -1,4 +1,3 @@
-
 import { ProviderContext, Stream } from "../types";
 
 const headers = {

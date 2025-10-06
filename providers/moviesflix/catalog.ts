@@ -4,7 +4,7 @@ export const catalog = [
     filter: "",
   },
   {
-    title: "Series",
-    filter: "category/web-series/",
+    title: "Anime",
+    filter: "category/animation/",
   },
 ];
