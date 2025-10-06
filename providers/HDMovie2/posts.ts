@@ -56,7 +56,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://themoviesflix.food";
+    const baseUrl = "https://themoviesflix.love";
     let url: string;
 
     // Search URL
@@ -117,3 +117,4 @@ async function fetchPosts({
     return [];
   }
 }
+
