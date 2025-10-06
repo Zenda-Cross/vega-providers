@@ -56,11 +56,11 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://themoviesflix.love";
+    const baseUrl = "https://movietp.com";
     let url: string;
 
-    // Search URL
-    if (query && query.trim() && query.trim().toLowerCase() !== "what are you looking for?") {
+    // ✅ Search URL construction: Use 's' parameter for query and 'paged' for pagination.
+    if (query && query.trim()) {
       const params = new URLSearchParams();
       params.append("s", query.trim());
       if (page > 1) params.append("paged", page.toString());
@@ -79,33 +79,84 @@ async function fetchPosts({
 
     const resolveUrl = (href: string) =>
       href?.startsWith("http") ? href : new URL(href, baseUrl).href;
+      
+    // Helper function to extract the largest URL from a srcset string
+    const getLargestSrcFromSrcset = (srcset: string | undefined): string | null => {
+        if (!srcset) return null;
+        // Split the srcset string into individual URL/width pairs
+        const sources = srcset.split(',').map(s => s.trim().split(/\s+/));
+        let largestSrc = null;
+        let largestWidth = 0;
+
+        // Find the URL associated with the largest width (or the last URL if widths aren't clear)
+        for (const [url, widthStr] of sources) {
+            const width = parseInt(widthStr) || 0;
+            if (width >= largestWidth) { 
+                largestWidth = width;
+                largestSrc = url;
+            } else if (!largestSrc) {
+                // If no width is specified, just take the first URL as a fallback
+                largestSrc = url;
+            }
+        }
+        return largestSrc;
+    };
+
 
     const seen = new Set<string>();
     const catalog: Post[] = [];
 
-    // ✅ Fetch posts
-    $("article.latestpost").each((_, el) => {
+    // 🚀 FIX: Use an OR selector to target posts on both the homepage/catalog (article.item.movies)
+    // and the search results page (.result-item article).
+    const postSelector = "article.item.movies, .result-item article";
+
+    $(postSelector).each((_, el) => {
       const card = $(el);
 
-      // Link
-      let link = card.find("header.entry-header h1.entry-title a, header.entry-header h2.entry-title a").attr("href") || "";
-      if (!link) return;
-      link = resolveUrl(link);
-      if (seen.has(link)) return;
+      // --- Link (Check both title link area and poster area) ---
+      const titleLinkEl = card.find(".details .title a, .data h3 a"); 
+      const posterLinkEl = card.find(".thumbnail a, .poster a");
 
-      // Title: remove "Download"
-      let title = card.find("header.entry-header h1.entry-title a, header.entry-header h2.entry-title a")
-        .text()
-        .replace(/^Download\s*/i, "")
-        .trim();
+      let link = titleLinkEl.attr("href") || posterLinkEl.attr("href") || "";
+      link = resolveUrl(link);
+      
+      if (!link || seen.has(link)) return;
+
+      // --- Title ---
+      let title = titleLinkEl.text().trim();
+      
+      // Fallback for title: use img alt attribute if the text is empty
+      if (!title) {
+          title = card.find("img").attr("alt")?.trim() || "";
+      }
+      
       if (!title) return;
 
-      // Image
-      let img =
-        card.find("a#featured-thumbnail img").attr("src") ||
-        card.find("a#featured-thumbnail img").attr("data-src") ||
-        "";
+      // --- Image (Robust Extraction Logic) ---
+      const imgEl = card.find("img").first(); // Target the image within the card
+      let img = "";
+      
+      // 1. Try srcset (standard or lazy-loaded)
+      const srcset = imgEl.attr("srcset") || imgEl.attr("data-lazy-srcset");
+      const largestSrc = getLargestSrcFromSrcset(srcset);
+      if (largestSrc) {
+          img = largestSrc;
+      }
+      
+      // 2. Fallback to standard/lazy src attributes
+      if (!img) {
+          img = imgEl.attr("src") || imgEl.attr("data-src") || imgEl.attr("data-lazy-src") || "";
+      }
+
+      // 3. Last resort: Check poster parent for data attributes
+      if (!img || img.includes("placeholder") || img.includes("no-thumbnail")) {
+          img = card.find(".poster").attr("data-img") || img;
+      }
+
       const image = img ? resolveUrl(img) : "";
+      
+      // Ensure we discard placeholder or no-thumbnail images
+      if (!image || image.includes("placeholder") || image.includes("no-thumbnail")) return; 
 
       seen.add(link);
       catalog.push({ title, link, image });
@@ -117,4 +168,3 @@ async function fetchPosts({
     return [];
   }
 }
-

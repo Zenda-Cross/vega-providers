@@ -1,25 +1,45 @@
 import { ProviderContext, Stream } from "../types";
 
 const headers = {
-  Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-  "Cache-Control": "no-store",
+  // Simplified headers for better performance and reduced payload
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "Accept-Language": "en-US,en;q=0.9",
-  DNT: "1",
-  "sec-ch-ua":
-    '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
-  "sec-ch-ua-mobile": "?0",
-  "sec-ch-ua-platform": '"Windows"',
-  "Sec-Fetch-Dest": "document",
-  "Sec-Fetch-Mode": "navigate",
-  "Sec-Fetch-Site": "none",
-  "Sec-Fetch-User": "?1",
-  Cookie:
-    "xla=s4t; _ga=GA1.1.1081149560.1756378968; _ga_BLZGKYN5PF=GS2.1.s1756378968$o1$g1$t1756378984$j44$l0$h0",
-  "Upgrade-Insecure-Requests": "1",
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
 };
+
+// Function to handle the Gdflix/PixelDrain extraction
+async function gdflixExtractor(
+  link: string,
+  axios: ProviderContext["axios"],
+  cheerio: ProviderContext["cheerio"],
+  signal: AbortSignal
+): Promise<Stream[]> {
+  const streamLinks: Stream[] = [];
+  try {
+    const gdflixRes = await axios.get(link, { headers, signal });
+    const $ = cheerio.load(gdflixRes.data);
+
+    // Look for the specific PixelDrain download button
+    const pixelDrainEl = $('a[href*="pixeldrain.dev/api/file/"]');
+    const pixelDrainLink = pixelDrainEl.attr('href');
+    // Extract button text for the title, cleaning up bracketed text like [20MB/s]
+    const title = pixelDrainEl.text().trim().replace(/\s*\[.*\]/i, '').replace(/\s*DL/i, ' Download');
+
+    if (pixelDrainLink) {
+      streamLinks.push({
+        server: "PixelDrain",
+        link: pixelDrainLink, 
+        type: "mp4", 
+      });
+    } else {
+      console.log("PixelDrain link not found on Gdflix page.");
+    }
+  } catch (error) {
+    console.error("Gdflix extraction error:", error instanceof Error ? error.message : String(error));
+  }
+  return streamLinks;
+}
 
 export async function getStream({
   link,
@@ -31,86 +51,25 @@ export async function getStream({
   type: string;
   signal: AbortSignal;
   providerContext: ProviderContext;
-}) {
+}): Promise<Stream[]> {
   const { axios, cheerio, extractors } = providerContext;
   const { hubcloudExtracter } = extractors;
-  try {
-    const streamLinks: Stream[] = [];
-    console.log("dotlink", link);
-    if (type === "movie") {
-      // vlink
-      const dotlinkRes = await axios(`${link}`, { headers });
-      const dotlinkText = dotlinkRes.data;
-      // console.log('dotlinkText', dotlinkText);
-      const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
-      // console.log('vLink', vlink[1]);
-      link = vlink[1];
 
-      // filepress link
-      try {
-        const $ = cheerio.load(dotlinkText);
-        const filepressLink = $(
-          '.btn.btn-sm.btn-outline[style="background:linear-gradient(135deg,rgb(252,185,0) 0%,rgb(0,0,0)); color: #fdf8f2;"]'
-        )
-          .parent()
-          .attr("href");
-        // console.log('filepressLink', filepressLink);
-        const filepressID = filepressLink?.split("/").pop();
-        const filepressBaseUrl = filepressLink
-          ?.split("/")
-          .slice(0, -2)
-          .join("/");
-        // console.log('filepressID', filepressID);
-        // console.log('filepressBaseUrl', filepressBaseUrl);
-        const filepressTokenRes = await axios.post(
-          filepressBaseUrl + "/api/file/downlaod/",
-          {
-            id: filepressID,
-            method: "indexDownlaod",
-            captchaValue: null,
-          },
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Referer: filepressBaseUrl,
-            },
-          }
-        );
-        // console.log('filepressTokenRes', filepressTokenRes.data);
-        if (filepressTokenRes.data?.status) {
-          const filepressToken = filepressTokenRes.data?.data;
-          const filepressStreamLink = await axios.post(
-            filepressBaseUrl + "/api/file/downlaod2/",
-            {
-              id: filepressToken,
-              method: "indexDownlaod",
-              captchaValue: null,
-            },
-            {
-              headers: {
-                "Content-Type": "application/json",
-                Referer: filepressBaseUrl,
-              },
-            }
-          );
-          // console.log('filepressStreamLink', filepressStreamLink.data);
-          streamLinks.push({
-            server: "filepress",
-            link: filepressStreamLink.data?.data?.[0],
-            type: "mkv",
-          });
-        }
-      } catch (error) {
-        console.log("filepress error: ");
-        // console.error(error);
-      }
+  try {
+    // 1. Check if the link is a Gdflix link and use the new extractor
+    if (link.includes("gdflix.dev")) {
+      console.log("Using Gdflix/PixelDrain extraction logic for:", link);
+      return await gdflixExtractor(link, axios, cheerio, signal);
     }
 
+    // 2. Otherwise, assume it's a Hubcloud (or generic) link and use the dedicated extractor
+    console.log("Using Hubcloud extraction logic for:", link);
     return await hubcloudExtracter(link, signal);
+
   } catch (error: any) {
-    console.log("getStream error: ", error);
+    console.log("getStream error: ", error instanceof Error ? error.message : String(error));
     if (error.message.includes("Aborted")) {
-    } else {
+      console.log("Request aborted by user.");
     }
     return [];
   }
