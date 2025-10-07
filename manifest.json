@@ -309,7 +309,7 @@
     "version": "1.0",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "Joya9tv",
