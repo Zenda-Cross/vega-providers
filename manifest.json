@@ -168,6 +168,14 @@
     "disabled": false
   },
   {
+    "display_name": "Ogomovies",
+    "value": "ogomovies",
+    "version": "1.0",
+    "icon": "",
+    "type": "india",
+    "disabled": false
+  },
+  {
     "display_name": "A.111477",
     "value": "a111477",
     "version": "1.2",
