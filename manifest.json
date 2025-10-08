@@ -133,7 +133,7 @@
     "version": "1.2",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "Ringz",
@@ -277,7 +277,7 @@
     "version": "1.4",
     "icon": "",
     "type": "india",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "RogMovies",
