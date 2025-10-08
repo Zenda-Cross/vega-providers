@@ -13,9 +13,9 @@ export const getMeta = async function ({
     const res = await axios.get(link);
     const data = res.data;
     const meta = {
-      title: "",
-      synopsis: "",
-      image: "",
+      title: data?.meta?.name || "",
+      synopsis: data?.meta?.description || "",
+      image: data?.meta?.background || "",
       imdbId: data?.meta?.imdb_id || "",
       type: data?.meta?.type || "movie",
     };
@@ -53,7 +53,6 @@ export const getMeta = async function ({
         });
       });
     } else {
-      console.log("all meta Mv🔥🔥", meta);
       links.push({
         title: data?.meta?.name as string,
         directLinks: [
