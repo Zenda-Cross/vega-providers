@@ -12,20 +12,33 @@ export async function getEpisodeLinks({
     const $ = providerContext.cheerio.load(res.data || "");
     const episodes: EpisodeLink[] = [];
 
-    let episodeCounter = 1; // Episode numbering start
+    // Select all episode headings (e.g., <h4>-:Episode: 1:-</h4> or <h4>-:Episodes: 1:-</h4>)
+    $("h4").each((_, h4El) => {
+      const headingText = $(h4El).text().trim();
+      
+      // Regex to extract the episode number (e.g., '1', '2', '03')
+      const match = headingText.match(/-:Episode(s)?:\s*(\d+):-/i);
 
-    // ✅ Sirf V-Cloud episodes
-    $("a").each((_, aEl) => {
-      const href = ($(aEl).attr("href") || "").trim();
+      if (match && match[2]) {
+        const episodeNumber = match[2].padStart(2, '0'); // Pads with zero (e.g., '01', '02')
+        const episodeTitle = `Episode ${episodeNumber}`; // Final title format
 
-      // V-Cloud link check
-      if (href.includes("vcloud.lol")) {
-        const btnText = `Episode ${episodeCounter}`; // Episode number assign
-        episodes.push({
-          title: btnText,
-          link: href,
-        });
-        episodeCounter++; // Counter increment
+        // Get the next immediate paragraph element after the current <h4>, which holds the links
+        const $linkContainer = $(h4El).next("p");
+
+        // Find the V-Cloud link: must contain "V-Cloud [Resumable]" text and the "vcloud.zip" domain
+        const vCloudLinkEl = $linkContainer.find('a:contains("V-Cloud [Resumable]")');
+        
+        if (vCloudLinkEl.length > 0) {
+          const href = vCloudLinkEl.attr("href")?.trim();
+          
+          if (href && href.includes("vcloud.zip")) {
+            episodes.push({
+              title: episodeTitle,
+              link: href,
+            });
+          }
+        }
       }
     });
 

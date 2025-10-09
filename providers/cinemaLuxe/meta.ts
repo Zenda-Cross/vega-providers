@@ -48,27 +48,34 @@ export const getMeta = function ({
       const linkList: Link[] = [];
 
       if (type === "series") {
-        // ✅ Series ke liye sirf V-Cloud links
+        // ✅ Series ke liye sab possible links (V-Cloud + NexDrive + others)
         infoContainer.find("h3").each((_, el) => {
           const el$ = $(el);
           const seasonTitle = el$.text().trim();
           if (!/Season \d+/i.test(seasonTitle)) return;
 
-          const vcloudLinks: string[] = [];
+          const allLinks: string[] = [];
 
           el$.nextUntil("h3").find("a").each((_, aEl) => {
             const href = $(aEl).attr("href")?.trim() || "";
             const btnText = $(aEl).text().trim() || "";
-            if (href.includes("vcloud.lol") || btnText.includes("V-Cloud")) {
-              vcloudLinks.push(href);
+
+            // ✅ Add all possible link patterns
+            if (
+              href.includes("vcloud.lol") ||
+              href.includes("nexdrive.rest") || // <-- Added this line
+              href.includes("gofile.io") || // <-- Optional extra sources
+              btnText.toLowerCase().includes("download")
+            ) {
+              allLinks.push(href);
             }
           });
 
-          if (vcloudLinks.length > 0) {
+          if (allLinks.length > 0) {
             linkList.push({
               title: seasonTitle,
-              episodesLink: vcloudLinks[0],
-              directLinks: vcloudLinks.map((l, i) => ({
+              episodesLink: allLinks[0],
+              directLinks: allLinks.map((l, i) => ({
                 title: `Episode ${i + 1}`,
                 link: l,
                 type: "series",
@@ -77,16 +84,22 @@ export const getMeta = function ({
           }
         });
       } else {
-        // ✅ Movie ke liye direct links fetch karenge
+        // ✅ Movie ke liye sab links include karenge
         infoContainer.find("h5").each((_, h5El) => {
           const el$ = $(h5El);
           const movieTitle = el$.text().trim();
           const directLinks: Link["directLinks"] = [];
 
-          // h5 ke next p me <a> tags search
           el$.next("p").find("a").each((_, aEl) => {
             const href = $(aEl).attr("href")?.trim() || "";
-            if (href) {
+            if (
+              href &&
+              (href.includes("nexdrive.rest") || // <-- Added support for NexDrive
+                href.includes("vcloud.lol") ||
+                href.includes("gofile.io") ||
+                href.includes("pixeldrain") ||
+                href.includes("download"))
+            ) {
               directLinks.push({
                 title: movieTitle,
                 link: href,

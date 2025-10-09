@@ -129,4 +129,3 @@ async function fetchPosts({
     return [];
   }
 }
-
