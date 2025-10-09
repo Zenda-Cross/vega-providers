@@ -48,34 +48,28 @@ export const getMeta = function ({
       const linkList: Link[] = [];
 
       if (type === "series") {
-        // ✅ Series ke liye sab possible links (V-Cloud + NexDrive + others)
+        // 1. --- PRIORITIZE V-CLOUD (PER-EPISODE) LINKS ---
         infoContainer.find("h3").each((_, el) => {
           const el$ = $(el);
           const seasonTitle = el$.text().trim();
           if (!/Season \d+/i.test(seasonTitle)) return;
 
-          const allLinks: string[] = [];
+          const vcloudLinks: string[] = [];
 
           el$.nextUntil("h3").find("a").each((_, aEl) => {
             const href = $(aEl).attr("href")?.trim() || "";
             const btnText = $(aEl).text().trim() || "";
-
-            // ✅ Add all possible link patterns
-            if (
-              href.includes("vcloud.lol") ||
-              href.includes("nexdrive.rest") || // <-- Added this line
-              href.includes("gofile.io") || // <-- Optional extra sources
-              btnText.toLowerCase().includes("download")
-            ) {
-              allLinks.push(href);
+            // Check for vcloud.lol (old) or button text 'V-Cloud'
+            if (href.includes("vcloud.lol") || btnText.includes("V-Cloud")) {
+              vcloudLinks.push(href);
             }
           });
 
-          if (allLinks.length > 0) {
+          if (vcloudLinks.length > 0) {
             linkList.push({
               title: seasonTitle,
-              episodesLink: allLinks[0],
-              directLinks: allLinks.map((l, i) => ({
+              episodesLink: vcloudLinks[0],
+              directLinks: vcloudLinks.map((l, i) => ({
                 title: `Episode ${i + 1}`,
                 link: l,
                 type: "series",
@@ -83,23 +77,49 @@ export const getMeta = function ({
             });
           }
         });
+
+        // 2. --- ADD BATCH/TOP-LEVEL DOWNLOAD LINKS (e.g., NexDrive) ---
+        // Iterate through all <h3> tags again to find batch download links.
+        $("h3").each((_, h3El) => {
+          const el$ = $(h3El);
+          const batchTitle = el$.text().trim();
+          
+          // Check if the title looks like a season/batch heading
+          if (/Season \d+|\[.+\]/i.test(batchTitle)) {
+              
+              // Look for an immediate following paragraph containing an <a> tag with a download button class or text
+              const $linkContainer = el$.next("p");
+              // Look for links with the 'dwd-button' class, or that contain 'download' in text/href
+              const batchLinkEl = $linkContainer.find('a:has(button.dwd-button), a:contains("download"), a[href*="download"]');
+              
+              if (batchLinkEl.length > 0) {
+                  const href = batchLinkEl.attr("href")?.trim() || "";
+                  
+                  if (href) {
+                      linkList.push({
+                          title: batchTitle,
+                          episodesLink: "", 
+                          directLinks: [{
+                              title: batchTitle,
+                              link: href,
+                              type: "series", 
+                          }],
+                      });
+                  }
+              }
+          }
+        });
       } else {
-        // ✅ Movie ke liye sab links include karenge
+        // ✅ Existing Movie logic
         infoContainer.find("h5").each((_, h5El) => {
           const el$ = $(h5El);
           const movieTitle = el$.text().trim();
           const directLinks: Link["directLinks"] = [];
 
+          // h5 ke next p me <a> tags search
           el$.next("p").find("a").each((_, aEl) => {
             const href = $(aEl).attr("href")?.trim() || "";
-            if (
-              href &&
-              (href.includes("nexdrive.rest") || // <-- Added support for NexDrive
-                href.includes("vcloud.lol") ||
-                href.includes("gofile.io") ||
-                href.includes("pixeldrain") ||
-                href.includes("download"))
-            ) {
+            if (href) {
               directLinks.push({
                 title: movieTitle,
                 link: href,
