@@ -93,12 +93,9 @@ export const getStream = async function ({
     console.log(id);
     const streams: Stream[] = [];
     // Handle double-encoded JSON
-    let parsedId = typeof id === "string" ? JSON.parse(id) : id;
-    if (typeof parsedId === "string") {
-      parsedId = JSON.parse(parsedId);
-    }
-    const { imdbId, season, episode } = parsedId;
-    console.log("Parsed ID:", parsedId);
+
+    const [imdbId, season, episode] = id.split("-");
+    console.log("Parsed ID:", { imdbId, season, episode });
     console.log("imdbId:", imdbId);
 
     ///// mostraguarda
