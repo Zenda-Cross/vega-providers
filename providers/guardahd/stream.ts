@@ -92,7 +92,11 @@ export const getStream = async function ({
     }
     console.log(id);
     const streams: Stream[] = [];
-    const { imdbId, season, episode } = JSON.parse(id);
+    // Handle double-encoded JSON
+
+    const [imdbId, season, episode] = id.split("-");
+    console.log("Parsed ID:", { imdbId, season, episode });
+    console.log("imdbId:", imdbId);
 
     ///// mostraguarda
     const mostraguardaStream = await GetMostraguardaStream({
