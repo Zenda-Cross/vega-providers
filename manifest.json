@@ -264,8 +264,16 @@
     "disabled": false
   },
 {
-    "display_name": "HDMovie2",
+    "display_name": "MovieTP",
     "value": "HDMovie2",
+    "version": "1.3",
+    "icon": "",
+    "type": "india",
+    "disabled": false
+  },
+  {
+    "display_name": "HDMovie2",
+    "value": "MovieTP",
     "version": "1.3",
     "icon": "",
     "type": "india",
@@ -418,6 +426,7 @@
  
   
 ]
+
 
 
 
