@@ -422,10 +422,19 @@
     "icon": "",
     "type": "global",
     "disabled": true
+  },
+  {
+    "display_name": "DesireMovie",
+    "value": "DesireMovie",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false 
   }
  
   
 ]
+
 
 
 
