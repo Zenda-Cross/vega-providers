@@ -9,6 +9,7 @@ export const getEpisodes = async function ({
 }): Promise<EpisodeLink[]> {
   const { axios, cheerio, commonHeaders: headers } = providerContext;
   console.log("getEpisodeLinks", url);
+
   try {
     const res = await axios.get(url, {
       headers: {
@@ -24,28 +25,38 @@ export const getEpisodes = async function ({
 
     const episodes: EpisodeLink[] = [];
 
+    // 🔹 Episode parsing (sirf GDFlix aur V-Cloud ke links)
     container.find("h4").each((index, element) => {
       const el = $(element);
       const title = el.text().replace(/-/g, "").replace(/:/g, "").trim();
 
-      // Sirf pehla direct link use karenge
       const link =
         el
           .next("p")
-          .find(
-            '.btn-outline[style*="background: linear-gradient(135deg,#ed0b0b,#f2d152);"]'
-          )
-          .parent()
+          .find('a[href*="gdflix"], a[href*="vcloud"]')
           .attr("href") || "";
 
       if (title && link) {
-        episodes.push({ title, link }); // yahan "link" hi use ho raha hai
+        episodes.push({ title, link });
       }
     });
 
+    // 🔹 Agar koi episode nahi mila (series single GDFlix/VCloud link hai)
+    if (episodes.length === 0) {
+      const singleLink =
+        container.find('a[href*="gdflix"], a[href*="vcloud"]').attr("href") || "";
+
+      if (singleLink) {
+        episodes.push({
+          title: "Play Now",
+          link: singleLink,
+        });
+      }
+    }
+
     return episodes;
   } catch (err) {
-    console.log("getEpisodeLinks error: ");
+    console.log("getEpisodeLinks error:", err);
     return [];
   }
 };
