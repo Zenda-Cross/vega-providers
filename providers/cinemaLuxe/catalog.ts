@@ -5,11 +5,11 @@ export const catalog = [
   },
   {
     title: "Animation",
-    filter: "animation/",
+    filter: "category/animation/",
   },
   {
     title:  "Apple-TV",
-    filter: "web-series/apple-tv/",
+    filter: "category/netflix/",
   },
 ];
 

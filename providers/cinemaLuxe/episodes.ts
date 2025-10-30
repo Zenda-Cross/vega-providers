@@ -1,61 +1,56 @@
 import { EpisodeLink, ProviderContext } from "../types";
 
-export async function getEpisodeLinks({
+export const getEpisodes = async function ({
   url,
   providerContext,
 }: {
   url: string;
   providerContext: ProviderContext;
 }): Promise<EpisodeLink[]> {
+  const { axios, cheerio, commonHeaders: headers } = providerContext;
+  console.log("getEpisodeLinks", url);
+
   try {
-    const res = await providerContext.axios.get(url);
-    const $ = providerContext.cheerio.load(res.data || "");
+    const res = await axios.get(url, {
+      headers: {
+        ...headers,
+        cookie:
+          "ext_name=ojplmecpdpgccookcobabopnaifgidhf; cf_clearance=Zl2yiOCN3pzGUd0Bgs.VyBXniJooDbG2Tk1g7DEoRnw-1756381111-1.2.1.1-RVPZoWGCAygGNAHavrVR0YaqASWZlJyYff8A.oQfPB5qbcPrAVud42BzsSwcDgiKAP0gw5D92V3o8XWwLwDRNhyg3DuL1P8wh2K4BCVKxWvcy.iCCxczKtJ8QSUAsAQqsIzRWXk29N6X.kjxuOTYlfB2jrlq12TRDld_zTbsskNcTxaA.XQekUcpGLseYqELuvlNOQU568NZD6LiLn3ICyFThMFAx6mIcgXkxVAvnxU; xla=s4t",
+      },
+    });
+
+    const $ = cheerio.load(res.data);
     const episodes: EpisodeLink[] = [];
 
-    // Select all episode headings (e.g., <h4>-:Episode: 1:-</h4> or <h4>-:Episodes: 1:-</h4>)
-    $("h4").each((_, h4El) => {
-      const headingText = $(h4El).text().trim();
-      
-      // Regex to extract the episode number (e.g., '1', '2', '03')
-      const match = headingText.match(/-:Episode(s)?:\s*(\d+):-/i);
+    // अब हर Episode ब्लॉक को पकड़ो जो -:Episodes: या Episode शब्द रखता हो
+    $("h4:contains('Episode'), h4:contains('Episodes')").each((_, el) => {
+      const episodeTitle = $(el).text().trim();
 
-      if (match && match[2]) {
-        const episodeNumber = match[2].padStart(2, '0'); // Pads with zero (e.g., '01', '02')
-        const episodeTitle = `Episode ${episodeNumber}`; // Final title format
+      // Episode number निकालना
+      const episodeNumberMatch = episodeTitle.match(/\d+/);
+      const episodeNumber = episodeNumberMatch ? episodeNumberMatch[0] : "";
 
-        // Get the next immediate paragraph element after the current <h4>, which holds the links
-        const $linkContainer = $(h4El).next("p");
+      // इसके नीचे वाले <p> में सारे links
+      const nextLinks = $(el).next("p").find("a");
 
-        // Find the V-Cloud link: must contain "V-Cloud [Resumable]" text and the "vcloud.zip" domain
-        const vCloudLinkEl = $linkContainer.find('a:contains("V-Cloud [Resumable]")');
-        
-        if (vCloudLinkEl.length > 0) {
-          const href = vCloudLinkEl.attr("href")?.trim();
-          
-          if (href && href.includes("vcloud.zip")) {
-            episodes.push({
-              title: episodeTitle,
-              link: href,
-            });
-          }
+      nextLinks.each((__, linkEl) => {
+        const btn = $(linkEl);
+        const link = btn.attr("href") || "";
+        const btnText = btn.text().trim();
+
+        // सिर्फ Zee-Cloud [Resumable] वाले लिंक
+        if (/zcloud\.lol/i.test(link) || /Zee-Cloud/i.test(btnText)) {
+          episodes.push({
+            title: `Episode ${episodeNumber || ""}`.trim(),
+            link: link,
+          });
         }
-      }
+      });
     });
 
     return episodes;
   } catch (err) {
-    console.error("getEpisodeLinks error:", err);
+    console.log("getEpisodeLinks error:", err);
     return [];
   }
-}
-
-// --- System wrapper
-export async function getEpisodes({
-  url,
-  providerContext,
-}: {
-  url: string;
-  providerContext: ProviderContext;
-}): Promise<EpisodeLink[]> {
-  return await getEpisodeLinks({ url, providerContext });
-}
+};
