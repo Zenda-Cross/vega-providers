@@ -1,6 +1,6 @@
 import { Post, ProviderContext } from "../types";
 
-// Using a comprehensive set of desktop headers to bypass potential bot-detection/filtering
+// Base desktop headers for general browsing
 const defaultHeaders = {
     Referer: "https://www.google.com",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
@@ -15,6 +15,22 @@ const defaultHeaders = {
     "Sec-Fetch-User": "?1",
     "Upgrade-Insecure-Requests": "1",
 };
+
+// Specific headers/cookies needed for search requests, derived from your provided trace.
+// Note: Cookie values should ideally be managed and updated externally, but for a fixed script, we use a snapshot.
+const searchHeaders = {
+    // Mobile User-Agent from the successful trace
+    "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36",
+    // Cookie from the successful trace
+    "Cookie": "_ga=GA1.1.1984067624.1761565546; xla=s4t; _ga_JY310N86S8=GS2.1.s1761830318$o5$g1$t1761830365$j13$l0$h0; prefetchAd_8832032=true",
+    // Use the specific Accept-Language/Encoding for better compatibility
+    "Accept-Language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7,hi;q=0.6,ar;q=0.5,pt;q=0.4",
+    "sec-ch-ua-mobile": "?1",
+    "sec-ch-ua-platform": '"Android"',
+    "Sec-Fetch-Site": "same-origin", // Search requests are same-origin
+    "Referer": "https://desiremovies.party/", // Specific referer for search
+};
+
 
 // --- Normal catalog posts (uses the general fetch) ---
 export async function getPosts({
@@ -71,8 +87,7 @@ async function fetchPosts({
 
         // --- Build URL for search query or category filter
         if (isSearch) {
-            // FIXED SEARCH URL CONSTRUCTION: Using path-based pagination for robustness
-            // URL structure: /page/X/?s=query
+            // URL structure: /page/X/?s=query (Using path-based pagination for robustness)
             const pathPrefix = page > 1 ? `/page/${page}` : "";
             url = `${baseUrl}${pathPrefix}/?s=${encodeURIComponent(trimmedQuery)}`;
         } else {
@@ -87,35 +102,34 @@ async function fetchPosts({
             }
         }
 
+        // --- Determine Headers ---
+        const requestHeaders = isSearch
+            ? { ...defaultHeaders, ...searchHeaders } // Merge default with specific search headers (overwriting defaults)
+            : defaultHeaders;
+
         const { axios, cheerio } = providerContext;
         let res;
         const maxRetries = 3;
 
-        // --- Use Retry Logic (Simulates Proxy Robustness/Reliability) ---
-        // Retry logic is implemented to overcome transient network errors, acting as a 'robust' connection.
+        // --- Use Retry Logic ---
         for (let i = 0; i < maxRetries; i++) {
             try {
-                // Setting a generous timeout to ensure we don't prematurely cancel the request.
                 res = await axios.get(url, { 
-                    headers: defaultHeaders, 
+                    headers: requestHeaders, // Use the dynamically determined headers
                     signal,
-                    timeout: 15000, // 15 second timeout for search robustness
+                    timeout: 15000,
                 });
-                // If successful, break the loop
-                break; 
+                break;
             } catch (error) {
                 if (!isSearch || i === maxRetries - 1) {
-                    // Re-throw if not a search request or if max retries reached
-                    throw error; 
+                    throw error;
                 }
-                // Log and wait before retrying (exponential backoff: 1s, 2s)
                 console.warn(`Search request failed, retry ${i + 1}/${maxRetries}. Waiting...`);
                 await sleep(1000 * (i + 1));
             }
         }
 
         if (!res) {
-            // Should only happen if all retries failed and the last error was caught above
             throw new Error(`Failed to retrieve data after ${maxRetries} attempts.`);
         }
 
@@ -127,14 +141,13 @@ async function fetchPosts({
         const seen = new Set<string>();
         const catalog: Post[] = [];
 
-        // --- FINAL, ULTRA-GENERIC POST SELECTORS ---
-        // Targeting the most common wrapper elements in the WordPress loop
+        // --- POST SELECTORS ---
         const POST_SELECTORS = [
-            "article",              // HTML5 article tag
-            ".post",                // Most common WP post class
-            ".type-post",           // Common WP class for post types
-            ".item",                // Generic item container
-            ".mh-loop-item",        // Specific class used previously
+            "article",              
+            ".post",               
+            ".type-post",          
+            ".item",                
+            ".mh-loop-item",        
         ].join(",");
 
         $(POST_SELECTORS).each((_, el) => {
@@ -144,7 +157,7 @@ async function fetchPosts({
             let title = "";
             let image = "";
 
-            // 1. **PRIMARY LINK/TITLE EXTRACTION:** Find the first meaningful link that is not just an image/logo link.
+            // 1. PRIMARY LINK/TITLE EXTRACTION
             const primaryAnchor = card.find("h2 a, h3 a, a[rel='bookmark'], .entry-title a").first();
             
             if (primaryAnchor.length) {
@@ -152,20 +165,20 @@ async function fetchPosts({
                 title = primaryAnchor.text().trim();
             }
 
-            // 2. **Fallback Link:** Try the link wrapping the image figure.
+            // 2. Fallback Link (from image wrapper)
             if (!link) {
                 const imgAnchor = card.find("figure a[href], .thumb a[href]").first();
                 link = imgAnchor.attr("href") || "";
             }
 
-            // 3. **Fallback Title:** Use the anchor's title attribute or image's alt text if the text content is empty.
+            // 3. Fallback Title (from attribute/alt text)
             if (!title) {
                 title = card.find("a[title]").first().attr("title")?.trim() || 
                                 card.find("img").first().attr("alt")?.trim() ||
                                 "";
             }
             
-            // 4. **IMAGE EXTRACTION:** Look for the image using multiple possible attributes.
+            // 4. IMAGE EXTRACTION
             const imgEl = card.find("img").first();
             const img = imgEl.attr("src") || imgEl.attr("data-src") || imgEl.attr("data-original") || "";
             image = img ? resolveUrl(img) : "";
@@ -176,9 +189,9 @@ async function fetchPosts({
             link = resolveUrl(link);
             if (seen.has(link)) return;
 
-            // Clean up title (remove common tags like quality, brackets, year, etc.)
+            // Clean up title
             title = title.replace(/\[.*?\]/g, "").replace(/\(.+?\)/g, "").replace(/\{.*?\}/g, "").replace(/\s{2,}/g, " ").trim();
-            if (!title) return; // Discard post if title is empty after cleaning
+            if (!title) return;
 
             seen.add(link);
             catalog.push({ title, link, image });
