@@ -430,10 +430,19 @@
     "icon": "",
     "type": "global",
     "disabled": false 
+  },
+  {
+    "display_name": "GokuHD",
+    "value": "GokuHD",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false 
   }
  
   
 ]
+
 
 
 
