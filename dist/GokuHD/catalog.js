@@ -1,1 +1,1 @@
-
+"use strict";Object.defineProperty(exports,"__esModule",{value:!0}),exports.genres=exports.catalog=void 0,exports.catalog=[{title:"Letest",filter:""},{title:"Hotstar",filter:"category/web-series/disney-plus-hotstar/"}],exports.genres=[];
