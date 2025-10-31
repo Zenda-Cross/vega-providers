@@ -362,7 +362,7 @@
    {
     "display_name": "mkvcinema",
     "value": "mkvcinema",
-    "version": "1.0",
+    "version": "1.01",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -442,6 +442,7 @@
  
   
 ]
+
 
 
 
