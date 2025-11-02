@@ -38,7 +38,13 @@ export async function getSearchPosts({
   signal?: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  return fetchPosts({ filter: "", page, query: searchQuery, signal, providerContext });
+  return fetchPosts({
+    filter: "",
+    page,
+    query: searchQuery,
+    signal,
+    providerContext,
+  });
 }
 
 // --- Core fetch function ---
@@ -56,17 +62,23 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://skymovieshd.tattoo";
+    const baseUrl = await providerContext.getBaseUrl("skymovieshd");
     let url: string;
 
-    if (query && query.trim() && query.trim().toLowerCase() !== "what are you looking for?") {
+    if (
+      query &&
+      query.trim() &&
+      query.trim().toLowerCase() !== "what are you looking for?"
+    ) {
       const params = new URLSearchParams();
       params.append("s", query.trim());
       if (page > 1) params.append("paged", page.toString());
       url = `${baseUrl}/?${params.toString()}`;
     } else if (filter) {
       url = filter.startsWith("/")
-        ? `${baseUrl}${filter.replace(/\/$/, "")}${page > 1 ? `/page/${page}` : ""}`
+        ? `${baseUrl}${filter.replace(/\/$/, "")}${
+            page > 1 ? `/page/${page}` : ""
+          }`
         : `${baseUrl}/${filter}${page > 1 ? `/page/${page}` : ""}`;
     } else {
       url = `${baseUrl}${page > 1 ? `/page/${page}` : ""}`;
@@ -87,13 +99,21 @@ async function fetchPosts({
       const card = $(el);
 
       // Link
-      let link = card.find("header.entry-header h2.entry-title a, header.entry-header h1.entry-title a").attr("href") || "";
+      let link =
+        card
+          .find(
+            "header.entry-header h2.entry-title a, header.entry-header h1.entry-title a"
+          )
+          .attr("href") || "";
       if (!link) return;
       link = resolveUrl(link);
       if (seen.has(link)) return;
 
       // Title: remove "Download"
-      let title = card.find("header.entry-header h2.entry-title a, header.entry-header h1.entry-title a")
+      let title = card
+        .find(
+          "header.entry-header h2.entry-title a, header.entry-header h1.entry-title a"
+        )
         .text()
         .replace(/^Download\s*/i, "")
         .trim();
@@ -112,7 +132,10 @@ async function fetchPosts({
 
     return catalog.slice(0, 100);
   } catch (err) {
-    console.error("fetchPosts error:", err instanceof Error ? err.message : String(err));
+    console.error(
+      "fetchPosts error:",
+      err instanceof Error ? err.message : String(err)
+    );
     return [];
   }
 }
