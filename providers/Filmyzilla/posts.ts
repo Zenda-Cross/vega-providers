@@ -11,9 +11,34 @@ const defaultHeaders = {
   "Cache-Control": "no-cache",
 };
 
-// 🔑 OMDb API Key
-const OMDB_API_KEY = "90b37ad0";
+// --- Helper: Extract clean movie name ---
+function extractMovieName(title: string): string {
+  const match = title.match(/^(.*?)\s*\(/);
+  return match ? match[1].trim() : title.split("Hindi")[0].trim();
+}
 
+// --- Fetch poster from IMDb Suggestion API ---
+async function fetchPoster(movieName: string): Promise<string> {
+  try {
+    if (!movieName) return "";
+    const firstLetter = movieName.charAt(0).toLowerCase();
+    const url = `https://v2.sg.media-imdb.com/suggestion/${firstLetter}/${encodeURIComponent(
+      movieName
+    )}.json`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data && data.d && data.d.length > 0) {
+      const movie = data.d.find((item: any) => item.i && item.i.imageUrl);
+      if (movie && movie.i && movie.i.imageUrl) return movie.i.imageUrl;
+    }
+  } catch (e) {
+    console.error("IMDb poster fetch error:", e);
+  }
+  return "";
+}
+
+// --- Normal catalog posts ---
 export async function getPosts({
   filter,
   page = 1,
@@ -28,6 +53,7 @@ export async function getPosts({
   return fetchPosts({ filter, page, query: "", signal, providerContext });
 }
 
+// --- Search posts ---
 export async function getSearchPosts({
   searchQuery,
   page = 1,
@@ -39,15 +65,10 @@ export async function getSearchPosts({
   signal?: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  return fetchPosts({
-    filter: "",
-    page,
-    query: searchQuery,
-    signal,
-    providerContext,
-  });
+  return fetchPosts({ query: searchQuery, page, signal, providerContext });
 }
 
+// --- Core fetch logic ---
 async function fetchPosts({
   filter,
   query,
@@ -62,18 +83,15 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = "https://www.ofilmyzilla.store";
+    const baseUrl = "https://www.ofilmyzilla.com.ng";
     let url: string;
 
+    // ✅ FIXED search parameter (q instead of search)
     if (query && query.trim()) {
-      url = `${baseUrl}/search.php?q=${encodeURIComponent(query)}${
-        page > 1 ? `&page=${page}` : ""
-      }`;
+      url = `${baseUrl}/search.php?q=${encodeURIComponent(query)}`;
     } else if (filter) {
       url = filter.startsWith("/")
-        ? `${baseUrl}${filter.replace(/\/$/, "")}${
-            page > 1 ? `/page/${page}` : ""
-          }`
+        ? `${baseUrl}${filter.replace(/\/$/, "")}${page > 1 ? `/page/${page}` : ""}`
         : `${baseUrl}/${filter}${page > 1 ? `/page/${page}` : ""}`;
     } else {
       url = `${baseUrl}${page > 1 ? `/page/${page}` : ""}`;
@@ -84,94 +102,45 @@ async function fetchPosts({
     const $ = cheerio.load(res.data || "");
 
     const resolveUrl = (href: string) =>
-      href?.startsWith("http") ? href : new URL(href, url).href;
+      href?.startsWith("http") ? href : new URL(href, baseUrl).href;
 
     const seen = new Set<string>();
     const catalog: Post[] = [];
 
-    const POST_SELECTORS = [".list div", ".post", "article"].join(",");
-
-    $(POST_SELECTORS).each((_, el) => {
-      const card = $(el);
-
-      let link = card.find("a[href]").first().attr("href") || "";
+    // 🔹 Parse movie links (search result or homepage)
+    $("a[href*='.html']").each((_, el) => {
+      const anchor = $(el);
+      let link = anchor.attr("href") || "";
       if (!link) return;
+
       link = resolveUrl(link);
       if (seen.has(link)) return;
 
-      let title =
-        card.find("h2").first().text().trim() ||
-        card.find("a[title]").first().attr("title")?.trim() ||
-        card.find("span").first().text().trim() ||
-        card.text().trim();
-      title = title
-        .replace(/\[.*?\]/g, "")
-        .replace(/\s{2,}/g, " ")
-        .trim();
-      if (!title) return;
+      const text = anchor.text().trim();
+      if (!text || text.length < 3) return; // Skip short text
 
-      const img =
-        card.find("img").first().attr("src") ||
-        card.find("img").first().attr("data-src") ||
-        card.find("img").first().attr("data-original") ||
-        "";
-      const image = img ? resolveUrl(img) : "";
+      // Ignore irrelevant links like navigation/menu
+      if (!/\d{4}/.test(text) && !text.toLowerCase().includes("hindi")) return;
 
       seen.add(link);
-      catalog.push({ title, link, image });
+      catalog.push({
+        title: text
+          .replace(/Download|Full Movie|Watch Online|Free/gi, "")
+          .trim(),
+        link,
+        image: "",
+      });
     });
 
-    // --- Step 2: OMDb fallback for missing posters ---
+    // 🔹 Fetch IMDb posters for each movie asynchronously
     for (const post of catalog) {
-      if ((!post.image || post.image.trim() === "") && OMDB_API_KEY) {
-        try {
-          // Year निकालो (e.g., "Movie Name (2025)")
-          const yearMatch = post.title.match(/\b(19|20)\d{2}\b/);
-          const year = yearMatch ? yearMatch[0] : "";
-
-          // साफ title (brackets हटाओ, लेकिन year अलग से रखो)
-          const cleanTitle = post.title
-            .replace(/\[.*?\]/g, "")
-            .replace(/\(.+?\)/g, "")
-            .trim();
-
-          let omdbUrl = `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(
-            cleanTitle
-          )}`;
-          if (year) {
-            omdbUrl += `&y=${year}`;
-          }
-
-          console.log(`🔎 OMDb lookup: ${omdbUrl}`);
-
-          const omdbRes = await providerContext.axios.get(omdbUrl);
-
-          if (
-            omdbRes.data &&
-            omdbRes.data.Poster &&
-            omdbRes.data.Poster !== "N/A"
-          ) {
-            post.image = omdbRes.data.Poster;
-            console.log(`✅ Poster found for "${cleanTitle}" → ${post.image}`);
-          } else {
-            console.warn(
-              `⚠️ OMDb: No poster for "${cleanTitle}" ${
-                year ? "(" + year + ")" : ""
-              }`
-            );
-          }
-        } catch (err) {
-          console.warn(`❌ OMDb lookup failed for "${post.title}" → ${err}`);
-        }
-      }
+      const movieName = extractMovieName(post.title);
+      post.image = await fetchPoster(movieName);
     }
 
     return catalog.slice(0, 100);
   } catch (err) {
-    console.error(
-      "OFilmyZilla fetchPosts error:",
-      err instanceof Error ? err.message : String(err)
-    );
+    console.error("fetchPosts error:", err instanceof Error ? err.message : String(err));
     return [];
   }
 }
