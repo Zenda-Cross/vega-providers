@@ -60,7 +60,7 @@ export const getMeta = async function ({
 
     // --- Title ---
     let rawTitle = content.find("h1, h2").first().text().trim();
-    rawTitle = rawTitle.replace(/^Download\s*/i, ""); // Download text remove
+    rawTitle = rawTitle.replace(/^Download\s*/i, ""); // remove "Download" word
     result.title = rawTitle;
 
     // --- Type Detect ---
@@ -94,29 +94,85 @@ export const getMeta = async function ({
     const links: Link[] = [];
 
     if (result.type === "series") {
-      // ✅ Series case: सिर्फ V-Cloud वाला और title = पूरा <h3> का text
       content.find("h3").each((_, h3) => {
         const h3Text = $(h3).text().trim();
         const qualityMatch = h3Text.match(/\d+p/)?.[0] || "";
+        const paragraph = $(h3).next("p");
 
-        const vcloudLink = $(h3)
-          .next("p")
+        const directLinks: { title: string; link: string; type: string }[] = [];
+        let episodesLink = "";
+
+        // Check for the "Episode Links" button structure (New Type)
+        const episodeLinksButton = paragraph
           .find("a")
-          .filter((_, a) => /v-cloud/i.test($(a).text()))
+          .filter((_, a) => /Episode Links/i.test($(a).text()))
           .first();
 
-        const href = vcloudLink.attr("href");
-        if (href) {
+        if (episodeLinksButton.length > 0) {
+          // Case: Single "Episode Links" button
+          episodesLink = episodeLinksButton.attr("href") || "";
+
+        } else {
+          // Case: Multi-button structure (G-Direct, Zee-Cloud, Batch/Zip)
+
+          // Find G-Direct (Instant) or a general single link for EpisodesLink if available
+          const gDirectLink = paragraph
+            .find("a")
+            .filter((_, a) => /G-Direct/i.test($(a).text()))
+            .first()
+            .attr("href");
+            
+          // Use G-Direct as the main episodesLink
+          episodesLink = gDirectLink || ""; 
+
+          // Find Zee-Cloud [Resumable] link and add to directLinks
+          const zeeCloudLink = paragraph
+            .find("a")
+            .filter((_, a) => /Zee-Cloud/i.test($(a).text()))
+            .first()
+            .attr("href");
+
+          if (zeeCloudLink) {
+            directLinks.push({
+              title: "Zee-Cloud [Resumable]",
+              link: zeeCloudLink,
+              type: "episode",
+            });
+          }
+
+          // Find Batch/Zip link and add to directLinks
+          const batchLink = paragraph
+            .find("a")
+            .filter((_, a) => /Batch|Zip/i.test($(a).text()))
+            .first()
+            .attr("href");
+
+          if (batchLink) {
+            directLinks.push({
+              title: "Batch/Zip",
+              link: batchLink,
+              type: "batch",
+            });
+          }
+        }
+        
+        // If we found any link (either episodesLink or directLinks), add the entry
+        if (episodesLink || directLinks.length > 0) {
           links.push({
             title: h3Text,
             quality: qualityMatch,
-            episodesLink: href, // Episode button
-            directLinks: [], // Empty for series
+            episodesLink: episodesLink,
+            
           });
         }
       });
+
+      // 🛑 The h5 logic from the original code (V-Cloud/Episode Links) is removed
+      // to avoid redundancy with the robust h3 logic, but if you have h5 series
+      // links that don't fit the above structure, you may need to re-add that.
+
     } else {
-      // ✅ Movie case: h5 text as title + download link
+      // ✅ Movie case: unchanged (using h5)
       content.find("h5").each((_, h5) => {
         const h5Text = $(h5).text().trim();
         const qualityMatch = h5Text.match(/\d+p/)?.[0] || "";
@@ -128,7 +184,7 @@ export const getMeta = async function ({
             quality: qualityMatch,
             episodesLink: "",
             directLinks: [
-              { title: "Movie", link: href, type: "movie" }, // Play/Download button
+              { title: "Movie", link: href, type: "movie" },
             ],
           });
         }
