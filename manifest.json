@@ -82,7 +82,7 @@
   {
     "display_name": "CinemaLuxe",
     "value": "cinemaLuxe",
-    "version": "1.8",
+    "version": "1.81",
     "icon": "",
     "type": "global",
     "disabled": false 
@@ -454,10 +454,19 @@
     "icon": "",
     "type": "global",
     "disabled": false 
+  },
+  {
+    "display_name": "HubMovies",
+    "value": "HubMovies",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false 
   }
  
   
 ]
+
 
 
 
