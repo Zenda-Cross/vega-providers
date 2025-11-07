@@ -462,10 +462,19 @@
     "icon": "",
     "type": "global",
     "disabled": false 
+  },
+   {
+    "display_name": "HiAnime1",
+    "value": "HiAnime1",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false 
   }
  
   
 ]
+
 
 
 
