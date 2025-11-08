@@ -470,10 +470,19 @@
     "icon": "",
     "type": "global",
     "disabled": false 
+  },
+  {
+    "display_name": "DramaKey",
+    "value": "DramaKey",
+    "version": "1.0",
+    "icon": "",
+    "type": "korean",
+    "disabled": false 
   }
  
   
 ]
+
 
 
 
