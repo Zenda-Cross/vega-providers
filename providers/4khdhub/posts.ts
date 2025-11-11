@@ -14,7 +14,7 @@ export const getPosts = async function ({
 }): Promise<Post[]> {
   const { getBaseUrl, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("4khdhub");
-  const url = `${baseUrl + filter}/page/${page}.html`;
+  const url = `${baseUrl + filter}/page/${page}`;
   console.log("4khdhubGetPosts url", url);
   return posts({ url, signal, cheerio });
 };
@@ -33,7 +33,7 @@ export const getSearchPosts = async function ({
 }): Promise<Post[]> {
   const { getBaseUrl, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("4khdhub");
-  const url = `${baseUrl}/page/${page}.html?s=${searchQuery}`;
+  const url = `${baseUrl}/page/${page}?s=${searchQuery}`;
   return posts({ url, signal, cheerio });
 };
 
