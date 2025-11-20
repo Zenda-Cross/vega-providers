@@ -33,7 +33,11 @@ export const getSearchPosts = async function ({
 }): Promise<Post[]> {
   const { getBaseUrl, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("4khdhub");
-  const url = `${baseUrl}/page/${page}?s=${searchQuery}`;
+  const url =
+    page == 1
+      ? `${baseUrl}/?s=${searchQuery}`
+      : `${baseUrl}/page/${page}?s=${searchQuery}`;
+  console.log("4khdhubGetSearchPosts url", url);
   return posts({ url, signal, cheerio });
 };
 
