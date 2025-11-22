@@ -1,7 +1,7 @@
 export const catalog = [
   {
     title: "Home",
-    filter: "/category/new-movies-10810.html",
+    filter: "",
   },
   {
     title: "Latest TV Shows",
