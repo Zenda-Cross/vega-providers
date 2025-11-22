@@ -426,7 +426,7 @@
   {
     "display_name": "DesireMovie",
     "value": "DesireMovie",
-    "version": "1.001",
+    "version": "1.002",
     "icon": "",
     "type": "global",
     "disabled": false 
@@ -458,7 +458,7 @@
   {
     "display_name": "HubMovies",
     "value": "HubMovies",
-    "version": "1.0",
+    "version": "1.01",
     "icon": "",
     "type": "global",
     "disabled": false 
@@ -482,6 +482,7 @@
  
   
 ]
+
 
 
 
