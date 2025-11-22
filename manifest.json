@@ -478,10 +478,19 @@
     "icon": "",
     "type": "global",
     "disabled": false 
+  },
+  {
+    "display_name": "Movies4u",
+    "value": "movies4u",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false 
   }
  
   
 ]
+
 
 
 
