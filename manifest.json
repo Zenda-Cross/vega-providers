@@ -82,7 +82,7 @@
   {
     "display_name": "CinemaLuxe",
     "value": "cinemaLuxe",
-    "version": "1.81",
+    "version": "1.82",
     "icon": "",
     "type": "global",
     "disabled": false 
@@ -482,6 +482,7 @@
  
   
 ]
+
 
 
 
