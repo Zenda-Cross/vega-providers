@@ -141,6 +141,22 @@ export const getStream = async function ({
     } catch (err) {
       console.log("ResumeBot link not found", err);
     }
+    // Base page worker
+    try {
+      const baseWorkerStream = $drive(".btn-success");
+      baseWorkerStream.each((i, el) => {
+        const link = (el as any).attribs?.href;
+        if (link) {
+          servers.push({
+            server: "Resume Worker " + (i + 1),
+            link: link,
+            type: "mkv",
+          });
+        }
+      });
+    } catch (err) {
+      console.log("Base page worker link not found", err);
+    }
     // CF workers type 1
     try {
       const cfWorkersLink = driveLink.replace("/file", "/wfile") + "?type=1";
@@ -185,37 +201,69 @@ export const getStream = async function ({
 
     // gdrive
 
-    //instant link
+    //*******
+    //instant link 1
+    //*******
+    // try {
+    //   const seed = $drive(".btn-danger").attr("href") || "";
+    //   const instantToken = seed.split("=")[1];
+    //   console.log("InstantToken", instantToken);
+    //   const InstantFromData = new FormData();
+    //   InstantFromData.append("keys", instantToken);
+    //   const videoSeedUrl = seed.split("/").slice(0, 3).join("/") + "/api";
+    //   console.log("videoSeedUrl", videoSeedUrl);
+    //   const instantLinkRes = await fetch(videoSeedUrl, {
+    //     method: "POST",
+    //     body: InstantFromData,
+    //     headers: {
+    //       "x-token": videoSeedUrl,
+    //     },
+    //   });
+    //   const instantLinkData = await instantLinkRes.json();
+    //   //   console.log('instantLinkData', instantLinkData);
+    //   if (instantLinkData.error === false) {
+    //     const instantLink = instantLinkData.url;
+    //     servers.push({
+    //       server: "Gdrive-Instant",
+    //       link: instantLink,
+    //       type: "mkv",
+    //     });
+    //   } else {
+    //     console.log("Instant link not found", instantLinkData);
+    //   }
+    // } catch (err) {
+    //   console.log("Instant link not found", err);
+    // }
+
+    //*******
+    //instant link 2
+    //*******
     try {
       const seed = $drive(".btn-danger").attr("href") || "";
-      const instantToken = seed.split("=")[1];
-      //   console.log('InstantToken', instantToken);
-      const InstantFromData = new FormData();
-      InstantFromData.append("keys", instantToken);
-      const videoSeedUrl = seed.split("/").slice(0, 3).join("/") + "/api";
-      //   console.log('videoSeedUrl', videoSeedUrl);
-      const instantLinkRes = await fetch(videoSeedUrl, {
-        method: "POST",
-        body: InstantFromData,
-        headers: {
-          "x-token": videoSeedUrl,
-        },
+      const newLinkRes = await fetch(seed, {
+        method: "HEAD",
+        headers,
+        redirect: "manual",
       });
-      const instantLinkData = await instantLinkRes.json();
-      //   console.log('instantLinkData', instantLinkData);
-      if (instantLinkData.error === false) {
-        const instantLink = instantLinkData.url;
-        servers.push({
-          server: "Gdrive-Instant",
-          link: instantLink,
-          type: "mkv",
-        });
+      let newLink = seed;
+      if (newLinkRes.status >= 300 && newLinkRes.status < 400) {
+        newLink = newLinkRes.headers.get("location") || seed;
+      } else if (newLinkRes.url && newLinkRes.url !== seed) {
+        // Fallback: check if URL changed (redirect was followed)
+        newLink = newLinkRes.url || newLinkRes.url;
       } else {
-        console.log("Instant link not found", instantLinkData);
+        newLink = newLinkRes.headers.get("location") || seed;
       }
+      console.log("Gdrive-Instant-2 link", newLink?.split("?url=")[1]);
+      servers.push({
+        server: "Gdrive-Instant-2",
+        link: newLink?.split("?url=")[1] || newLink,
+        type: "mkv",
+      });
     } catch (err) {
       console.log("Instant link not found", err);
     }
+
     return servers;
   } catch (err) {
     console.log("getStream error", err);

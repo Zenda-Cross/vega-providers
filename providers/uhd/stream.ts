@@ -42,6 +42,7 @@ export const getStream = async ({
     const driveRes = await axios.get(driveLink, { headers });
     const driveHtml = driveRes.data;
     const $drive = cheerio.load(driveHtml);
+
     //instant link
     try {
       const seed = $drive(".btn-danger").attr("href") || "";
@@ -74,6 +75,35 @@ export const getStream = async ({
       console.log("Instant link not found", err);
     }
 
+    //*******
+    //instant link 2
+    //*******
+    try {
+      const seed = $drive(".btn-danger").attr("href") || "";
+      const newLinkRes = await fetch(seed, {
+        method: "HEAD",
+        headers,
+        redirect: "manual",
+      });
+      let newLink = seed;
+      if (newLinkRes.status >= 300 && newLinkRes.status < 400) {
+        newLink = newLinkRes.headers.get("location") || seed;
+      } else if (newLinkRes.url && newLinkRes.url !== seed) {
+        // Fallback: check if URL changed (redirect was followed)
+        newLink = newLinkRes.url || newLinkRes.url;
+      } else {
+        newLink = newLinkRes.headers.get("location") || seed;
+      }
+      console.log("Gdrive-Instant-2 link", newLink?.split("?url=")[1]);
+      ServerLinks.push({
+        server: "Gdrive-Instant-2",
+        link: newLink?.split("?url=")[1] || newLink,
+        type: "mkv",
+      });
+    } catch (err) {
+      console.log("Instant link not found", err);
+    }
+
     // resume link
     try {
       const resumeDrive = driveLink.replace("/file", "/zfile");
@@ -92,6 +122,23 @@ export const getStream = async ({
       }
     } catch (err) {
       console.log("Resume link not found");
+    }
+
+    // Base page worker
+    try {
+      const baseWorkerStream = $drive(".btn-success");
+      baseWorkerStream.each((i, el) => {
+        const link = (el as any).attribs?.href;
+        if (link) {
+          ServerLinks.push({
+            server: "Resume Worker " + (i + 1),
+            link: link,
+            type: "mkv",
+          });
+        }
+      });
+    } catch (err) {
+      console.log("Base page worker link not found", err);
     }
 
     // CF workers type 1
