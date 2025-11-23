@@ -14,9 +14,28 @@ export const getMeta = async function ({
     const data = res.data;
     const $ = cheerio.load(data);
     const meta = {
-      title: $(".imdbwp__title").text(),
-      synopsis: $(".imdbwp__teaser").text(),
-      image: $(".imdbwp__thumb").find("img").attr("src") || "",
+      title:
+        $(".imdbwp__title").text() ||
+        $("strong:contains('Full Name:')")
+          .parent()
+          .clone()
+          .children()
+          .remove()
+          .end()
+          .text()
+          .trim(),
+      synopsis:
+        $(".imdbwp__teaser").text() ||
+        $(".liTOue").children("p").first().text(),
+      image:
+        $(".imdbwp__thumb").find("img").attr("src") ||
+        $("span:contains('ScreenShots:')")
+          .parent()
+          .next("p")
+          .children("img")
+          .first()
+          .attr("src") ||
+        "",
       imdbId: $(".imdbwp__link").attr("href")?.split("/")[4] || "",
       type: $(".thecontent").text().toLocaleLowerCase().includes("season")
         ? "series"
