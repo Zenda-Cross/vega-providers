@@ -1,4 +1,3 @@
-
 import { ProviderContext, Stream } from "../types";
 
 const headers = {
@@ -38,6 +37,10 @@ export async function getStream({
   try {
     const streamLinks: Stream[] = [];
     console.log("dotlink", link);
+    if (link.includes("zcloud") || link.includes("zeecloud") || link.includes("zee-cloud")) {
+      // Directly use hubcloud extractor
+      return await hubcloudExtracter(link, signal);
+    }
     if (type === "movie") {
       // vlink
       const dotlinkRes = await axios(`${link}`, { headers });
