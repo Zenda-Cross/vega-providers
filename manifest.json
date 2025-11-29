@@ -486,10 +486,19 @@
     "icon": "",
     "type": "global",
     "disabled": false 
+  },
+  {
+    "display_name": "AnimeSalt",
+    "value": "AnimeSalt",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false 
   }
  
   
 ]
+
 
 
 
