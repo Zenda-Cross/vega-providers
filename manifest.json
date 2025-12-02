@@ -122,7 +122,7 @@
   {
     "display_name": "PrimeMirror",
     "value": "primeMirror",
-    "version": "1.7",
+    "version": "1.8",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -506,6 +506,7 @@
  
   
 ]
+
 
 
 
