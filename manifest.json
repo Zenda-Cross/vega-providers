@@ -394,7 +394,7 @@
   {
     "display_name": "moviesflix",
     "value": "moviesflix",
-    "version": "1.0",
+    "version": "1.1",
     "icon": "",
     "type": "india",
     "disabled": false
@@ -506,6 +506,7 @@
  
   
 ]
+
 
 
 
