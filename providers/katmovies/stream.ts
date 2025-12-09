@@ -5,7 +5,11 @@ async function extractKmhdLink(
   providerContext: ProviderContext
 ) {
   const { axios } = providerContext;
-  const res = await axios.get(katlink);
+  const res = await axios.get(katlink, {
+    headers: {
+      Cookie: "unlocked=true",
+    },
+  });
   const data = res.data;
   const hubDriveRes = data.match(/hubdrive_res:\s*"([^"]+)"/)[1];
   const hubDriveLink = data.match(

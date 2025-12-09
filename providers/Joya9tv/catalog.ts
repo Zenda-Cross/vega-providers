@@ -1,7 +1,7 @@
 export const catalog = [
   {
-    title: "Latest",
-    filter: "", // baseUrl se latest page fetch hoga
+    title: "Hollywood-Movies",
+    filter: "genre/hollywood-movies/", // baseUrl se latest page fetch hoga
   },
   {
     title: "Bangali-Movies",

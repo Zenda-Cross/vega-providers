@@ -145,7 +145,6 @@ export const getMeta = async function ({
           title: fullTitle,
           quality: quality.replace(/[^0-9p]/g, ""), // Clean to just 480p, 720p, 1080p
           // The direct link is to a page that lists all episodes, so it acts as the episodesLink
-          episodesLink: directLink,
           directLinks,
         });
       }

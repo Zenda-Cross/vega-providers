@@ -107,7 +107,6 @@ export const getMeta = async function ({
           const titleText = `Download ${quality} ${size}`.trim();
           linkList.push({
             title: titleText,
-            episodesLink: href,
             quality: quality || "AUTO",
             directLinks: [
               {
@@ -129,7 +128,6 @@ export const getMeta = async function ({
         if (href) {
           linkList.push({
             title: titleText,
-            episodesLink: href,
             quality,
             directLinks: [
               {
