@@ -8,10 +8,8 @@
   "main": "index.js",
   "scripts": {
     "test": "node test-providers.js",
+    "test:single": "node test-providers.js",
     "test:provider": "node test-provider.js",
-    "test:provider:build": "npm run build && node test-provider.js",
-    "test:interactive": "npm run build && node interactive-test.js",
-    "test:quick": "npm run build && node quick-test.js",
     "test:ui": "npm run test:interactive",
     "build": "node build-simple.js",
     "build:dev": "cross-env SKIP_MINIFY=true node build-simple.js",
