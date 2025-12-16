@@ -418,7 +418,7 @@
   {
     "display_name": "mkvhub",
     "value": "mkvhub",
-    "version": "1.01",
+    "version": "1.02",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -514,6 +514,7 @@
  
   
 ]
+
 
 
 
