@@ -234,7 +234,7 @@
   {
     "display_name": "Dooflix",
     "value": "dooflix",
-    "version": "1.7",
+    "version": "1.8",
     "icon": "",
     "type": "india",
     "disabled": false
@@ -514,6 +514,7 @@
  
   
 ]
+
 
 
 
