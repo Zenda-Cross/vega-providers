@@ -178,7 +178,7 @@
   {
     "display_name": "RidoMovies",
     "value": "ridoMovies",
-    "version": "1.3",
+    "version": "1.4",
     "icon": "",
     "type": "english",
     "disabled": false
@@ -514,6 +514,7 @@
  
   
 ]
+
 
 
 
