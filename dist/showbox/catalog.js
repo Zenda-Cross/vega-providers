@@ -1,1 +1,1 @@
-"use strict";Object.defineProperty(exports,"__esModule",{value:!0}),exports.genres=exports.catalog=void 0,exports.catalog=[{title:"Home",filter:"category/movies-by-quality/1080p/"},{title:"Movies",filter:"category/hindi-dubbed-movies/"}],exports.genres=[];
+"use strict";Object.defineProperty(exports,"__esModule",{value:!0}),exports.genres=exports.catalog=void 0,exports.catalog=[{title:"Home",filter:""},{title:"fantasy",filter:"genre/fantasy/"}],exports.genres=[];
