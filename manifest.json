@@ -274,7 +274,7 @@
   {
     "display_name": "HDMovie2",
     "value": "MovieTP",
-    "version": "1.3",
+    "version": "1.4",
     "icon": "",
     "type": "india",
     "disabled": false
@@ -514,6 +514,7 @@
  
   
 ]
+
 
 
 
