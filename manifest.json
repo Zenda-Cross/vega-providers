@@ -157,7 +157,7 @@
     "version": "1.0",
     "icon": "",
     "type": "english",
-    "disabled": true
+    "disabled": false
   },
   {
     "display_name": "MoviezWap",
@@ -514,6 +514,7 @@
  
   
 ]
+
 
 
 
