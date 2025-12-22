@@ -3,9 +3,9 @@
     "display_name": "VegaMovies",
     "value": "vega",
     "version": "1.9.05",
-    "icon": "",
+    "icon": "https://vegamovies.careers//templates/vegamovies/images/v-l.png",
     "type": "global",
-    "category": "movie",
+    "category": "movie/tvshow",
     "disabled": false
   },
   {
@@ -547,6 +547,7 @@
  
   
 ]
+
 
 
 
