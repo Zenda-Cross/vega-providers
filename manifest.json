@@ -336,7 +336,7 @@
     "display_name": "cinevood",
     "value": "cinevood",
     "version": "1.5",
-    "icon": "",
+    "icon": "https://1cinevood.fyi/wp-content/uploads/2020/07/favicon2.png",
     "type": "india",
     "category": "movie/tvshow",
     "disabled": false
@@ -345,7 +345,7 @@
     "display_name": "Filmyzilla",
     "value": "Filmyzilla",
     "version": "1.1",
-    "icon": "",
+    "icon": "https://www.ofilmyzilla.dog/templates/images/fev.png",
     "type": "india",
     "category": "movie/tvshow",
     "disabled": false
@@ -354,7 +354,7 @@
     "display_name": "bolly4u",
     "value": "bolly4u",
     "version": "1.5",
-    "icon": "",
+    "icon": "https://bolly4u.deals//templates/bolly4u/images/favicon-16x16.png",
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false
@@ -614,6 +614,7 @@
  
   
 ]
+
 
 
 
