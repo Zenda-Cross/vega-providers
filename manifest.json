@@ -48,7 +48,7 @@
     "display_name": "World4uFree",
     "value": "world4u",
     "version": "1.2",
-    "icon": "",
+    "icon": "https://worldfree4u.army/wp-content/themes/worldfree4u/assets/favicon-32x32.png",
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false
@@ -57,16 +57,16 @@
     "display_name": "KatMoviesHd",
     "value": "katmovies",
     "version": "1.1",
-    "icon": "",
+    "icon": "https://katmoviehd.pictures/wp-content/uploads/2019/03/android-icon-144x144-2-55x55.png",
     "type": "global",
-    "category": "movie/tvshow",
+    "category": "tvshow",
     "disabled": false
   },
   {
     "display_name": "MoviesMod",
     "value": "mod",
     "version": "1.2",
-    "icon": "",
+    "icon": "https://moviesmod.cards/wp-content/uploads/2024/06/favicon-3-200x200.png",
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false
@@ -75,8 +75,8 @@
     "display_name": "UHDMovies",
     "value": "uhd",
     "version": "1.1",
-    "icon": "",
-    "type": "global",
+    "icon": "https://uhdmovies.biz//templates/uhdmovies/images/cropped-output-onlinepngtools-1-32x32.png",
+    "type": "india",
     "category": "movie/tvshow",
     "disabled": false
   },
@@ -86,14 +86,14 @@
     "version": "1.2.01",
     "icon": "",
     "type": "global",
-    "category": "movie/tvshow",
+    "category": "tvshow",
     "disabled": false
   },
   {
     "display_name": "CinemaLuxe",
     "value": "cinemaLuxe",
     "version": "1.83",
-    "icon": "",
+    "icon": "https://cinemalux.tel/wp-content/uploads/2025/03/cropped-icons8-film-reel-48-192x192.png",
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false 
@@ -102,8 +102,8 @@
     "display_name": "FilmyFly",
     "value": "filmyfly",
     "version": "1.0",
-    "icon": "",
-    "type": "global",
+    "icon": "/templates/filmyfly/images/TBLFavi.png",
+    "type": "india",
     "category": "movie/tvshow",
     "disabled": false
   },
@@ -114,13 +114,13 @@
     "icon": "",
     "type": "global",
     "category": "movie/tvshow",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "Ringz",
     "value": "ringz",
     "version": "1.0",
-    "icon": "",
+    "icon": "https://ringzapk.com/favicon.jpg",
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false
@@ -138,8 +138,8 @@
     "display_name": "PrimeMirror",
     "value": "primeMirror",
     "version": "1.9",
-    "icon": "",
-    "type": "global",
+    "icon": "https://m.media-amazon.com/images/G/01/digital/video/DVUI/favicons/mstile-70x70.png",
+    "type": "india",
     "category": "movie/tvshow",
     "disabled": false
   },
@@ -147,7 +147,7 @@
     "display_name": "HdHub4u",
     "value": "hdhub4u",
     "version": "1.2",
-    "icon": "",
+    "icon": "https://hdhub4u.lt/wp-content/uploads/2025/09/cropped-favicon-192x192.png",
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false
@@ -613,6 +613,7 @@
  
   
 ]
+
 
 
 
