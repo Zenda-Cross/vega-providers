@@ -5,6 +5,7 @@
     "version": "1.9.05",
     "icon": "",
     "type": "global",
+    "category": "movie",
     "disabled": false
   },
   {
@@ -546,6 +547,7 @@
  
   
 ]
+
 
 
 
