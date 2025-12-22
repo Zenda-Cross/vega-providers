@@ -84,7 +84,7 @@
     "display_name": "ProtonMovies",
     "value": "protonMovies",
     "version": "1.2.01",
-    "icon": "",
+    "icon": "https://static-bmc.pages.dev/apple-touch-icon.png",
     "type": "global",
     "category": "tvshow",
     "disabled": false
@@ -183,7 +183,7 @@
     "display_name": "MoviezWap",
     "value": "moviezwap",
     "version": "1.1",
-    "icon": "",
+    "icon": "https://www.moviezwap.zip//images/favicon.ico",
     "type": "india",
     "category": "movie/tvshow",
     "disabled": false
@@ -192,8 +192,8 @@
     "display_name": "ShowBox",
     "value": "showbox",
     "version": "1.3",
-    "icon": "",
-    "type": "english",
+    "icon": "https://www.showbox.media//favicon.ico",
+    "type": "india",
     "category": "movie/tvshow",
     "disabled": false
   },
@@ -201,7 +201,7 @@
     "display_name": "RidoMovies",
     "value": "ridoMovies",
     "version": "1.4",
-    "icon": "",
+    "icon": "https://ridomovies.tv/channels/favicon.png",
     "type": "english",
     "category": "movie/tvshow",
     "disabled": false
@@ -210,15 +210,16 @@
     "display_name": "FlixHQ",
     "value": "flixhq",
     "version": "1.4",
-    "icon": "",
+    "icon": "https://img.flixhq-tv.lol/xxrz/100x100/100/bc/3c/bc3c462f0fb1b1c71288170b3bd55aeb/bc3c462f0fb1b1c71288170b3bd55aeb.png",
     "type": "global",
+    "category": "movie/tvshow",
     "disabled": false
   },
   {
     "display_name": "Primewire",
     "value": "primewire",
     "version": "1.0",
-    "icon": "",
+    "icon": "https://newprimewire.org/images/favicon.png",
     "type": "english",
     "category": "movie/tvshow",
     "disabled": false
@@ -227,43 +228,43 @@
     "display_name": "HiAnime",
     "value": "hiAnime",
     "version": "1.2",
-    "icon": "",
-    "type": "global",
-    "category": "movie/tvshow",
+    "icon": "https://hianime.tv/proxy/favicon.png",
+    "type": "india",
+    "category": "anime",
     "disabled": false
   },
   {
     "display_name": "Animetsu",
     "value": "animetsu",
     "version": "1.2",
-    "icon": "",
+    "icon": "https://animetsu.cc//favicon-32x32.png",
     "type": "english",
-    "category": "movie/tvshow",
+    "category": "anime",
     "disabled": false
   },
   {
     "display_name": "TokyoInsider",
     "value": "tokyoInsider",
     "version": "1.0",
-    "icon": "",
-    "type": "english",
-    "category": "movie/tvshow",
+    "icon": "https://www.tokyoinsider.com/favicon.ico",
+    "type": "asian",
+    "category": "kdrama",
     "disabled": false
   },
   {
     "display_name": "KissKh",
     "value": "kissKh",
     "version": "1.0",
-    "icon": "",
-    "type": "english",
-    "category": "movie/tvshow",
+    "icon": "https://kisskh.ws//assets/icons/icon-192x192.png",
+    "type": "asian",
+    "category": "kdrama",
     "disabled": false
   },
   {
     "display_name": "Dooflix",
     "value": "dooflix",
     "version": "1.9",
-    "icon": "",
+    "icon": "https://dooflixapk.com/files/dooflix_favicon_hd_.webp",
     "type": "india",
     "category": "movie/tvshow",
     "disabled": false
@@ -272,7 +273,7 @@
     "display_name": "RogMovies",
     "value": "luxMovies",
     "version": "1.5",
-    "icon": "",
+    "icon": "https://rogmovies.in/favicon.png",
     "type": "india",
     "category": "movie/tvshow",
     "disabled": false
@@ -281,7 +282,7 @@
     "display_name": "TopMovies",
     "value": "topmovies",
     "version": "1.1",
-    "icon": "",
+    "icon": "https://moviesleech.eu/wp-content/uploads/2024/06/favicon.png",
     "type": "india",
     "category": "movie/tvshow",
     "disabled": false
@@ -290,7 +291,7 @@
     "display_name": "GuardaHD",
     "value": "guardahd",
     "version": "1.1",
-    "icon": "",
+    "icon": "https://gardavideo.com/assets/img/favicon.png",
     "type": "italy",
     "category": "movie/tvshow",
     "disabled": false
@@ -299,7 +300,7 @@
     "display_name": "MovieTP",
     "value": "HDMovie2",
     "version": "1.4",
-    "icon": "",
+    "icon": "https://movietp.net/img/movietp.webp",
     "type": "india",
     "category": "movie/tvshow",
     "disabled": false
@@ -317,9 +318,9 @@
     "display_name": "pikahd",
     "value": "pikahd",
     "version": "1.2",
-    "icon": "",
-    "type": "india",
-    "category": "movie/tvshow",
+    "icon": "https://pikahd.eu/wp-content/uploads/2020/07/cropped-plkd-32x32.png",
+    "type": "global",
+    "category": "tvshow",
     "disabled": false
   },
   {
@@ -613,6 +614,7 @@
  
   
 ]
+
 
 
 
