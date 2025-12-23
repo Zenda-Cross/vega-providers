@@ -610,10 +610,20 @@
     "type": "global",
     "category": "anime",
     "disabled": false  
+  },
+  {
+    "display_name": "AnimeHeaven",
+    "value": "animeheaven",
+    "version": "1.0",
+    "icon": "https://animeheaven.me/og.png",
+    "type": "global",
+    "category": "anime",
+    "disabled": false
   }
  
   
 ]
+
 
 
 
