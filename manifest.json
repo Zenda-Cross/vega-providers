@@ -619,10 +619,20 @@
     "type": "global",
     "category": "anime",
     "disabled": false
+  },
+  {
+    "display_name": "Tamilian",
+    "value": "tamilian",
+    "version": "1.0",
+    "icon": "https://tamilian.io/favicon.ico",
+    "type": "tamil",
+    "category": "movie/tvshow",
+    "disabled": false
   }
  
   
 ]
+
 
 
 
