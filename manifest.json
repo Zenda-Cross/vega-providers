@@ -209,7 +209,7 @@
   {
     "display_name": "FlixHQ",
     "value": "flixhq",
-    "version": "1.5",
+    "version": "1.6",
     "icon": "https://img.flixhq-tv.lol/xxrz/100x100/100/bc/3c/bc3c462f0fb1b1c71288170b3bd55aeb/bc3c462f0fb1b1c71288170b3bd55aeb.png",
     "type": "global",
     "category": "movie/tvshow",
@@ -650,6 +650,7 @@
  
   
 ]
+
 
 
 
