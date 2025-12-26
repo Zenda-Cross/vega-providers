@@ -21,9 +21,19 @@ export const getStream = async ({
 
     const tmdbId: string | number =
       payload.tmdbId ?? payload.id ?? payload.tmdId ?? "";
+    const imdbId: string = payload.imdbId ?? "";
     const season: string = payload.season ?? "";
     const episode: string = payload.episode ?? "";
     const effectiveType: string = payload.type ?? type ?? "movie";
+
+    await getWebstreamerStream(
+      String(imdbId),
+      episode,
+      season,
+      effectiveType,
+      streams,
+      providerContext
+    );
 
     await getRiveStream(
       String(tmdbId),
@@ -40,6 +50,47 @@ export const getStream = async ({
   }
 };
 
+///////// Webstreamer
+export async function getWebstreamerStream(
+  imdbId: string,
+  episode: string,
+  season: string,
+  type: string,
+  Streams: Stream[],
+  providerContext: ProviderContext
+) {
+  if (!imdbId || imdbId === "undefined") return;
+  const url = `https://webstreamr.hayd.uk/{"multi":"on","al":"on","de":"on","es":"on","fr":"on","hi":"on","it":"on","mx":"on","mediaFlowProxyUrl":"","mediaFlowProxyPassword":""}/stream/${type}/${imdbId}${
+    type === "series" ? `:${season}:${episode}` : ""
+  }.json`;
+
+  console.log("Webstreamer URL: ", encodeURI(url));
+  try {
+    const res = await providerContext.axios.get(encodeURI(url), {
+      timeout: 5000,
+      headers: providerContext.commonHeaders,
+    });
+    res.data?.streams.forEach((source: any) => {
+      const url = source?.url;
+      const name = source?.name || "WebStreamer";
+      // Infer type from URL
+      const qualityMatch = name?.match(/(\d{3,4})p/);
+      const quality = qualityMatch
+        ? (qualityMatch[1] as "360" | "480" | "720" | "1080" | "2160")
+        : undefined;
+      Streams.push({
+        server: name,
+        link: url,
+        type,
+        quality,
+      });
+    });
+  } catch (e) {
+    throw e;
+  }
+}
+
+// // Rive Stream Fetcher
 export async function getRiveStream(
   tmdId: string,
   episode: string,
@@ -55,15 +106,13 @@ export async function getRiveStream(
   const secret = generateSecretKey(tmdId);
   const servers = [
     "flowcast",
-    "primevids",
-    "humpy",
-    "loki",
     "asiacloud",
+    "humpy",
+    "primevids",
     "shadow",
     "hindicast",
     "animez",
     "aqua",
-    "voyager",
     "yggdrasil",
     "putafilme",
     "ophim",
@@ -84,7 +133,6 @@ export async function getRiveStream(
       try {
         const res = await providerContext.axios.get(url + server, {
           timeout: 4000,
-          headers: providerContext.commonHeaders,
         });
         const subtitles: TextTracks = [];
         // if (res.data?.data?.captions) {
@@ -119,108 +167,78 @@ export async function getRiveStream(
 }
 
 function generateSecretKey(id: number | string) {
-  // Array of secret key fragments from the provided implementation
+  // Updated array from module 2873 in the provided source
   const c = [
-    "oYRu3JJ5g1C",
-    "TRlWJIJXT",
-    "RuoyGA0udvsFVXr",
-    "Y4s2LNM4y",
-    "wHzuSgl0fD",
-    "MGLTaSGs",
-    "rr0rSBIYfwutV7E",
-    "ABJXC9c",
-    "W2BuY0yDB9CcK",
-    "3yvZP1OJuTM",
-    "YDoqbu6zdN0zT",
-    "rnNQ2a5OBaMu",
-    "eSKa1Uy",
-    "QsIV8J472Xa",
-    "cPfTgu27",
-    "j4mzadQCou9",
-    "qHLZbLrZQfB",
-    "8U9YP6hrTz4cJNQ",
-    "xbAbu4pzFEXz",
-    "dhuA9zvdw",
-    "k3A1JGmb",
-    "eVC3z4COdUNvvzA",
-    "dwMmuXnrb",
-    "AqpWzY9I1ZmGPR",
-    "VGXWUm0JTetmXs",
-    "gD4sH3CISTanpTs",
-    "d6w8dntV",
-    "iL6dvSNqEab4kd",
-    "mIB8NFtmPjnX1kM",
-    "F4PXdP0Hx3",
-    "5Fijua4Z7C",
-    "wPGnHJrkYa1Tu4P",
-    "pjrfBfTf",
-    "vswQDEbM0y64io",
-    "LAnpQuk6hR2bEWs",
-    "kX8orxNnkK",
-    "mRsZ5fjHbC8YuT",
-    "JnBr1jr",
-    "2twFGU5PgvDmKdP",
-    "3wCg6zYtHFjy",
-    "gaQSJhixHiy1pa8",
-    "pE2cXTP0GPX",
-    "xr0ONW3sOnCRdt",
-    "QZu43flHFsebX",
-    "yrvtqRTOnHo",
-    "kvXEs16lgj",
-    "AGwT2zpQVHCMb09",
-    "M4BxOh3z2JgC",
-    "5hbV7briYC7",
-    "YfHMsm0",
-    "jC9PAPfz34Vgc",
-    "ExoJ1tgEXpK",
-    "eD8WPA4Lmsyf4W",
-    "h7WSlhT7iNOj",
-    "RRP61kk",
-    "QtY0f1aN",
-    "TlatGjcOQjup",
-    "MfpeEGbjouYSOa",
-    "Zz0Qh8B0pwUkdRT",
-    "Y4SkLSQNU",
-    "hOk01KFeEVbNRZx",
-    "fyf4H8MXazm3oY",
-    "Z116B9F2p",
-    "GdxNJOnvdz",
-    "kqVNNHfP",
-    "IO3hhNu",
-    "qDdC9Lcllce",
-    "Et7lLOg",
-    "6ZlQrvfgZu",
-    "YXHLeZBF",
-    "NH6nAd7y",
-    "ARsut59gfK6j0v",
-    "jPE2KXiJjnSsjn",
-    "qYcG5HOJc3TtxM",
-    "C2w06YGj5C",
-    "kHx1pT7",
-    "2enXfHXw",
-    "koFHBiR054aizN",
-    "Uj53XTQ92Ntbq7K",
-    "QjC5euFYi2AuxWb",
-    "njLwvdMejA",
-    "NWMzrwTAVZEb",
-    "s4sVqC0AyTM5h",
-    "pu01jeZ6AoH",
-    "SgiOfwx9qkR",
-    "grjsLtBNn9eTQg",
-    "XABTTaYgihZk2mq",
-    "2vlSCZQc3HT27F4",
-    "kQZ7VQfEL3TC7P",
-    "MEzqVne021W",
-    "BLYPZp2SIO",
-    "5zDMVoqw4nH",
-    "t14S9uLuGKX7Lb5",
-    "4McODHAYTyp",
-    "EAoxL5UKvMPqjH3",
-    "hJpAbqp",
-    "tcj63Wpz",
-    "hGqEu0LxKkMv46P",
-    "u2wNvb8ou19N3",
-    "wUKY6Opi1kH",
+    "4Z7lUo",
+    "gwIVSMD",
+    "PLmz2elE2v",
+    "Z4OFV0",
+    "SZ6RZq6Zc",
+    "zhJEFYxrz8",
+    "FOm7b0",
+    "axHS3q4KDq",
+    "o9zuXQ",
+    "4Aebt",
+    "wgjjWwKKx",
+    "rY4VIxqSN",
+    "kfjbnSo",
+    "2DyrFA1M",
+    "YUixDM9B",
+    "JQvgEj0",
+    "mcuFx6JIek",
+    "eoTKe26gL",
+    "qaI9EVO1rB",
+    "0xl33btZL",
+    "1fszuAU",
+    "a7jnHzst6P",
+    "wQuJkX",
+    "cBNhTJlEOf",
+    "KNcFWhDvgT",
+    "XipDGjST",
+    "PCZJlbHoyt",
+    "2AYnMZkqd",
+    "HIpJh",
+    "KH0C3iztrG",
+    "W81hjts92",
+    "rJhAT",
+    "NON7LKoMQ",
+    "NMdY3nsKzI",
+    "t4En5v",
+    "Qq5cOQ9H",
+    "Y9nwrp",
+    "VX5FYVfsf",
+    "cE5SJG",
+    "x1vj1",
+    "HegbLe",
+    "zJ3nmt4OA",
+    "gt7rxW57dq",
+    "clIE9b",
+    "jyJ9g",
+    "B5jXjMCSx",
+    "cOzZBZTV",
+    "FTXGy",
+    "Dfh1q1",
+    "ny9jqZ2POI",
+    "X2NnMn",
+    "MBtoyD",
+    "qz4Ilys7wB",
+    "68lbOMye",
+    "3YUJnmxp",
+    "1fv5Imona",
+    "PlfvvXD7mA",
+    "ZarKfHCaPR",
+    "owORnX",
+    "dQP1YU",
+    "dVdkx",
+    "qgiK0E",
+    "cx9wQ",
+    "5F9bGa",
+    "7UjkKrp",
+    "Yvhrj",
+    "wYXez5Dg3",
+    "pG4GMU",
+    "MwMAu",
+    "rFRD5wlM",
   ];
 
   if (id === undefined) {
