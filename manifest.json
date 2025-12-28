@@ -664,10 +664,20 @@
     "type": "japan",
     "category": "anime",
     "disabled": false
+  },
+  {
+    "display_name": "Coflix",
+    "value": "conflix",
+    "version": "1.0",
+    "icon": "https://raw.githubusercontent.com/phisher98/TVVVV/refs/heads/main/Icons/Coflix.png",
+    "type": "france",
+    "category": "movie/tvshow",
+    "disabled": false
   }
  
   
 ]
+
 
 
 
