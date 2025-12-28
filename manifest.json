@@ -648,7 +648,16 @@
     "disabled": false
   },
   {
-    "display_name": "animenosub",
+    "display_name": "Animeluxe",
+    "value": "animeluxe",
+    "version": "1.0",
+    "icon": "https://wb.animeluxe.org/wp-content/uploads/2023/08/apple-touch-icon.png",
+    "type": "arabic",
+    "category": "anime",
+    "disabled": false
+  },
+  {
+    "display_name": "Animenosub",
     "value": "animenosub",
     "version": "1.0",
     "icon": "https://i3.wp.com/animenosub.to/wp-content/uploads/2024/04/cropped-favicon-180x180.png",
@@ -659,6 +668,7 @@
  
   
 ]
+
 
 
 
