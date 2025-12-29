@@ -67,7 +67,7 @@ export async function getWebstreamerStream(
   console.log("Webstreamer URL: ", encodeURI(url));
   try {
     const res = await providerContext.axios.get(encodeURI(url), {
-      timeout: 5000,
+      timeout: 30000,
       headers: providerContext.commonHeaders,
     });
     res.data?.streams.forEach((source: any) => {
@@ -132,7 +132,7 @@ export async function getRiveStream(
       console.log("Rive: " + url + server);
       try {
         const res = await providerContext.axios.get(url + server, {
-          timeout: 4000,
+          timeout: 8000,
         });
         const subtitles: TextTracks = [];
         // if (res.data?.data?.captions) {
