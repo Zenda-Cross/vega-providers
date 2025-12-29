@@ -11,7 +11,7 @@
   {
     "display_name": "MultiStream",
     "value": "autoEmbed",
-    "version": "1.3",
+    "version": "1.4",
     "icon": "https://multistream.pt/en/wp-content/uploads/2021/12/wp_logo_mls_live_white_01-400.png",
     "type": "global",
     "category": "movie/tvshow",
@@ -677,6 +677,7 @@
  
   
 ]
+
 
 
 
