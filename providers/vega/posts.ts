@@ -84,8 +84,8 @@ async function posts(
     });
     const $ = cheerio.load(await urlRes.text());
     const posts: Post[] = [];
-    $(".blog-items,.post-list")
-      ?.children("article")
+    $(".blog-items,.post-list,#archive-container")
+      ?.children("article,.entry-list-item")
       ?.each((index, element) => {
         const post = {
           title: (
