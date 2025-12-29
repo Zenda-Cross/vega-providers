@@ -668,7 +668,7 @@
   {
     "display_name": "Coflix",
     "value": "conflix",
-    "version": "1.0",
+    "version": "1.1",
     "icon": "https://raw.githubusercontent.com/phisher98/TVVVV/refs/heads/main/Icons/Coflix.png",
     "type": "france",
     "category": "movie/tvshow",
@@ -677,6 +677,7 @@
  
   
 ]
+
 
 
 
