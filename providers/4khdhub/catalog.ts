@@ -5,15 +5,15 @@ export const catalog = [
   },
   {
     title: "Latest TV Shows",
-    filter: "/category/new-series-10811",
+    filter: "/category/series",
   },
   {
     title: "Anime",
-    filter: "/category/anime-10812",
+    filter: "/category/anime",
   },
   {
     title: "4K HDR",
-    filter: "/category/4k-hdr-10776",
+    filter: "/category/-2160p-HDR",
   },
 ];
 
