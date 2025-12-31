@@ -673,10 +673,20 @@
     "type": "france",
     "category": "movie/tvshow",
     "disabled": false
+  },
+  {
+    "display_name": "Cinestream",
+    "value": "cinestream",
+    "version": "1.0",
+    "icon": "https://repository-images.githubusercontent.com/879081629/3c21f1d5-5d5b-421d-b033-19a72391cf6b",
+    "type": "global",
+    "category": "movie/tvshow",
+    "disabled": false
   }
  
   
 ]
+
 
 
 
