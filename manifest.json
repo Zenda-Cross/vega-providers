@@ -718,9 +718,19 @@
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false
+  },
+  {
+    "display_name": "Mxplayer",
+    "value": "mxplayer",
+    "version": "1.0",
+    "icon": "https://dfyr469febw8d.cloudfront.net/static/desktop/images/favicon.png",
+    "type": "india",
+    "category": "movie/tvshow",
+    "disabled": false
   }
   
 ]
+
 
 
 
