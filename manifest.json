@@ -727,9 +727,19 @@
     "type": "india",
     "category": "movie/tvshow",
     "disabled": false
+  },
+  {
+    "display_name": "Topcartoon",
+    "value": "topcartoon",
+    "version": "1.0",
+    "icon": "https://www.topcartoons.tv/wp-content/uploads/logo.png",
+    "type": "global",
+    "category": "cartoon",
+    "disabled": false
   }
   
 ]
+
 
 
 
