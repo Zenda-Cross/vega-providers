@@ -1,16 +1,14 @@
 export const catalog = [
   {
     title: "Home",
-    filter: "/mobile/home?app=1",
-  },
-  {
-    title: "Series",
-    filter: "/mobile/series",
+    filter: "home",
   },
   {
     title: "Movies",
-    filter: "/mobile/movies",
+    filter: "movies",
+  },
+  {
+    title: "TV Shows",
+    filter: "tv",
   },
 ];
-
-export const genres = [];
