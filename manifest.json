@@ -128,11 +128,11 @@
   {
     "display_name": "NetflixMirror",
     "value": "netflixMirror",
-    "version": "1.7",
-    "icon": "",
+    "version": "1.0",
+    "icon": "https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2023.ico",
     "type": "global",
     "category": "movie/tvshow",
-    "disabled": true 
+    "disabled": false
   },
   {
     "display_name": "PrimeMirror",
@@ -695,6 +695,7 @@
  
   
 ]
+
 
 
 
