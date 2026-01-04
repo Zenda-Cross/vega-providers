@@ -736,9 +736,19 @@
     "type": "global",
     "category": "cartoon",
     "disabled": false
+  },
+  {
+    "display_name": "Toontales",
+    "value": "toontales",
+    "version": "1.0",
+    "icon": "https://www.toontales.net/wp-content/uploads/cropped-favicon-180x180.png",
+    "type": "english",
+    "category": "cartoon",
+    "disabled": false
   }
   
 ]
+
 
 
 
