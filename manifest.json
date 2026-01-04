@@ -416,7 +416,7 @@
   {
     "display_name": "ogomovies",
     "value": "ogomovies",
-    "version": "1.0",
+    "version": "1.1",
     "icon": "https://ogomovies.cat/wp-content/uploads/cropped-fav-1-192x192.png",
     "type": "tamil",
     "category": "movie/tvshow",
@@ -766,6 +766,7 @@
   }
   
 ]
+
 
 
 
