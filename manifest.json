@@ -691,10 +691,20 @@
     "type": "tamil",
     "category": "movie/tvshow",
     "disabled": false
+  },
+  {
+    "display_name": "Primevideo",
+    "value": "primevideo",
+    "version": "1.0",
+    "icon": "https://m.media-amazon.com/images/G/01/digital/video/DVUI/favicons/mstile-70x70.png",
+    "type": "global",
+    "category": "movie/tvshow",
+    "disabled": false
   }
  
   
 ]
+
 
 
 
