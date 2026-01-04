@@ -745,9 +745,19 @@
     "type": "english",
     "category": "cartoon",
     "disabled": false
+  },
+  {
+    "display_name": "Toonhub",
+    "value": "toonhub",
+    "version": "1.0",
+    "icon": "https://toonhub4u.co/wp-content/uploads/2024/02/cropped-cropped-TOONHUB4U-180x180.jpg",
+    "type": "global",
+    "category": "anime",
+    "disabled": false
   }
   
 ]
+
 
 
 
