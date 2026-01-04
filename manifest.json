@@ -700,10 +700,20 @@
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false
+  },
+  {
+    "display_name": "desny",
+    "value": "desny",
+    "version": "1.0",
+    "icon": "https://static-mh.content.disney.io/matterhorn/assets/logos/disney_logo_dark-baa807690db7.png",
+    "type": "global",
+    "category": "movie/tvshow",
+    "disabled": false
   }
  
   
 ]
+
 
 
 
