@@ -1,0 +1,1 @@
+"use strict";Object.defineProperty(exports,"__esModule",{value:!0}),exports.getEpisodes=void 0;const getEpisodes=({url:url})=>Promise.resolve([{title:"Play",link:url}]);exports.getEpisodes=getEpisodes;

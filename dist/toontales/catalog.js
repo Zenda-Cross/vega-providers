@@ -1,1 +1,1 @@
-
+"use strict";Object.defineProperty(exports,"__esModule",{value:!0}),exports.catalog=void 0,exports.catalog=[{title:"Popeye the Sailor",filter:"series/popeye-the-sailor"},{title:"Disney",filter:"series/disney"},{title:"Looney Tunes",filter:"series/looney-tunes"},{title:"Merrie Melodies",filter:"series/merrie-melodies"}];
