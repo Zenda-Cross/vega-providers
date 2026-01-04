@@ -754,9 +754,19 @@
     "type": "global",
     "category": "anime",
     "disabled": false
+  },
+  {
+    "display_name": "Donghuastream",
+    "value": "donghuastream",
+    "version": "1.0",
+    "icon": "https://i0.wp.com/donghuastream.org/wp-content/uploads/2024/02/donghuastream.png",
+    "type": "english",
+    "category": "donghua",
+    "disabled": false
   }
   
 ]
+
 
 
 
