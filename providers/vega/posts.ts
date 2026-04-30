@@ -39,7 +39,7 @@ export const getPosts = async ({
 
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
   const url = filter
-    ? `${baseUrl}/genre/${filter}/page/${page}/`
+    ? `${baseUrl}/${filter}/page/${page}/`
     : `${baseUrl}/page/${page}/`;
   console.log("vegaGetPosts url:", url);
   return posts(baseUrl, url, signal, headers, axios, cheerio);
