@@ -81,8 +81,6 @@ providers/
 - `cheerio`: For HTML parsing
 - `getBaseUrl`: Helper to get the provider's base URL (base url are generall stored here https://github.com/himanshu8443/providers/blob/main/modflix.json)
 - `commonHeaders`: Standard HTTP headers
-- `extractors`: Shared extractor functions
-- `Aes`: (if needed) for encryption/decryption
 
 This ensures all providers use the same tools and patterns, making code easier to maintain and extend.
 
@@ -260,7 +258,15 @@ linkList: [
 
 This gives you flexibility to support both providers that need extra requests for episodes and those that can return all links up front.
 
-## How to Test Your Provider
+# How to Test Your Provider
+
+## Test with CLI
+1. Run `npm run test -- provider_name` (example: `npm run test -- showbox`)
+   - This will do full testing by picking random posts and episodes and testing end-to-end.
+2. Run `npm run test:provider provider_name function_name` (example: `npm run test:provider showbox getPosts`)
+   - This is for testing a single function, such as getPosts, getSearchPosts, getStream, etc. After entering manually, enter the input.
+
+## Test in App
 
 1. **Start the Dev Server**
 
