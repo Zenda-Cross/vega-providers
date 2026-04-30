@@ -13,7 +13,7 @@ export const catalog = [
   },
   {
     title: "Apple TV+",
-    filter: "web-series/apple-tv/",
+    filter: "web-series/apple-tv",
   },
 ];
 
