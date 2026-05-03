@@ -13,6 +13,9 @@ export async function getStream({
 }) {
   const { axios, cheerio, commonHeaders: headers } = providerContext;
   let hubdriveLink = "";
+  if (link.includes("hubcloud") || link.includes("/drive/")) {
+    return await hubcloudExtractor(link, signal, axios, cheerio, headers);
+  }
   if (link.includes("hubdrive")) {
     const hubdriveRes = await axios.get(link, { headers, signal });
     const hubdriveText = hubdriveRes.data;
@@ -23,8 +26,8 @@ export async function getStream({
     const res = await axios.get(link, { headers, signal });
     const text = res.data;
     const encryptedString = text.split("s('o','")?.[1]?.split("',180")?.[0];
-    const decodedString: any = decodeString(encryptedString);
-    link = atob(decodedString?.o);
+    const decodedString: any = decodeString(encryptedString) || link;
+    link = safeAtob(decodedString?.o) || link;
     const redirectLink = await getRedirectLinks(link, signal, headers);
     const redirectLinkRes = await axios.get(redirectLink, { headers, signal });
     const redirectLinkText = redirectLinkRes.data;
@@ -45,6 +48,7 @@ export async function getStream({
     console.log("hubdriveLink2", hubdriveLink);
   }
   let hubcloudLink = hubdriveLink;
+  console.log("hubdriveLink3", hubdriveLink);
   try {
     const hubdriveLinkRes = await axios.get(hubdriveLink, { headers, signal });
     const hubcloudText = hubdriveLinkRes.data;
@@ -172,6 +176,14 @@ function rot13(str: string) {
     );
   });
 }
+
+const safeAtob = (str: string) => {
+  try {
+    return atob(str);
+  } catch (e) {
+    return null;
+  }
+};
 
 export function decodeString(encryptedString: string) {
   try {

@@ -23,8 +23,10 @@ export async function getStream({
     const res = await axios.get(link, { headers, signal });
     const text = res.data;
     const encryptedString = text.split("s('o','")?.[1]?.split("',180")?.[0];
-    const decodedString: any = decodeString(encryptedString);
-    link = atob(decodedString?.o);
+    const decodedString: any = decodeString(encryptedString) || link;
+    console.log("decodedString", decodedString);
+    link = safeAtob(decodedString?.o) || link;
+    console.log("Decoded link", link);
     const redirectLink = await getRedirectLinks(link, signal, headers);
     console.log("redirectLink", redirectLink);
     if (redirectLink.includes("hubcloud") || redirectLink.includes("/drive/")) {
@@ -175,6 +177,14 @@ function rot13(str: string) {
     );
   });
 }
+
+const safeAtob = (str: string) => {
+  try {
+    return atob(str);
+  } catch (e) {
+    return null;
+  }
+};
 
 export function decodeString(encryptedString: string) {
   try {
