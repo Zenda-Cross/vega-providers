@@ -44,7 +44,50 @@ export async function getStream({
       // console.log('dotlinkText', dotlinkText);
       const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
       // console.log('vLink', vlink[1]);
-      link = vlink[1];
+      if (vlink[1]) {
+        link = vlink[1];
+      } else {
+        // Try to find hubcloud or gdflix links directly
+        const $ = cheerio.load(dotlinkText);
+        const directLink = $("a")
+          .filter((i, el) => {
+            const href = $(el).attr("href") || "";
+            return (
+              href.includes("hubcloud") ||
+              href.includes("gdflix") ||
+              href.includes("filebee") ||
+              href.includes("fastdl")
+            );
+          })
+          .first()
+          .attr("href");
+
+        if (directLink) {
+          link = directLink;
+        }
+      }
+
+      // If it's a fastdl link, extract the redirect URL
+      if (link.includes("fastdl.zip")) {
+        try {
+          const fastdlRes = await axios.get(link, { headers });
+          const reurlMatch = fastdlRes.data.match(/var reurl = "([^"]+)";/);
+          if (reurlMatch && reurlMatch[1]) {
+            const actualLink = reurlMatch[1].replace(
+              "https://fastdl.zip/dl.php?link=",
+              "",
+            );
+            streamLinks.push({
+              server: "fastdl",
+              link: actualLink,
+              type: "mkv",
+            });
+            return streamLinks;
+          }
+        } catch (error) {
+          console.log("fastdl error: ", error);
+        }
+      }
 
       // filepress link
       try {
