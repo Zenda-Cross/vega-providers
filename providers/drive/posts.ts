@@ -56,7 +56,6 @@ async function posts({
       const title = $(element).find(".poster-title").text();
       const link = $(element).parent().attr("href");
       const image = $(element).find(".poster-image img").attr("src");
-      console.log({ title, link, image });
       if (title && link && image) {
         catalog.push({
           title: title.replace("Download", "").trim(),

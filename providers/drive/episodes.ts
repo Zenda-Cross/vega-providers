@@ -74,8 +74,18 @@ export const getEpisodes = async function ({
         }
       });
     }
+    if (episodeLinks.length === 0) {
+      // https://hubcloud.foo/drive/gvdzmpioeeaf8mp
+      // find link contain hubcloud  and have drive in url using regex
+      const hubcloudLink = html.match(
+        /https:\/\/hubcloud\.[^\/]+\/drive\/[^"'\s]+/i,
+      )?.[0];
+      if (hubcloudLink) {
+        episodeLinks.push({ title: "Play", link: hubcloudLink });
+      }
+    }
 
-    // console.log(episodeLinks);
+    console.log("episodeLinks:", episodeLinks);
     return episodeLinks.length > 0
       ? episodeLinks
       : [{ title: "Play", link: url }];

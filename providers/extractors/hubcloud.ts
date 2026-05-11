@@ -5,6 +5,28 @@ const hubcloudDecode = function (value: string) {
   return atob(value.toString());
 };
 
+const getPixelDrainUrl = (html: string) => {
+  const match = html.match(/var\s+pxl\s*=\s*['"]([^'"]+)['"];?/i);
+  return match?.[1] || "";
+};
+
+const getRedirectedPixelDrainUrl = (
+  ...htmlSources: Array<string | undefined>
+) => {
+  for (const html of htmlSources) {
+    if (!html) {
+      continue;
+    }
+
+    const redirectedUrl = getPixelDrainUrl(html);
+    if (redirectedUrl) {
+      return redirectedUrl;
+    }
+  }
+
+  return "";
+};
+
 export async function hubcloudExtractor(
   link: string,
   signal: AbortSignal,
@@ -16,7 +38,7 @@ export async function hubcloudExtractor(
     headers["Cookie"] =
       "ext_name=ojplmecpdpgccookcobabopnaifgidhf; xla=s4t; cf_clearance=woQrFGXtLfmEMBEiGUsVHrUBMT8s3cmguIzmMjmvpkg-1770053679-1.2.1.1-xBrQdciOJsweUF6F2T_OtH6jmyanN_TduQ0yslc_XqjU6RcHSxI7.YOKv6ry7oYo64868HYoULnVyww536H2eVI3R2e4wKzsky6abjPdfQPxqpUaXjxfJ02o6jl3_Vkwr4uiaU7Wy596Vdst3y78HXvVmKdIohhtPvp.vZ9_L7wvWdce0GRixjh_6JiqWmWMws46hwEt3hboaS1e1e4EoWCvj5b0M_jVwvSxBOAW5emFzvT3QrnRh4nyYmKDERnY";
     console.log("hubcloudExtractor", link);
-    console.log("headers", headers);
+    // console.log("headers", headers);
     const baseUrl = link.split("/").slice(0, 3).join("/");
     const streamLinks: any[] = [];
     const vLinkRes = await axios(`${link}`, { headers, signal });
@@ -38,7 +60,8 @@ export async function hubcloudExtractor(
       signal,
       redirect: "follow",
     });
-    const $ = cheerio.load(await vcloudRes.text());
+    const vcloudText = await vcloudRes.text();
+    const $ = cheerio.load(vcloudText);
     // console.log('vcloudRes', $.text());
 
     const linkClass = $(".btn-success.btn-lg.h6,.btn-danger,.btn-secondary");
@@ -48,8 +71,21 @@ export async function hubcloudExtractor(
 
       switch (true) {
         case link?.includes("pixeld"):
+          console.log("Pixeldrain link found:", link);
           if (!link?.includes("api")) {
-            const token = link.split("/").pop();
+            const redirectedPixelDrainUrl = getRedirectedPixelDrainUrl(
+              vLinkText,
+              vcloudText,
+            );
+            if (redirectedPixelDrainUrl) {
+              console.log(
+                "Special case for token negn6f",
+                redirectedPixelDrainUrl,
+              );
+              link = redirectedPixelDrainUrl;
+            }
+
+            const token = link.split("/").pop()?.split("?")[0];
             const baseUrl = link.split("/").slice(0, -2).join("/");
             link = `${baseUrl}/api/file/${token}`;
           }

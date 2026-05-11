@@ -12,12 +12,11 @@ const headers = {
   "sec-ch-ua-platform": '"Windows"',
   "Sec-Fetch-Dest": "document",
   "Sec-Fetch-Mode": "navigate",
-  Cookie: "popads_user_id=6ba8fe60a481387a3249f05aa058822d",
   "Sec-Fetch-Site": "none",
   "Sec-Fetch-User": "?1",
   "Upgrade-Insecure-Requests": "1",
   "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0",
 };
 
 export const getPosts = async function ({
@@ -60,7 +59,7 @@ export const getSearchPosts = async function ({
 async function posts(
   url: string,
   signal: AbortSignal,
-  providerContext: ProviderContext
+  providerContext: ProviderContext,
 ): Promise<Post[]> {
   try {
     const { axios, cheerio } = providerContext;
