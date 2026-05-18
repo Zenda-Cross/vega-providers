@@ -1,1 +1,137 @@
-"use strict";var __defProp=Object.defineProperty,__defProps=Object.defineProperties,__getOwnPropDesc=Object.getOwnPropertyDescriptor,__getOwnPropDescs=Object.getOwnPropertyDescriptors,__getOwnPropNames=Object.getOwnPropertyNames,__getOwnPropSymbols=Object.getOwnPropertySymbols,__hasOwnProp=Object.prototype.hasOwnProperty,__propIsEnum=Object.prototype.propertyIsEnumerable,__defNormalProp=(obj,key,value)=>key in obj?__defProp(obj,key,{enumerable:!0,configurable:!0,writable:!0,value:value}):obj[key]=value,__spreadValues=(a,b)=>{for(var prop in b||(b={}))__hasOwnProp.call(b,prop)&&__defNormalProp(a,prop,b[prop]);if(__getOwnPropSymbols)for(var prop of __getOwnPropSymbols(b))__propIsEnum.call(b,prop)&&__defNormalProp(a,prop,b[prop]);return a},__spreadProps=(a,b)=>__defProps(a,__getOwnPropDescs(b)),__name=(target,value)=>__defProp(target,"name",{value:value,configurable:!0}),__export=(target,all)=>{for(var name in all)__defProp(target,name,{get:all[name],enumerable:!0})},__copyProps=(to,from,except,desc)=>{if(from&&"object"==typeof from||"function"==typeof from)for(let key of __getOwnPropNames(from))__hasOwnProp.call(to,key)||key===except||__defProp(to,key,{get:()=>from[key],enumerable:!(desc=__getOwnPropDesc(from,key))||desc.enumerable});return to},__toCommonJS=mod=>__copyProps(__defProp({},"__esModule",{value:!0}),mod),__async=(__this,__arguments,generator)=>new Promise((resolve,reject)=>{var fulfilled=value=>{try{step(generator.next(value))}catch(e){reject(e)}},rejected=value=>{try{step(generator.throw(value))}catch(e){reject(e)}},step=x=>x.done?resolve(x.value):Promise.resolve(x.value).then(fulfilled,rejected);step((generator=generator.apply(__this,__arguments)).next())}),meta_exports={};__export(meta_exports,{getMeta:()=>getMeta});var headers={Accept:"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7","Cache-Control":"no-store","Accept-Language":"en-US,en;q=0.9",DNT:"1","sec-ch-ua":'"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',"sec-ch-ua-mobile":"?0","sec-ch-ua-platform":'"Windows"',"Sec-Fetch-Dest":"document","Sec-Fetch-Mode":"navigate","Sec-Fetch-Site":"none","Sec-Fetch-User":"?1","Upgrade-Insecure-Requests":"1","User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"},getMeta=__name(function(_0){return __async(this,arguments,function*({link:link,providerContext:providerContext}){const{axios:axios,cheerio:cheerio}=providerContext,url=link,baseUrl=url.split("/").slice(0,3).join("/"),emptyResult={title:"",synopsis:"",image:"",imdbId:"",type:"movie",linkList:[]};try{const response=yield axios.get(url,{headers:__spreadProps(__spreadValues({},headers),{Referer:baseUrl})}),$=cheerio.load(response.data),content=$(".entry-content, .post-inner").length?$(".entry-content, .post-inner"):$("body"),result={title:"",synopsis:"",image:"",imdbId:"",type:"movie",linkList:[]};let rawTitle=content.find("h1, h2").first().text().trim();rawTitle=rawTitle.replace(/^Download\s*/i,""),result.title=rawTitle;const pageText=content.text();/Season\s*\d+/i.test(pageText)||/Episode\s*\d+/i.test(pageText)?result.type="series":result.type="movie";const imdbHref=content.find("a[href*='imdb.com/title/']").attr("href"),imdbMatch=null==imdbHref?void 0:imdbHref.match(/tt\d+/);result.imdbId=imdbMatch?imdbMatch[0]:"";let image=content.find("img").first().attr("data-src")||content.find("img").first().attr("src")||"";image.startsWith("//")?image="https:"+image:image.startsWith("/")&&(image=baseUrl+image),(image.includes("no-thumbnail")||image.includes("placeholder"))&&(image=""),result.image=image,result.synopsis=content.find("p").first().text().trim()||"";const links=[];return"series"===result.type?content.find("h3").each((_,h3)=>{var _a;const h3Text=$(h3).text().trim(),qualityMatch=(null==(_a=h3Text.match(/\d+p/))?void 0:_a[0])||"",href=$(h3).next("p").find("a").filter((_2,a)=>/v-cloud/i.test($(a).text())).first().attr("href");href&&links.push({title:h3Text,quality:qualityMatch,episodesLink:href,directLinks:[]})}):content.find("h5").each((_,h5)=>{var _a;const h5Text=$(h5).text().trim(),qualityMatch=(null==(_a=h5Text.match(/\d+p/))?void 0:_a[0])||"",href=$(h5).next("p").find("a").attr("href");href&&links.push({title:h5Text,quality:qualityMatch,episodesLink:"",directLinks:[{title:"Movie",link:href,type:"movie"}]})}),result.linkList=links,result}catch(err){return console.error("getMeta error:",err instanceof Error?err.message:err),emptyResult}})},"getMeta");exports.getMeta=getMeta;
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getMeta = void 0;
+// Headers
+const headers = {
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Cache-Control": "no-store",
+    "Accept-Language": "en-US,en;q=0.9",
+    DNT: "1",
+    "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+};
+const getMeta = async function ({ link, providerContext, }) {
+    const { axios, cheerio } = providerContext;
+    const url = link;
+    const baseUrl = url.split("/").slice(0, 3).join("/");
+    const emptyResult = {
+        title: "",
+        synopsis: "",
+        image: "",
+        imdbId: "",
+        type: "movie",
+        linkList: [],
+    };
+    try {
+        const response = await axios.get(url, {
+            headers: { ...headers, Referer: baseUrl },
+        });
+        const $ = cheerio.load(response.data);
+        const content = $(".entry-content, .post-inner").length
+            ? $(".entry-content, .post-inner")
+            : $("body");
+        const result = {
+            title: "",
+            synopsis: "",
+            image: "",
+            imdbId: "",
+            type: "movie",
+            linkList: [],
+        };
+        // --- Title ---
+        let rawTitle = content.find("h1, h2").first().text().trim();
+        rawTitle = rawTitle.replace(/^Download\s*/i, ""); // Download text remove
+        result.title = rawTitle;
+        // --- Type Detect ---
+        const pageText = content.text();
+        if (/Season\s*\d+/i.test(pageText) || /Episode\s*\d+/i.test(pageText)) {
+            result.type = "series";
+        }
+        else {
+            result.type = "movie";
+        }
+        // --- IMDb ID ---
+        const imdbHref = content.find("a[href*='imdb.com/title/']").attr("href");
+        const imdbMatch = imdbHref === null || imdbHref === void 0 ? void 0 : imdbHref.match(/tt\d+/);
+        result.imdbId = imdbMatch ? imdbMatch[0] : "";
+        // --- Image ---
+        let image = content.find("img").first().attr("data-src") ||
+            content.find("img").first().attr("src") ||
+            "";
+        if (image.startsWith("//"))
+            image = "https:" + image;
+        else if (image.startsWith("/"))
+            image = baseUrl + image;
+        if (image.includes("no-thumbnail") || image.includes("placeholder"))
+            image = "";
+        result.image = image;
+        // --- Synopsis ---
+        result.synopsis = content.find("p").first().text().trim() || "";
+        // --- Download Links Extraction ---
+        const links = [];
+        if (result.type === "series") {
+            // ✅ Series case
+            content.find("h3").each((_, h3) => {
+                var _a;
+                const h3Text = $(h3).text().trim();
+                const qualityMatch = ((_a = h3Text.match(/\d+p/)) === null || _a === void 0 ? void 0 : _a[0]) || "";
+                // existing V-Cloud logic
+                let linkElement = $(h3)
+                    .next("p")
+                    .find("a")
+                    .filter((_, a) => /v-cloud/i.test($(a).text()))
+                    .first();
+                // ✅ fallback Zee-Cloud (agar V-Cloud na mile)
+                if (!linkElement.length) {
+                    linkElement = $(h3)
+                        .next("p")
+                        .find("a")
+                        .filter((_, a) => /zee-cloud/i.test($(a).text()))
+                        .first();
+                }
+                const href = linkElement.attr("href");
+                if (href) {
+                    links.push({
+                        title: h3Text,
+                        quality: qualityMatch,
+                        episodesLink: href,
+                        directLinks: [],
+                    });
+                }
+            });
+        }
+        else {
+            // ✅ Movie case: h5 text as title + download link
+            content.find("h5").each((_, h5) => {
+                var _a;
+                const h5Text = $(h5).text().trim();
+                const qualityMatch = ((_a = h5Text.match(/\d+p/)) === null || _a === void 0 ? void 0 : _a[0]) || "";
+                const href = $(h5).next("p").find("a").attr("href");
+                if (href) {
+                    links.push({
+                        title: h5Text,
+                        quality: qualityMatch,
+                        episodesLink: "",
+                        directLinks: [
+                            { title: "Movie", link: href, type: "movie" }, // Play/Download button
+                        ],
+                    });
+                }
+            });
+        }
+        result.linkList = links;
+        return result;
+    }
+    catch (err) {
+        console.error("getMeta error:", err instanceof Error ? err.message : err);
+        return emptyResult;
+    }
+};
+exports.getMeta = getMeta;
