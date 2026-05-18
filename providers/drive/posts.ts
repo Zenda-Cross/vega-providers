@@ -32,8 +32,12 @@ export const getSearchPosts = async function ({
 }): Promise<Post[]> {
   const { getBaseUrl } = providerContext;
   const baseUrl = await getBaseUrl("drive");
-  const url = `${baseUrl}page/${page}/?s=${searchQuery}`;
-  return posts({ url, signal, providerContext });
+  const url = buildSearchUrl(baseUrl, searchQuery, page);
+  return searchPosts({
+    url,
+    baseUrl,
+    signal,
+  });
 };
 
 async function posts({
@@ -69,4 +73,100 @@ async function posts({
     console.error("drive error ", err);
     return [];
   }
+}
+
+async function searchPosts({
+  url,
+  baseUrl,
+  signal,
+}: {
+  url: string;
+  baseUrl: string;
+  signal: AbortSignal;
+}): Promise<Post[]> {
+  try {
+    console.log("Fetching drive search URL:", url);
+    const res = await fetch(url, { signal });
+
+    if (!res.ok) {
+      throw new Error(`drive search failed with status ${res.status}`);
+    }
+
+    const data = (await res.json()) as {
+      hits?: Array<{
+        document?: {
+          permalink?: string;
+          post_thumbnail?: string;
+          post_title?: string;
+        };
+      }>;
+    };
+
+    return (
+      data.hits
+        ?.map((hit) => {
+          const document = hit.document;
+          const title = document?.post_title?.trim();
+          const link = document?.permalink
+            ? normalizeUrl(baseUrl, document.permalink)
+            : "";
+          const image = document?.post_thumbnail
+            ? normalizeUrl(baseUrl, document.post_thumbnail)
+            : "";
+
+          if (!title || !link || !image) {
+            return null;
+          }
+
+          return {
+            title,
+            link,
+            image,
+          };
+        })
+        .filter((post): post is Post => post !== null) ?? []
+    );
+  } catch (err) {
+    console.error("drive search error ", err);
+    return [];
+  }
+}
+
+function buildSearchUrl(
+  baseUrl: string,
+  searchQuery: string,
+  page: number,
+): string {
+  const separator = baseUrl.includes("?") ? "&" : "?";
+  return `${trimTrailingSlash(baseUrl)}/search.php${separator}q=${encodeURIComponent(
+    searchQuery,
+  )}&page=${page}`;
+}
+
+function normalizeUrl(baseUrl: string, value: string): string {
+  if (!value) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  if (value.startsWith("//")) {
+    return `https:${value}`;
+  }
+
+  if (value.startsWith("/")) {
+    return `${trimTrailingSlash(baseUrl)}${value}`;
+  }
+
+  return `${trimTrailingSlash(baseUrl)}/${trimLeadingSlash(value)}`;
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+function trimLeadingSlash(value: string): string {
+  return value.replace(/^\/+/, "");
 }
