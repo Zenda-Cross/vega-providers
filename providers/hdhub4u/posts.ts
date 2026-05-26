@@ -39,8 +39,49 @@ export const getSearchPosts = async function ({
 }): Promise<Post[]> {
   const { getBaseUrl } = providerContext;
   const baseUrl = await getBaseUrl("hdhub");
-  const url = `${baseUrl}/page/${page}/?s=${searchQuery}`;
-  return posts({ url, signal, providerContext });
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const params = new URLSearchParams({
+      q: searchQuery,
+      query_by: "post_title,category,stars,director,imdb_id",
+      query_by_weights: "4,2,2,2,4",
+      sort_by: "sort_by_date:desc",
+      limit: "15",
+      highlight_fields: "none",
+      use_cache: "true",
+      page: String(page),
+      analytics_tag: today,
+    });
+    const searchUrl = `https://search.hdhub4u.glass/collections/post/documents/search?${params.toString()}`;
+    const res = await fetch(searchUrl, {
+      headers: {
+        ...hdbHeaders,
+        Referer: baseUrl + "/",
+        Accept: "application/json, text/plain, */*",
+      },
+      signal,
+    });
+    const json: any = await res.json();
+    const hits: any[] = Array.isArray(json?.hits) ? json.hits : [];
+    const catalog: Post[] = [];
+    for (const hit of hits) {
+      const doc = hit?.document || {};
+      const title = String(doc.post_title || "")
+        .replace(/Download/gi, "")
+        .trim();
+      const permalink = String(doc.permalink || "");
+      const image = String(doc.post_thumbnail || "");
+      if (!title || !permalink) continue;
+      const link = permalink.startsWith("http")
+        ? permalink
+        : `${baseUrl}${permalink.startsWith("/") ? "" : "/"}${permalink}`;
+      catalog.push({ title, link, image });
+    }
+    return catalog;
+  } catch (err) {
+    console.error("hdhubGetSearchPosts error ", err);
+    return [];
+  }
 };
 
 async function posts({
