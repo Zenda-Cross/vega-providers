@@ -357,9 +357,15 @@ class ProviderTester {
           result.episodes.skipped = true;
           result.episodes.error = "Function not available";
         }
-      } else {
+      } else if (directLinks.length === 0) {
         result.episodes.skipped = true;
-        console.log(`   ℹ️  No episode links found, skipping episodes test`);
+        console.log(
+          `   ℹ️  No episode links or direct links found, skipping episodes test`,
+        );
+      } else {
+        console.log(
+          `   ℹ️  No episode links found; will test stream via direct links instead`,
+        );
       }
 
       // Test direct links/stream if episodes not tested or no episode links
@@ -378,6 +384,7 @@ class ProviderTester {
 
         const streamModule = this.loadModule(providerName, "stream");
         if (streamModule && streamModule.getStream) {
+          let lastEmptyMessage = null;
           for (const directLink of Array.isArray(linksToTest)
             ? linksToTest
             : [linksToTest]) {
@@ -395,6 +402,7 @@ class ProviderTester {
 
               if (Array.isArray(streams) && streams.length > 0) {
                 result.stream.success = true;
+                result.stream.error = null;
                 result.stream.data = {
                   count: streams.length,
                   type: directLink.type || "movie",
@@ -410,11 +418,19 @@ class ProviderTester {
                 break; // One success is enough
               } else {
                 console.log(`      ⚠️  No streams returned`);
+                lastEmptyMessage = "No streams returned";
               }
             } catch (err) {
               console.log(`      ❌ Stream error: ${err.message}`);
               result.stream.error = err.message;
             }
+          }
+          if (
+            !result.stream.success &&
+            !result.stream.error &&
+            lastEmptyMessage
+          ) {
+            result.stream.error = lastEmptyMessage;
           }
         } else {
           console.log(`   ❌ getStream function not found`);
