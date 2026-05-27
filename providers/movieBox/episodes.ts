@@ -11,7 +11,7 @@ export const getEpisodes = async function ({
   try {
     const episodeLinks: EpisodeLink[] = [];
 
-    const response = await fetch("https://dob-worker.8man.workers.dev", {
+    const response = await fetch("https://dob-worker.1proxy.workers.dev", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

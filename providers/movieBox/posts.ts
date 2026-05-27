@@ -17,12 +17,11 @@ export const getPosts = async function ({
   if (page > 1) {
     return posts;
   }
-  const baseUrl = await getBaseUrl("movieBox");
-  console.log("baseUrl", baseUrl);
 
-  const url = `${baseUrl}/wefeed-mobile-bff/tab-operating?page=3&tabId=0&version=2fe0d7c224603ff7b0df294b46d3b84b`;
+  const url = `/wefeed-mobile-bff/tab-operating?page=3&tabId=0&version=2fe0d7c224603ff7b0df294b46d3b84b`;
 
-  const response = await fetch("https://dob-worker.8man.workers.dev", {
+  // this is just a proxy please host your own if you want to use this code:- https://github.com/himanshu8443/Cf-Workers/blob/main/src/dob-worker/index.js
+  const response = await fetch("https://dob-worker.1proxy.workers.dev", {
     signal: signal,
     method: "POST",
     headers: {
@@ -35,13 +34,21 @@ export const getPosts = async function ({
   });
 
   const data = await response.json();
-  const list = data?.data?.items?.[parseInt(filter)]?.subjects;
-  console.log("list", list);
+  const items = data?.data?.items || [];
+  const filterIndex = Number.parseInt(filter, 10);
+  let list = items?.[filterIndex]?.subjects;
+  if (!Array.isArray(list) || list.length === 0) {
+    list =
+      items?.find(
+        (item: any) =>
+          Array.isArray(item?.subjects) && item.subjects.length > 0,
+      )?.subjects || [];
+  }
   for (const item of list) {
     const post: Post = {
       image: item?.cover.url,
       title: item?.title?.replace(/\s*\[.*?\]\s*$/, ""),
-      link: `${baseUrl}/wefeed-mobile-bff/subject-api/get?subjectId=${item?.subjectId}`,
+      link: `/wefeed-mobile-bff/subject-api/get?subjectId=${item?.subjectId}`,
     };
     posts.push(post);
   }

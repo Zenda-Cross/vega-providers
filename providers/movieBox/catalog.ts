@@ -1,7 +1,7 @@
 export const catalog = [
   {
     title: "Trending",
-    filter: "2",
+    filter: "4",
   },
   {
     title: "Cinema",

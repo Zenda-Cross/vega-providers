@@ -106,10 +106,10 @@
   {
     "display_name": "MovieBox",
     "value": "movieBox",
-    "version": "1.2",
+    "version": "2.0",
     "icon": "",
     "type": "global",
-    "disabled": true
+    "disabled": false
   },
   {
     "display_name": "Movies4U",
