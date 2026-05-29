@@ -57,7 +57,7 @@ export const getSearchPosts = async ({
   providerContext: ProviderContext;
 }): Promise<Post[]> => {
   const { getBaseUrl, axios, cheerio } = providerContext;
-  const baseUrl = await getBaseUrl("Vega");
+  const baseUrl = await getBaseUrl("lux");
 
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
   const url = `${baseUrl}/search.php?q=${searchQuery}&page=${page}`;
