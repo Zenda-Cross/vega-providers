@@ -52,7 +52,7 @@ export const getSearchPosts = async function ({
       page: String(page),
       analytics_tag: today,
     });
-    const searchUrl = `https://search.hdhub4u.glass/collections/post/documents/search?${params.toString()}`;
+    const searchUrl = `https://search.pingora.fyi/collections/post/documents/search?${params.toString()}`;
     const res = await fetch(searchUrl, {
       headers: {
         ...hdbHeaders,
