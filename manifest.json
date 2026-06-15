@@ -2,7 +2,7 @@
   {
     "display_name": "VegaMovies",
     "value": "vega",
-    "version": "1.9.09",
+    "version": "2.0",
     "icon": "https://vegamovies.vodka/wp-content/uploads/2026/04/cropped-v-pink-180x180.png",
     "type": "global",
     "category": "movie/tvshow",
@@ -20,7 +20,7 @@
   {
     "display_name": "MoviesDrive",
     "value": "drive",
-    "version": "1.8",
+    "version": "1.9",
     "icon": "https://new1.moviesdrives.my/apple-touch-icon.png",
     "type": "global",
     "category": "movie/tvshow",
@@ -38,7 +38,7 @@
   {
     "display_name": "4khdHub",
     "value": "4khdhub",
-    "version": "1.4",
+    "version": "1.5",
     "icon": "https://4khdhub.fans/apple-touch-icon.png",
     "type": "global",
     "category": "movie/tvshow",
