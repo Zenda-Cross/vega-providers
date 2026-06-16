@@ -74,8 +74,8 @@
   {
     "display_name": "UHDMovies",
     "value": "uhd",
-    "version": "1.1",
-    "icon": "https://uhdmovies.biz/templates/uhdmovies/images/cropped-output-onlinepngtools-1-32x32.png",
+    "version": "1.2",
+    "icon": "https://uhdmovies.food/wp-content/uploads/2021/03/cropped-output-onlinepngtools-1-180x180.png",
     "type": "india",
     "category": "movie/tvshow",
     "disabled": false
@@ -866,8 +866,8 @@
   {
     "display_name": "dudefilms",
     "value": "dudefilms",
-    "version": "1.0",
-    "icon": "https://dudefilms.esq/wp-content/uploads/2021/04/DF_LOGO.png",
+    "version": "1.1",
+    "icon": "https://dudefilms.name/wp-content/uploads/2021/04/DF_LOGO.png",
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false
