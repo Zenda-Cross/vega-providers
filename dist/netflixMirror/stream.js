@@ -1,1 +1,97 @@
-"use strict";Object.defineProperty(exports,"__esModule",{value:!0}),exports.getStream=getStream;const MAIN_URL="https://net52.cc",UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36";async function getBypassCookie(axios){try{for(let i=0;i<5;i++){const res=await axios.post(`${MAIN_URL}/tv/p.php`,null,{headers:{"User-Agent":UA,"X-Requested-With":"XMLHttpRequest",Referer:`${MAIN_URL}/`,Cookie:"ott=nf; hd=on; user_token=233123f803cf02184bf6c67e149cdd50;"}}),dataStr=JSON.stringify(res.data);if(dataStr&&dataStr.includes('"r":"n"')){const setCookie=res.headers["set-cookie"];if(setCookie){const match=(Array.isArray(setCookie)?setCookie.join(";"):setCookie).match(/t_hash_t=[^;]+/);if(match)return match[0]}}}}catch(_a){}return""}async function getStream({link:link,providerContext:providerContext}){const{axios:axios}=providerContext,unixTime=Math.floor(Date.now()/1e3),[id,title=""]=link.split("|"),tHash=await getBypassCookie(axios);if(!tHash)return[];const cookieHeader=`ott=nf; hd=on; user_token=233123f803cf02184bf6c67e149cdd50; ${tHash}`,playlistUrl=`${MAIN_URL}/mobile/playlist.php?id=${id}&t=${encodeURIComponent(title)}&tm=${unixTime}`,streams=[],playlist=(await axios.get(playlistUrl,{headers:{"User-Agent":UA,"X-Requested-With":"XMLHttpRequest",Referer:`${MAIN_URL}/`,Cookie:cookieHeader}})).data;if(Array.isArray(playlist))for(const item of playlist)for(const src of item.sources||[]){if(!src.file||!src.file.includes(".m3u8"))continue;const finalUrl=src.file.startsWith("http")?src.file:MAIN_URL+src.file;streams.push({server:`NetflixMirror ${src.label||"Auto"}`,link:finalUrl,type:"m3u8",headers:{"User-Agent":"Mozilla/5.0 (Android) ExoPlayer",Accept:"*/*",Cookie:"hd=on",Referer:`${MAIN_URL}/`}})}return streams}
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getStream = getStream;
+// Base64 encoded fallback domains from Kotlin
+const newTvDomains = [
+    "aHR0cHM6Ly9tb2JpbGVkZXRlY3RzLmNvbQ==", "aHR0cHM6Ly9tb2JpbGVkZXRlY3QuYXBw",
+    "aHR0cHM6Ly9tb2JpZGV0ZWN0LmFydA==", "aHR0cHM6Ly9tb2JpZGV0ZWN0LmNj",
+    "aHR0cHM6Ly9tb2JpZGV0ZWN0LmNsaWNr", "aHR0cHM6Ly9tb2JpZGV0ZWN0Lmluaw==",
+    "aHR0cHM6Ly9tb2JpZGV0ZWN0LmxpdmU=", "aHR0cHM6Ly9tb2JpZGV0ZWN0LnBybw==",
+    "aHR0cHM6Ly9tb2JpZGV0ZWN0LnNob3A=", "aHR0cHM6Ly9tb2JpZGV0ZWN0LnNpdGU=",
+    "aHR0cHM6Ly9tb2JpZGV0ZWN0LnNwYWNl", "aHR0cHM6Ly9tb2JpZGV0ZWN0LnN0b3Jl",
+    "aHR0cHM6Ly9tb2JpZGV0ZWN0LnZpcA==", "aHR0cHM6Ly9tb2JpZGV0ZWN0Lndpa2k=",
+    "aHR0cHM6Ly9tb2JpZGV0ZWN0Lnh5eg==", "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5hcnQ=",
+    "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5jYw==", "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5pbmZv",
+    "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5pbms=", "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5saXZl",
+    "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5wcm8=", "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5zdG9yZQ==",
+    "aHR0cHM6Ly9tb2JpZGV0ZWN0cy50b3A=", "aHR0cHM6Ly9tb2JpZGV0ZWN0cy54eXo="
+];
+const newTvBaseHeaders = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "X-Requested-With": "NetmirrorNewTV v1.0",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0 /OS.GatuNewTV v1.0",
+    "Accept": "application/json, text/plain, */*"
+};
+/**
+ * Pure JS Base64 Decoder (no 'Buffer' dependency required)
+ */
+function decodeBase64(str) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let output = '';
+    str = String(str).replace(/=+$/, '');
+    for (let bc = 0, bs = 0, buffer, idx = 0; (buffer = str.charAt(idx++)); ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer, bc++ % 4) ?
+        output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0) {
+        buffer = chars.indexOf(buffer);
+    }
+    return output;
+}
+/**
+ * 🔗 Dynamically resolves the API base URL by checking encoded domains
+ */
+async function resolveApiUrl(axios) {
+    var _a;
+    for (const encoded of newTvDomains) {
+        const base = decodeBase64(encoded).replace(/\/$/, '');
+        try {
+            const res = await axios.get(`${base}/checknewtv.php`, { headers: newTvBaseHeaders, timeout: 3000 });
+            const tokenHash = (_a = res.data) === null || _a === void 0 ? void 0 : _a.token_hash;
+            if (tokenHash) {
+                return decodeBase64(tokenHash).replace(/\/$/, '');
+            }
+        }
+        catch (e) {
+            // Silently try the next domain
+            continue;
+        }
+    }
+    throw new Error("Failed to resolve NewTV API base URL");
+}
+async function getStream({ link, providerContext }) {
+    const { axios } = providerContext;
+    // link format: "ID|Title" - we just need the ID.
+    const [id] = link.split("|");
+    const streams = [];
+    try {
+        // STEP 1: Get dynamic base API URL
+        const apiBase = await resolveApiUrl(axios);
+        // STEP 2: Build headers specific to newtv player
+        const headers = {
+            ...newTvBaseHeaders,
+            "Ott": "nf",
+            "Usertoken": ""
+        };
+        // STEP 3: Request the player endpoint
+        const res = await axios.get(`${apiBase}/newtv/player.php?id=${id}`, { headers });
+        const data = res.data;
+        if ((data === null || data === void 0 ? void 0 : data.status) === "ok" && (data === null || data === void 0 ? void 0 : data.video_link)) {
+            streams.push({
+                server: `NetflixMirror Auto`,
+                link: data.video_link, // M3U8 link
+                type: "m3u8",
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Android) ExoPlayer",
+                    "Accept": "*/*",
+                    // Interceptor in Kotlin adds this header automatically
+                    "Cookie": "hd=on",
+                    "Referer": data.referer || apiBase,
+                },
+            });
+        }
+    }
+    catch (e) {
+        console.error("NetflixMirror stream extraction failed:", e);
+    }
+    return streams;
+}
