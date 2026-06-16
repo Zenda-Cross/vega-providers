@@ -2,8 +2,8 @@
   {
     "display_name": "VegaMovies",
     "value": "vega",
-    "version": "2.0",
-    "icon": "https://vegamovies.vodka/wp-content/uploads/2026/04/cropped-v-pink-180x180.png",
+    "version": "2.1",
+    "icon": "https://vegamovies.mq/images/favicon-32x32.png",
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false
@@ -20,8 +20,8 @@
   {
     "display_name": "MoviesDrive",
     "value": "drive",
-    "version": "1.9",
-    "icon": "https://new1.moviesdrives.my/apple-touch-icon.png",
+    "version": "2.0",
+    "icon": "https://moviesdrives.cv/logo.webp",
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false
@@ -371,8 +371,8 @@
   {
     "display_name": "zeefliz",
     "value": "zeefliz",
-    "version": "1.1.13",
-    "icon": "https://zeefliz.skin/wp-content/uploads/2025/11/cropped-zeefliz-logo-180x180.jpg",
+    "version": "1.1.14",
+    "icon": "https://zeefliz.beer/wp-content/uploads/2025/11/cropped-zeefliz-logo-180x180.jpg",
     "type": "global",
     "category": "movie/tvshow",
     "disabled": false
