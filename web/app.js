@@ -154,7 +154,12 @@ async function loadCatalog() {
         renderCatalog(data.catalog || [], data.genres || []);
 
     } catch {
-        catalogContainer.innerHTML = "";
+        // Fallback categories if API fails
+        renderCatalog([
+            { title: "Home", filter: "" },
+            { title: "Movies", filter: "movie" },
+            { title: "Series", filter: "tv" }
+        ], []);
         fetchData("");
     }
 }
@@ -271,7 +276,7 @@ function renderGrid(items) {
         card.innerHTML = `
             <div class="media-poster-container">
                 <img class="media-poster" src="${item.image}" loading="lazy"
-                onerror="this.src='https://via.placeholder.com/300x450?text=No+Image'">
+                onerror="handleImageError(this, '${(item.title || '').replace(/'/g, "\\'")}')">
                 <div class="media-overlay">
                     <div class="media-title">${item.title}</div>
                     <div class="media-meta">
@@ -499,6 +504,18 @@ function renderLinks(meta) {
          } else {
              container.innerHTML = "<p style='color: var(--text-dim)'>No playable streams found.</p>";
          }
+         
+         const searchBtn = document.createElement("button");
+         searchBtn.className = "stream-btn";
+         searchBtn.style.marginTop = "10px";
+         searchBtn.innerHTML = `<i data-lucide="search"></i> Search All Providers`;
+         searchBtn.onclick = () => {
+             currentProvider = "__all__";
+             document.getElementById('providerSelect').value = "__all__";
+             fetchData(parseMediaInfo(meta.title).title, true);
+         };
+         container.appendChild(searchBtn);
+         lucide.createIcons();
          return;
     }
 
@@ -728,8 +745,13 @@ async function playStream(link, provider) {
     console.log("🎥 RESOLVED STREAMS:", streams);
 
     if (!streams || !streams.length) {
-        alert("⚠️ No playable stream found. This source might be IP-locked or expired.");
-        setStatus("Online");
+        if (confirm("⚠️ No playable stream found for this provider. Would you like to search across all providers?")) {
+            currentProvider = "__all__";
+            document.getElementById('providerSelect').value = "__all__";
+            fetchData(currentMeta ? parseMediaInfo(currentMeta.title).title : "", true);
+        } else {
+            setStatus("Online");
+        }
         return;
     }
 
@@ -1074,6 +1096,60 @@ function setStatus(text, color = "#22c55e") {
 function search() {
     const q = searchInput.value.trim();
     if (q) fetchData(q, true);
+}
+
+// ============================
+// 🖼️ IMAGE FALLBACK
+// ============================
+async function handleImageError(img, title) {
+    if (img.dataset.failed) return;
+    img.dataset.failed = "true";
+    
+    // 1. Try TMDB first
+    if (tmdbKey && title) {
+        try {
+            const parsed = parseMediaInfo(title);
+            const resp = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${encodeURIComponent(parsed.title)}`);
+            const data = await resp.json();
+            const item = data.results?.[0];
+            if (item && item.poster_path) {
+                img.src = `https://image.tmdb.org/t/p/w500${item.poster_path}`;
+                return;
+            }
+        } catch (e) { console.error("TMDB fallback failed", e); }
+    }
+    
+    // 2. Try fetching from other providers as a fallback
+    if (title && Object.keys(providersMap).length > 0) {
+        try {
+            const parsed = parseMediaInfo(title);
+            const providers = Object.keys(providersMap);
+            // Search all providers concurrently
+            const allResults = await Promise.all(
+                providers.map(p =>
+                    fetch(`${getApiUrl()}/fetch`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ provider: p, functionName: "getSearchPosts", params: { searchQuery: parsed.title, page: 1 } })
+                    })
+                    .then(r => r.json())
+                    .catch(() => [])
+                )
+            );
+            
+            // Find the first valid image from the results
+            const results = allResults.flat();
+            const validResult = results.find(i => i.image && !i.image.includes('placeholder'));
+            
+            if (validResult) {
+                img.src = validResult.image;
+                return;
+            }
+        } catch (e) { console.error("Provider image fallback failed", e); }
+    }
+    
+    // 3. Nice CSS-based placeholder if all fails
+    img.src = 'https://via.placeholder.com/300x450/16161a/8b5cf6?text=' + encodeURIComponent(title.substring(0, 20));
 }
 
 // 🚀 START
