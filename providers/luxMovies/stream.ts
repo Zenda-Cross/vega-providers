@@ -37,7 +37,7 @@ export async function getStream({
   try {
     const streamLinks: Stream[] = [];
     console.log("dotlink", link);
-    if (type === "movie") {
+    if (type === "movie" && !link.includes("cloud")) {
       // vlink
       const dotlinkRes = await axios(`${link}`, { headers });
       const dotlinkText = dotlinkRes.data;

@@ -37,13 +37,13 @@ export async function getStream({
   try {
     const streamLinks: Stream[] = [];
     console.log("dotlink", link);
-    if (type === "movie") {
+    if (type === "movie" && !link.includes("cloud")) {
       // vlink
       const dotlinkRes = await axios(`${link}`, { headers });
       const dotlinkText = dotlinkRes.data;
       // console.log('dotlinkText', dotlinkText);
       const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
-      // console.log('vLink', vlink[1]);
+      console.log("vLink", vlink[1]);
       link = vlink[1];
 
       // filepress link

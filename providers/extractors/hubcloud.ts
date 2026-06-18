@@ -5,6 +5,21 @@ const hubcloudDecode = function (value: string) {
   return atob(value.toString());
 };
 
+const extractUrlFromScript = (html: string): string => {
+  const doubleAtobMatch = html.match(
+    /var\s+url\s*=\s*atob\(atob\(['"]([^'"]+)['"]\)\)/,
+  );
+  if (doubleAtobMatch?.[1]) {
+    return atob(atob(doubleAtobMatch[1]));
+  }
+  const plainMatch = html.match(/var\s+url\s*=\s*['"]([^'"]+)['"]/);
+  return (
+    hubcloudDecode(plainMatch?.[1]?.split("r=")?.[1] ?? "") ||
+    plainMatch?.[1] ||
+    ""
+  );
+};
+
 const getPixelDrainUrl = (html: string) => {
   const match = html.match(/var\s+pxl\s*=\s*['"]([^'"]+)['"];?/i);
   return match?.[1] || "";
@@ -44,10 +59,8 @@ export async function hubcloudExtractor(
     const vLinkRes = await axios(`${link}`, { headers, signal });
     const vLinkText = vLinkRes.data;
     const $vLink = cheerio.load(vLinkText);
-    const vLinkRedirect = vLinkText.match(/var\s+url\s*=\s*'([^']+)';/) || [];
     let vcloudLink =
-      hubcloudDecode(vLinkRedirect[1]?.split("r=")?.[1]) ||
-      vLinkRedirect[1] ||
+      extractUrlFromScript(vLinkText) ||
       $vLink(".fa-file-download.fa-lg").parent().attr("href") ||
       link;
     console.log("vcloudLink", vcloudLink);
@@ -62,7 +75,7 @@ export async function hubcloudExtractor(
     });
     const vcloudText = await vcloudRes.text();
     const $ = cheerio.load(vcloudText);
-    // console.log('vcloudRes', $.text());
+    // console.log("vcloudRes", $.text());
 
     const linkClass = $(".btn-success.btn-lg.h6,.btn-danger,.btn-secondary");
     for (const element of linkClass) {
