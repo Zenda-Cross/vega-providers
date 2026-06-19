@@ -10,6 +10,7 @@ export const getStream = async function ({
   try {
     const { axios, openWebView, commonHeaders } = providerContext;
     const baseUrl = "https://animetsu.net";
+    const streamUrl = `https://swiftstream.top/proxy`;
 
     let wafCookies: string | undefined;
     try {
@@ -86,11 +87,11 @@ export const getStream = async function ({
             }
             res.data.sources.forEach((source: any) => {
               const sourceUrl = source.url.startsWith("/")
-                ? `${baseUrl}${source.url}`
+                ? `${streamUrl}${source.url}`
                 : source.url;
               streamLinks.push({
                 server: `${server} (Sub): ${source.quality}`,
-                link: `https://m3u8.8man.workers.dev?url=${encodeURIComponent(sourceUrl)}`,
+                link: sourceUrl,
                 type: "m3u8",
                 quality: source.quality,
                 headers: {
@@ -155,11 +156,11 @@ export const getStream = async function ({
             }
             res.data.sources.forEach((source: any) => {
               const sourceUrl = source.url.startsWith("/")
-                ? `${baseUrl}${source.url}`
+                ? `${streamUrl}${source.url}`
                 : source.url;
               streamLinks.push({
                 server: `${server} (Dub): ${source.quality}`,
-                link: `https://m3u8.8man.workers.dev?url=${encodeURIComponent(sourceUrl)}`,
+                link: sourceUrl,
                 type: "m3u8",
                 quality: source.quality,
                 headers: {
