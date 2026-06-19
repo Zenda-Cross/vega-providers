@@ -12,14 +12,21 @@ export const getPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { axios } = providerContext;
-  const baseUrl = "https://backend.animetsu.to";
+  if (page > 1) {
+    return [];
+  }
+  const { axios, commonHeaders } = providerContext;
+  const baseUrl = "https://animetsu.net";
+  const url = `${baseUrl}/v2/api/anime/home`;
 
-  // Parse filter to modify page parameter
-  const url = baseUrl + filter + "&page=" + page.toString();
-  console.log("animetsuGetPosts url", url);
-
-  return posts({ url: url.toString(), signal, axios });
+  return posts({
+    url,
+    filter,
+    signal,
+    axios,
+    providerContext,
+    headers: commonHeaders,
+  });
 };
 
 export const getSearchPosts = async function ({
@@ -34,32 +41,62 @@ export const getSearchPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { axios } = providerContext;
-  const baseUrl = "https://backend.animetsu.to";
-  const url = `${baseUrl}/api/anime/search?query=${encodeURIComponent(
-    searchQuery
-  )}&page=${page}&perPage=35&year=any&sort=favourites&season=any&format=any&status=any`;
+  const { axios, commonHeaders } = providerContext;
+  const baseUrl = "https://animetsu.net";
+  const url = `${baseUrl}/v2/api/anime/search/?query=${encodeURIComponent(
+    searchQuery,
+  )}`;
 
-  return posts({ url, signal, axios });
+  return posts({ url, signal, axios, providerContext, headers: commonHeaders });
 };
 
 async function posts({
   url,
+  filter,
   signal,
   axios,
+  providerContext,
+  headers,
 }: {
   url: string;
+  filter?: string;
   signal: AbortSignal;
   axios: ProviderContext["axios"];
+  providerContext: ProviderContext;
+  headers?: Record<string, string>;
 }): Promise<Post[]> {
+  const baseUrl = "https://animetsu.net";
+  const { openWebView } = providerContext;
   try {
-    const res = await axios.get(url, {
-      signal,
-      headers: {
-        Referer: "https://animetsu.to/",
-      },
-    });
-    const data = res.data?.results;
+    let cookies: string | undefined;
+    let res: any;
+    try {
+      res = await axios.get(url, {
+        signal,
+        headers: {
+          ...headers,
+          Referer: baseUrl,
+        },
+      });
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        const wafResult = await openWebView(baseUrl, {
+          title: "Solve the captcha below and click done",
+          description: "Required to bypass Animetsu anti-bot protection.",
+          headers: { ...headers, Referer: baseUrl },
+          force: true,
+          waitForCookie: "cf_clearance",
+        });
+        cookies = wafResult.cookies;
+        res = await axios.get(url, {
+          signal,
+          headers: { ...headers, Referer: baseUrl, Cookie: cookies },
+        });
+      } else {
+        throw error;
+      }
+    }
+    const data = filter ? res.data?.[filter] : res.data?.results || res.data;
     const catalog: Post[] = [];
 
     data?.map((element: any) => {
@@ -69,6 +106,10 @@ async function posts({
         element.title?.native;
       const link = element.id?.toString();
       const image =
+        element.cover_image?.large ||
+        element.cover_image?.extraLarge ||
+        element.cover_image?.medium ||
+        element.cover_image?.small ||
         element.coverImage?.large ||
         element.coverImage?.extraLarge ||
         element.coverImage?.medium;

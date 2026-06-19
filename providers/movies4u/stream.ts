@@ -15,11 +15,6 @@ const headers = {
   "Sec-Fetch-Mode": "navigate",
   "Sec-Fetch-Site": "none",
   "Sec-Fetch-User": "?1",
-  Cookie:
-    "xla=s4t; _ga=GA1.1.1081149560.1756378968; _ga_BLZGKYN5PF=GS2.1.s1756378968$o1$g1$t1756378984$j44$l0$h0",
-  "Upgrade-Insecure-Requests": "1",
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
 };
 
 export async function getStream({
@@ -33,13 +28,50 @@ export async function getStream({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }) {
-  const { axios, cheerio, commonHeaders } = providerContext;
+  const { axios, cheerio, commonHeaders, openWebView } = providerContext;
   try {
     const streamLinks: Stream[] = [];
     console.log("dotlink", link);
     if (type === "movie") {
-      // vlink
-      const dotlinkRes = await axios(`${link}`, { headers });
+      let dotlinkRes;
+      let cookies: string | undefined;
+
+      try {
+        dotlinkRes = await axios(`${link}`, {
+          headers: {
+            ...commonHeaders,
+            Referer: link,
+          },
+        });
+      } catch (error: any) {
+        if (error.response?.status === 403) {
+          console.log("Solving WAF for Movies4U...");
+          const wafResult = await openWebView(link, {
+            title: "Solve the captcha below and click done",
+            description:
+              "This is required to bypass the anti-bot protection and retrieve the stream link.",
+            headers: {
+              ...commonHeaders,
+              Referer: link,
+            },
+            force: true,
+            waitForCookie: "cf_clearance",
+          });
+          console.log("WAF solved", wafResult.cookies);
+          cookies = wafResult.cookies;
+
+          dotlinkRes = await axios(`${link}`, {
+            headers: {
+              ...commonHeaders,
+              Referer: link,
+              Cookie: cookies,
+            },
+          });
+        } else {
+          throw error;
+        }
+      }
+
       const dotlinkText = dotlinkRes.data;
       // console.log('dotlinkText', dotlinkText);
       const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
