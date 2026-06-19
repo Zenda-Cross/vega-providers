@@ -129,10 +129,46 @@ export interface ProviderType {
   }) => Promise<Post[]>;
 }
 
+// Options to customize the WAF-solving WebView dialog.
+// Options to customize the WAF-solving WebView dialog.
+export interface OpenWebViewOptions {
+  // Title shown in the dialog header.
+  title?: string;
+  // Helper text shown under the title.
+  description?: string;
+
+  headers?: Record<string, string>;
+
+  waitForCookie?: string;
+
+  force?: boolean;
+  // If set, the dialog auto-cancels (rejects) after this many milliseconds.
+  timeoutMs?: number;
+}
+
+// Result returned to the provider after the user solves the challenge.
+export interface OpenWebViewResult {
+  // The page response after the challenge is solved: the rendered HTML of the
+  // document (document.documentElement.outerHTML).
+  data: string;
+  // Cookie header value, e.g. "cf_clearance=abc; other=def".
+  cookies: string;
+  // Cookies as a name -> value map.
+  cookieMap: Record<string, string>;
+  // The User-Agent used by the WebView.
+  userAgent: string;
+  // The URL that was opened.
+  url: string;
+}
+
 export type ProviderContext = {
   axios: AxiosStatic;
   Aes: any; // AES encryption utility, if used
   getBaseUrl: (providerValue: string) => Promise<string>;
   commonHeaders: Record<string, string>;
   cheerio: typeof cheerio;
+  openWebView: (
+    url: string,
+    options?: OpenWebViewOptions,
+  ) => Promise<OpenWebViewResult>;
 };
