@@ -10,7 +10,7 @@ export const getMeta = async function ({
   try {
     const { axios, openWebView, commonHeaders } = providerContext;
     const baseUrl = "https://animetsu.net";
-    const url = `${baseUrl}/v2/api/anime/${link}`;
+    const url = `${baseUrl}/v2/api/anime/info/${link}`;
 
     let cookies: string | undefined;
     let res: any;
@@ -67,7 +67,7 @@ export const getMeta = async function ({
 
           try {
             const epsRes = await axios.get(
-              `${baseUrl}/api/anime/eps/${season.id}`,
+              `${baseUrl}/v2/api/anime/eps/${season.id}`,
               {
                 headers: {
                   ...commonHeaders,
@@ -80,8 +80,8 @@ export const getMeta = async function ({
             if (episodes && episodes.length > 0) {
               episodes.forEach((ep: any) => {
                 directLinks.push({
-                  title: `Episode ${ep.number}`,
-                  link: `${season.id}:${ep.number}`,
+                  title: `Episode ${ep.ep_num}`,
+                  link: `${season.id}:${ep.ep_num}`,
                 });
               });
             }
