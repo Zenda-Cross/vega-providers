@@ -91,9 +91,7 @@ export const getStream = async function ({
                 : source.url;
               streamLinks.push({
                 server: `${server} (Sub): ${source.quality}`,
-                link:
-                  "https://m3u8.8man.workers.dev?url=" +
-                  encodeURIComponent(sourceUrl),
+                link: sourceUrl,
                 type: "m3u8",
                 quality: source.quality,
                 headers: {
@@ -162,9 +160,7 @@ export const getStream = async function ({
                 : source.url;
               streamLinks.push({
                 server: `${server} (Dub): ${source.quality}`,
-                link:
-                  "https://m3u8.8man.workers.dev?url=" +
-                  encodeURIComponent(sourceUrl),
+                link: sourceUrl,
                 type: "m3u8",
                 quality: source.quality,
                 headers: {
