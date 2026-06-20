@@ -13,7 +13,7 @@
     "version": "1.6",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "MoviesDrive",
@@ -130,7 +130,7 @@
   {
     "display_name": "Zeefliz",
     "value": "zeefliz",
-    "version": "1.6",
+    "version": "1.7",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -237,7 +237,7 @@
     "version": "1.0",
     "icon": "",
     "type": "english",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "Primewire",
@@ -269,7 +269,7 @@
     "version": "1.0",
     "icon": "",
     "type": "english",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "KissKh",
@@ -277,7 +277,7 @@
     "version": "1.2",
     "icon": "",
     "type": "english",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "Dooflix",
@@ -309,7 +309,7 @@
     "version": "1.6",
     "icon": "",
     "type": "italy",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "SkyMovieHD",

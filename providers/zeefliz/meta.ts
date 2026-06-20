@@ -93,6 +93,35 @@ export const getMeta = async function ({
     // --- Download Links Extraction ---
     const links: Link[] = [];
 
+    // Pick the most likely download anchor from a heading's following content.
+    // Prefers anchors that look like download buttons / known hosts, then
+    // falls back to the first usable link.
+    const pickDownloadHref = (heading: any): string => {
+      const anchors = $(heading)
+        .nextUntil("h2, h3, h4, h5, h6")
+        .find("a[href]")
+        .add($(heading).next().find("a[href]"));
+
+      let preferred = "";
+      let firstHttp = "";
+      anchors.each((_, a) => {
+        const aHref = $(a).attr("href") || "";
+        if (!/^https?:/i.test(aHref)) return;
+        if (!firstHttp) firstHttp = aHref;
+        const hay = `${$(a).text()} ${aHref}`.toLowerCase();
+        if (
+          !preferred &&
+          /download|v-cloud|vcloud|nexdrive|hubcloud|gdflix|drive|cloud|fast/i.test(
+            hay,
+          )
+        ) {
+          preferred = aHref;
+        }
+      });
+
+      return preferred || firstHttp;
+    };
+
     if (result.type === "series") {
       // ✅ Series case: सिर्फ V-Cloud वाला और title = पूरा <h3> का text
       content.find("h3").each((_, h3) => {
@@ -115,6 +144,29 @@ export const getMeta = async function ({
           });
         }
       });
+
+      // Fallback for the changed season-pack layout: quality headings
+      // (h3/h4/h5/h6) followed by a single "DOWNLOAD NOW" style link.
+      // Only runs when the legacy V-Cloud structure produced nothing, so
+      // existing series pages keep parsing exactly as before.
+      if (links.length === 0) {
+        content.find("h3, h4, h5, h6").each((_, h) => {
+          const hText = $(h).text().trim();
+          const qualityMatch = hText.match(/\d{3,4}p/)?.[0];
+          if (!qualityMatch) return;
+
+          const href = pickDownloadHref(h);
+          if (href) {
+            links.push({
+              title: hText,
+              quality: qualityMatch,
+              episodesLink: "",
+              // Resolve through the same dotlink/cloud flow used for movies.
+              directLinks: [{ title: hText, link: href, type: "movie" }],
+            });
+          }
+        });
+      }
     } else {
       // ✅ Movie case: h5 text as title + download link
       content.find("h5").each((_, h5) => {

@@ -441,8 +441,22 @@ class ProviderTester {
         directLinks.length === 0 &&
         episodeLinks.length === 0
       ) {
-        result.stream.skipped = true;
-        console.log(`   ℹ️  No links to test stream with`);
+        result.stream.error =
+          "No links to test stream with - meta must return at least one episode link or direct link";
+        console.log(
+          `   ❌ No links to test stream with - meta.getMeta must return at least one episode link or direct link`,
+        );
+      }
+
+      // Stream is mandatory: if it was never successfully tested and no error
+      // was recorded (e.g. episodes failed before stream could run), fail it.
+      if (
+        !result.stream.success &&
+        !result.stream.error &&
+        !result.stream.skipped
+      ) {
+        result.stream.error = "Stream could not be tested";
+        console.log(`   ❌ Stream could not be tested`);
       }
     } catch (error) {
       console.log(`\n❌ Test failed: ${error.message}`);
