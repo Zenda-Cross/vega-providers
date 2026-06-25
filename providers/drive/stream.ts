@@ -50,6 +50,7 @@ export const getStream = async function ({
           axios,
           cheerio,
           headers,
+          providerContext,
         );
         return gdflixStreams;
       }

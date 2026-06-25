@@ -28,6 +28,7 @@ export const getStream = async function ({
           axios,
           cheerio,
           headers,
+          providerContext,
         );
         streams.push(...gdLinks);
       }

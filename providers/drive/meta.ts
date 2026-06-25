@@ -33,7 +33,7 @@ export const getMeta = async function ({
     const synopsis =
       $(".left-wrapper")
         .find(
-          'h2:contains("Storyline"),h3:contains("Storyline"),h5:contains("Storyline"),h4:contains("Storyline"),h4:contains("STORYLINE")'
+          'h2:contains("Storyline"),h3:contains("Storyline"),h5:contains("Storyline"),h4:contains("Storyline"),h4:contains("STORYLINE")',
         )
         .next()
         .text() ||
@@ -41,7 +41,7 @@ export const getMeta = async function ({
       "";
     const image =
       $("img.entered.lazyloaded,img.entered,img.litespeed-loaded").attr(
-        "src"
+        "src",
       ) ||
       $("img.aligncenter").attr("src") ||
       "";
@@ -50,14 +50,23 @@ export const getMeta = async function ({
     const links: Link[] = [];
 
     $(
-      'a:contains("1080")a:not(:contains("Zip")),a:contains("720")a:not(:contains("Zip")),a:contains("480")a:not(:contains("Zip")),a:contains("2160")a:not(:contains("Zip")),a:contains("4k")a:not(:contains("Zip"))'
+      'a:contains("1080")a:not(:contains("Zip")),a:contains("720")a:not(:contains("Zip")),a:contains("480")a:not(:contains("Zip")),a:contains("2160")a:not(:contains("Zip")),a:contains("4k")a:not(:contains("Zip"))',
     ).map((i: number, element: any) => {
-      const title = $(element).parent("h5").prev().text();
+      let linkTitle = $(element).parent("h5").prev().text();
       const episodesLink = $(element).attr("href");
-      const quality = title.match(/\b(480p|720p|1080p|2160p)\b/i)?.[0] || "";
-      if (episodesLink && title) {
+      const quality =
+        linkTitle.match(/\b(480p|720p|1080p|2160p)\b/i)?.[0] || "";
+
+      if (type === "series") {
+        const seasonMatch = linkTitle.match(/Season\s*\d+/i);
+        if (seasonMatch) {
+          linkTitle = seasonMatch[0];
+        }
+      }
+
+      if (episodesLink && linkTitle) {
         links.push({
-          title,
+          title: linkTitle,
           episodesLink: type === "series" ? episodesLink : "",
           directLinks:
             type === "movie"

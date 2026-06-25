@@ -2,15 +2,47 @@ import { Stream, ProviderContext } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
 import { gdflixExtractor } from "../extractors/gdflix";
 
+async function getWithWAF(
+  url: string,
+  axios: any,
+  openWebView: any,
+  headers: any,
+  customHeaders?: any,
+): Promise<any> {
+  const baseUrl = url.split("/").slice(0, 3).join("/");
+  const mergedHeaders = { ...headers, ...customHeaders, Referer: baseUrl };
+  try {
+    return await axios.get(url, { headers: mergedHeaders });
+  } catch (error: any) {
+    if (error.response?.status === 403 && openWebView) {
+      console.log(`WAF detected (403) for ${url}, using solver...`);
+      const wafResult = await openWebView(baseUrl, {
+        title: "Solve the captcha below and click done",
+        description: "Required to bypass anti-bot protection.",
+        headers: mergedHeaders,
+        force: true,
+        waitForCookie: "cf_clearance",
+      });
+      return await axios.get(url, {
+        headers: {
+          ...mergedHeaders,
+          Cookie:
+            (mergedHeaders.Cookie ? mergedHeaders.Cookie + "; " : "") +
+            wafResult.cookies,
+        },
+      });
+    }
+    throw error;
+  }
+}
+
 async function extractKmhdLink(
   katlink: string,
   providerContext: ProviderContext,
 ) {
-  const { axios } = providerContext;
-  const res = await axios.get(katlink, {
-    headers: {
-      Cookie: "unlocked=true",
-    },
+  const { axios, openWebView, commonHeaders } = providerContext;
+  const res = await getWithWAF(katlink, axios, openWebView, commonHeaders, {
+    Cookie: "unlocked=true",
   });
   const data = res.data;
   const hubDriveRes = data.match(/hubdrive_res:\s*"([^"]+)"/)[1];
@@ -29,12 +61,19 @@ export const getStream = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Stream[]> {
-  const { axios, cheerio, commonHeaders } = providerContext;
+  const { axios, cheerio, commonHeaders, openWebView } = providerContext;
   const streamLinks: Stream[] = [];
   console.log("katGetStream", link);
   try {
     if (link.includes("gdflix")) {
-      return await gdflixExtractor(link, signal, axios, cheerio, commonHeaders);
+      return await gdflixExtractor(
+        link,
+        signal,
+        axios,
+        cheerio,
+        commonHeaders,
+        providerContext,
+      );
     }
     if (link.includes("kmhd")) {
       const hubcloudLink = await extractKmhdLink(link, providerContext);
@@ -51,7 +90,12 @@ export const getStream = async function ({
       try {
         const resumeDrive = link.replace("/file", "/zfile");
         //   console.log('resumeDrive', resumeDrive);
-        const resumeDriveRes = await axios.get(resumeDrive);
+        const resumeDriveRes = await getWithWAF(
+          resumeDrive,
+          axios,
+          openWebView,
+          commonHeaders,
+        );
         const resumeDriveHtml = resumeDriveRes.data;
         const $resumeDrive = cheerio.load(resumeDriveHtml);
         const resumeLink = $resumeDrive(".btn-success").attr("href");
@@ -68,7 +112,12 @@ export const getStream = async function ({
       }
       //instant link
       try {
-        const driveres = await axios.get(link, { timeout: 10000 });
+        const driveres = await getWithWAF(
+          link,
+          axios,
+          openWebView,
+          commonHeaders,
+        );
         const $drive = cheerio.load(driveres.data);
         const seed = $drive(".btn-danger").attr("href") || "";
         const instantToken = seed.split("=")[1];

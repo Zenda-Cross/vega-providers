@@ -4,8 +4,33 @@ export async function gdflixExtractor(
   axios: any,
   cheerio: any,
   headers: Record<string, string>,
+  providerContext?: any,
 ) {
   try {
+    let wafCookies: string | undefined;
+    try {
+      await axios.get(link, { headers, signal });
+    } catch (error: any) {
+      if (error.response?.status === 403 && providerContext?.openWebView) {
+        console.log("gdflix: WAF detected (403), using solver...");
+        const baseUrl = link.split("/").slice(0, 3).join("/");
+        const wafResult = await providerContext.openWebView(link, {
+          title: "Solve the captcha below and click done",
+          description: "Required to bypass GDFlix anti-bot protection.",
+          headers: { ...headers, Referer: baseUrl },
+          force: true,
+          waitForCookie: "cf_clearance",
+        });
+        wafCookies = wafResult.cookies;
+      } else {
+        throw error;
+      }
+    }
+
+    if (wafCookies) {
+      headers["Cookie"] = wafCookies;
+    }
+
     const streamLinks: any[] = [];
     const res = await axios(`${link}`, { headers, signal });
     console.log("gdflixExtractor", link);

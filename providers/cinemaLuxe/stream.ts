@@ -72,6 +72,7 @@ export const getStream = async ({
         axios,
         cheerio,
         headers,
+        providerContext,
       );
       return sreams;
     }
