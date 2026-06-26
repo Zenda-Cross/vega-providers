@@ -8,10 +8,6 @@ export const catalog = [
     filter: "/category/netflix",
   },
   {
-    title: "Animated",
-    filter: "/category/animated",
-  },
-  {
     title: "Amazon Prime",
     filter: "/category/amazon-prime",
   },

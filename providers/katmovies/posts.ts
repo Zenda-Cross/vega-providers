@@ -16,11 +16,10 @@ async function getWithWAF(
         title: "Solve the captcha below and click done",
         description: "Required to bypass anti-bot protection.",
         headers: { ...headers, Referer: baseUrl },
-        force: true,
         waitForCookie: "cf_clearance",
       });
       return await axios.get(url, {
-        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookies },
+        headers: { ...headers, Referer: baseUrl },
       });
     }
     throw error;
