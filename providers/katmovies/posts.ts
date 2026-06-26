@@ -19,7 +19,7 @@ async function getWithWAF(
         waitForCookie: "cf_clearance",
       });
       return await axios.get(url, {
-        headers: { ...headers, Referer: baseUrl },
+        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
       });
     }
     throw error;
