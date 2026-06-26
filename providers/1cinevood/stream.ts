@@ -35,8 +35,23 @@ export async function getStream({
 }) {
   const { axios, cheerio, commonHeaders } = providerContext;
   try {
+    let processLink = link;
+    if (processLink.includes("oxxfile")) {
+      try {
+        const urlObj = new URL(processLink);
+        const id = processLink.split("/").filter(Boolean).pop();
+        const apiUrl = `${urlObj.origin}/api/s/${id}/hubcloud`;
+        const res = await fetch(apiUrl, { headers: commonHeaders, redirect: "follow", signal });
+        if (res.url && res.url.includes("hubcloud")) {
+          processLink = res.url;
+        }
+      } catch (e) {
+        console.log("Error resolving oxxfile link", e);
+      }
+    }
+
     const hubcloudLink = await hubcloudExtractor(
-      link,
+      processLink,
       signal,
       axios,
       cheerio,

@@ -1,5 +1,31 @@
 import { EpisodeLink, ProviderContext } from "../types";
 
+async function getWithWAF(
+  url: string,
+  axios: any,
+  openWebView: any,
+  headers: any,
+): Promise<any> {
+  const baseUrl = url.split("/").slice(0, 3).join("/");
+  try {
+    return await axios.get(url, { headers: { ...headers, Referer: baseUrl } });
+  } catch (error: any) {
+    if (error.response?.status === 403 && openWebView) {
+      console.log(`WAF detected (403) for ${url}, using solver...`);
+      const wafResult = await openWebView(baseUrl, {
+        title: "Solve the captcha below and click done",
+        description: "Required to bypass anti-bot protection.",
+        headers: { ...headers, Referer: baseUrl },
+        waitForCookie: "cf_clearance",
+      });
+      return await axios.get(url, {
+        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
+      });
+    }
+    throw error;
+  }
+}
+
 export async function getEpisodeLinks({
   url,
   providerContext,
@@ -8,8 +34,9 @@ export async function getEpisodeLinks({
   providerContext: ProviderContext;
 }): Promise<EpisodeLink[]> {
   try {
-    const res = await providerContext.axios.get(url);
-    const $ = providerContext.cheerio.load(res.data || "");
+    const { axios, cheerio, openWebView, commonHeaders } = providerContext;
+    const res = await getWithWAF(url, axios, openWebView, commonHeaders);
+    const $ = cheerio.load(res.data || "");
     const episodes: EpisodeLink[] = [];
 
     $("h4.fittexted_for_content_h4").each((_, h4El) => {

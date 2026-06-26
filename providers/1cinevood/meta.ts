@@ -152,8 +152,11 @@ export const getMeta = async function ({
               .replace(/\|$/, "")
               .trim(),
             quality: qualityMatch,
-            // Keep original structure: episodesLink is the first direct download link
-            episodesLink: link,
+            episodesLink: result.type === "series" ? link : "",
+            directLinks:
+              result.type === "movie"
+                ? [{ link: link || "", title: "Movie", type: "movie" }]
+                : undefined,
           });
         });
     });

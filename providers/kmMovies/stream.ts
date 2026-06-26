@@ -19,6 +19,33 @@ const headers = {
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
 };
 
+async function getWithWAF(
+  url: string,
+  axios: any,
+  openWebView: any,
+  headers: any,
+): Promise<any> {
+  const baseUrl = url.split("/").slice(0, 3).join("/");
+  try {
+    return await axios.get(url, { headers: { ...headers, Referer: baseUrl } });
+  } catch (error: any) {
+    if (error.response?.status === 403 && openWebView) {
+      console.log(`WAF detected (403) for ${url}, using solver...`);
+      const wafResult = await openWebView(baseUrl, {
+        title: "Solve the captcha below and click done",
+        description: "Required to bypass anti-bot protection.",
+        headers: { ...headers, Referer: baseUrl },
+        waitForCookie: "cf_clearance",
+      });
+      return await axios.get(url, {
+        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
+      });
+    }
+    throw error;
+  }
+}
+
+
 export async function getStream({
   link,
   type,
@@ -30,13 +57,13 @@ export async function getStream({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }) {
-  const { axios, cheerio } = providerContext;
+  const { axios, cheerio, openWebView } = providerContext;
 
   try {
     const streamLinks: Stream[] = [];
 
     // Fetch the page HTML
-    const res = await axios.get(link, { headers, signal });
+    const res = await getWithWAF(link, axios, openWebView, headers);
     const $ = cheerio.load(res.data);
 
     const ALLOWED_SERVERS = ["ONE CLICK", "ZIP-ZAP", "ULTRA FAST", "SKYDROP"];
