@@ -33,9 +33,17 @@ export const getMeta = async function ({
       });
     }
 
+    let imageUrl = series.image || "";
+    if (series.images && Array.isArray(series.images)) {
+      const widePoster = series.images.find((img: any) => img.type === "poster_wide");
+      if (widePoster && widePoster.url) {
+        imageUrl = widePoster.url;
+      }
+    }
+
     return {
       title: series.title || "",
-      image: series.images?.[0]?.url || "",
+      image: imageUrl,
       synopsis: series.description || "",
       imdbId: "",
       type: "series",

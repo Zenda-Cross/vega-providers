@@ -24,7 +24,7 @@ export const getPosts = async function ({
     return data.map((item: any) => ({
       title: item.title,
       link: `https://anime.uniquestream.net/api/v1/series/${item.content_id}`,
-      image: item.images?.[0]?.url || "",
+      image: item.image || "",
     }));
   } catch (error) {
     console.error("uniquestream getPosts failed", error);
@@ -61,7 +61,7 @@ export const getSearchPosts = async function ({
     return combined.map((item: any) => ({
       title: item.title,
       link: `https://anime.uniquestream.net/api/v1/series/${item.content_id}`,
-      image: item.images?.[0]?.url || "",
+      image: item.image || "",
     }));
   } catch (error) {
     console.error("uniquestream getSearchPosts failed", error);
