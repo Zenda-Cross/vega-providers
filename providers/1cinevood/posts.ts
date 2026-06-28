@@ -1,15 +1,32 @@
 import { Post, ProviderContext } from "../types";
 
-const defaultHeaders = {
-  Referer: "https://www.google.com",
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-    "(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
-  Pragma: "no-cache",
-  "Cache-Control": "no-cache",
-};
+
+
+async function getWithWAF(
+  url: string,
+  axios: any,
+  openWebView: any,
+  headers: any,
+): Promise<any> {
+  const baseUrl = url.split("/").slice(0, 3).join("/");
+  try {
+    return await axios.get(url, { headers: { ...headers, Referer: baseUrl } });
+  } catch (error: any) {
+    if (error.response?.status === 403 && openWebView) {
+      console.log(`WAF detected (403) for ${url}, using solver...`);
+      const wafResult = await openWebView(baseUrl, {
+        title: "Solve the captcha below and click done",
+        description: "Required to bypass anti-bot protection.",
+        headers: { ...headers, Referer: baseUrl },
+        waitForCookie: "cf_clearance",
+      });
+      return await axios.get(url, {
+        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
+      });
+    }
+    throw error;
+  }
+}
 
 // --- Normal catalog posts ---
 export async function getPosts({
@@ -67,21 +84,19 @@ async function fetchPosts({
 
     // --- Build URL for category filter or search query
     if (query && query.trim()) {
-      url = `${baseUrl}/?s=${encodeURIComponent(query)}${
-        page > 1 ? `&paged=${page}` : ""
-      }`;
+      url = `${baseUrl}/?s=${encodeURIComponent(query)}${page > 1 ? `&paged=${page}` : ""
+        }`;
     } else if (filter) {
       url = filter.startsWith("/")
-        ? `${baseUrl}${filter.replace(/\/$/, "")}${
-            page > 1 ? `/page/${page}` : ""
-          }`
+        ? `${baseUrl}${filter.replace(/\/$/, "")}${page > 1 ? `/page/${page}` : ""
+        }`
         : `${baseUrl}/${filter}${page > 1 ? `/page/${page}` : ""}`;
     } else {
       url = `${baseUrl}${page > 1 ? `/page/${page}` : ""}`;
     }
 
-    const { axios, cheerio } = providerContext;
-    const res = await axios.get(url, { headers: defaultHeaders, signal });
+    const { axios, cheerio, commonHeaders, openWebView } = providerContext;
+    const res = await getWithWAF(url, axios, openWebView, commonHeaders);
     const $ = cheerio.load(res.data || "");
 
     const resolveUrl = (href: string) =>

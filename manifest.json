@@ -42,7 +42,7 @@
   {
     "display_name": "Cinewood",
     "value": "1cinevood",
-    "version": "1.6",
+    "version": "1.7",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -122,7 +122,7 @@
   {
     "display_name": "KmMovies",
     "value": "kmMovies",
-    "version": "1.4",
+    "version": "1.5",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -258,7 +258,7 @@
   {
     "display_name": "Animetsu",
     "value": "animetsu",
-    "version": "1.7",
+    "version": "1.8",
     "icon": "",
     "type": "english",
     "disabled": false

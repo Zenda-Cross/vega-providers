@@ -1,27 +1,32 @@
 import { Info, Link, ProviderContext } from "../types";
 
-// Headers
-const headers = {
-  Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,application/signed-exchange;v=b3;q=0.7",
-  "Cache-Control": "no-store",
-  "Accept-Language": "en-US,en;q=0.9",
-  DNT: "1",
-  "sec-ch-ua":
-    '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
-  "sec-ch-ua-mobile": "?0",
-  "sec-ch-ua-platform": '"Windows"',
-  "Sec-Fetch-Dest": "document",
-  "Sec-Fetch-Mode": "navigate",
-  "Sec-Fetch-Site": "none",
-  "Sec-Fetch-User": "?1",
-  // NOTE: Cookies often expire or change, use caution with hardcoding.
-  Cookie:
-    "xla=s4t; _ga=GA1.1.1081149560.1756378968; _ga_BLZGKYN5PF=GS2.1.s1756378968$o1$g1$t1756378984$j44$l0$h0",
-  "Upgrade-Insecure-Requests": "1",
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
-};
+
+
+async function getWithWAF(
+  url: string,
+  axios: any,
+  openWebView: any,
+  headers: any,
+): Promise<any> {
+  const baseUrl = url.split("/").slice(0, 3).join("/");
+  try {
+    return await axios.get(url, { headers: { ...headers, Referer: baseUrl } });
+  } catch (error: any) {
+    if (error.response?.status === 403 && openWebView) {
+      console.log(`WAF detected (403) for ${url}, using solver...`);
+      const wafResult = await openWebView(baseUrl, {
+        title: "Solve the captcha below and click done",
+        description: "Required to bypass anti-bot protection.",
+        headers: { ...headers, Referer: baseUrl },
+        waitForCookie: "cf_clearance",
+      });
+      return await axios.get(url, {
+        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
+      });
+    }
+    throw error;
+  }
+}
 
 export const getMeta = async function ({
   link,
@@ -30,7 +35,7 @@ export const getMeta = async function ({
   link: string;
   providerContext: ProviderContext;
 }): Promise<Info> {
-  const { axios, cheerio } = providerContext;
+  const { axios, cheerio, commonHeaders, openWebView } = providerContext;
   const url = link;
   const baseUrl = url.split("/").slice(0, 3).join("/");
 
@@ -44,9 +49,7 @@ export const getMeta = async function ({
   };
 
   try {
-    const response = await axios.get(url, {
-      headers: { ...headers, Referer: baseUrl },
-    });
+    const response = await getWithWAF(url, axios, openWebView, commonHeaders);
 
     const $ = cheerio.load(response.data);
     const infoContainer = $(".entry-content, .post-inner").first();
@@ -145,9 +148,8 @@ export const getMeta = async function ({
 
           links.push({
             // Final title for the link entry (e.g., S01 | 1080p | 11.78 GB)
-            title: `${seasonEpisode}${qualityMatch}${
-              fileSizeMatch ? " | " + fileSizeMatch : ""
-            }`
+            title: `${seasonEpisode}${qualityMatch}${fileSizeMatch ? " | " + fileSizeMatch : ""
+              }`
               .trim()
               .replace(/\|$/, "")
               .trim(),

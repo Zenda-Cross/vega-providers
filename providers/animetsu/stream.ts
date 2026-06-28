@@ -37,7 +37,7 @@ export const getStream = async function ({
       throw new Error("Invalid link format");
     }
 
-    const servers = ["sage", "meg", "dio", "kite"];
+    const servers = ["sage", "dio"];
     const streamLinks: Stream[] = [];
 
     await Promise.all(

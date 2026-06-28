@@ -1,5 +1,31 @@
 import { EpisodeLink, ProviderContext } from "../types";
 
+async function getWithWAF(
+  url: string,
+  axios: any,
+  openWebView: any,
+  headers: any,
+): Promise<any> {
+  const baseUrl = url.split("/").slice(0, 3).join("/");
+  try {
+    return await axios.get(url, { headers: { ...headers, Referer: baseUrl } });
+  } catch (error: any) {
+    if (error.response?.status === 403 && openWebView) {
+      console.log(`WAF detected (403) for ${url}, using solver...`);
+      const wafResult = await openWebView(baseUrl, {
+        title: "Solve the captcha below and click done",
+        description: "Required to bypass anti-bot protection.",
+        headers: { ...headers, Referer: baseUrl },
+        waitForCookie: "cf_clearance",
+      });
+      return await axios.get(url, {
+        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
+      });
+    }
+    throw error;
+  }
+}
+
 const formatEpisodeTitle = (fileName: string): string => {
   try {
     // Match patterns like S03E01, S03E1, s03e01, etc.
@@ -22,7 +48,7 @@ export const getEpisodes = async function ({
   url: string;
   providerContext: ProviderContext;
 }): Promise<EpisodeLink[]> {
-  const { axios, cheerio, commonHeaders: headers } = providerContext;
+  const { axios, cheerio, commonHeaders: headers, openWebView } = providerContext;
   console.log("getEpisodeLinks", url);
   try {
     const baseUrl = url.split("/").slice(0, 3).join("/");
@@ -32,18 +58,14 @@ export const getEpisodes = async function ({
 
     let res;
     try {
-      res = await axios.get(apiUrl, {
-        headers: headers,
-      });
+      res = await getWithWAF(apiUrl, axios, openWebView, headers);
     } catch (error: any) {
       // If 404, try alternative API endpoint
       if (error.response?.status === 404) {
         const alternativeUrl = `${baseUrl}/api/s/${id}/`;
         console.log("Trying alternative URL:", alternativeUrl);
 
-        const altRes = await axios.get(alternativeUrl, {
-          headers: headers,
-        });
+        const altRes = await getWithWAF(alternativeUrl, axios, openWebView, headers);
 
         // Check if hubcloud is available
         if (altRes.data?.hasHubcloud) {

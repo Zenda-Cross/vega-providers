@@ -1,9 +1,12 @@
 import { Info, Link, ProviderContext } from "../types";
 
 const kmmHeaders = {
-  Referer: "https://google.com",
   "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  Pragma: "no-cache",
+  "Cache-Control": "no-cache",
 };
 
 async function getWithWAF(
@@ -121,59 +124,41 @@ export const getMeta = async function ({
 
     // --- Download Links
     const linkList: Link[] = [];
-    const isSeries = $(".download-options-grid").length > 0; // Series tab structure
 
-    if (isSeries) {
-      // --- Series: loop through each download-card
-      $(".download-card").each((_, card) => {
-        const card$ = $(card);
-        const quality = card$.find(".download-quality-text").text().trim();
-        const size = card$.find(".download-size-info").text().trim() || "";
-        const href = card$.find("a.tabs-download-button").attr("href") || "";
-        if (href) {
-          const titleText = `Download ${quality} ${size}`.trim();
-          linkList.push({
-            title: titleText,
-            quality: quality || "AUTO",
-            directLinks: [
-              {
-                link: href,
-                title: titleText,
-                type: "series",
-              },
-            ],
-          });
-        }
-      });
-    } else {
-      // --- Movie: same as before
-      $("a.modern-download-button").each((_, a) => {
-        const parent = $(a).closest(".modern-option-card");
-        const quality = parent.find(".modern-badge").text().trim() || "AUTO";
-        const href = $(a).attr("href") || "";
-        const titleText = `Download ${quality}`;
-        if (href) {
-          linkList.push({
-            title: titleText,
+    // Both movies and series use a.dl-btn now
+    $("a.dl-btn").each((_, a) => {
+      const el = $(a);
+      const text = el.text().trim(); // e.g. "720p\n\t\t\t\t\t\t\t\t\t623 MB"
+      // Replace multiple whitespaces/newlines with a single space
+      const titleText = text.replace(/\s+/g, ' ').trim();
+      let quality = "AUTO";
+      if (titleText.toLowerCase().includes('480p')) quality = '480p';
+      else if (titleText.toLowerCase().includes('720p')) quality = '720p';
+      else if (titleText.toLowerCase().includes('1080p')) quality = '1080p';
+      else if (titleText.toLowerCase().includes('2160p') || titleText.toLowerCase().includes('4k')) quality = '2160p';
+      
+      const href = el.attr("href") || "";
+      if (href) {
+        linkList.push({
+            title: `Download ${titleText}`,
             quality,
             directLinks: [
-              {
-                link: href,
-                title: titleText,
-                type: "movie",
-              },
+                {
+                    link: href,
+                    title: `Download ${titleText}`,
+                    type: href.includes("/series/") ? "series" : "movie",
+                },
             ],
-          });
-        }
-      });
-    }
+        });
+      }
+    });
 
     return {
       title,
       synopsis,
       image,
       imdbId,
-      type: isSeries ? "series" : "movie",
+      type: linkList.some(l => l.directLinks && l.directLinks.some(dl => dl.type === "series")) ? "series" : "movie",
       tags,
       cast,
       rating,
