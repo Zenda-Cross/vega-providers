@@ -326,5 +326,13 @@
     "icon": "",
     "type": "india",
     "disabled": false
+  },
+  {
+    "display_name": "AnimeStream",
+    "value": "uniquestream",
+    "version": "1.0",
+    "icon": "",
+    "type": "english",
+    "disabled": false
   }
 ]
