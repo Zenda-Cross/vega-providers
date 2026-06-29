@@ -207,8 +207,35 @@ const isDriveLink = async (ddl: string) => {
   }
 };
 
+async function getWithWAF(
+  url: string,
+  axios: any,
+  openWebView: any,
+  headers: any,
+): Promise<any> {
+  const baseUrl = url.split("/").slice(0, 3).join("/");
+  try {
+    return await axios.get(url, { headers: { ...headers, Referer: baseUrl } });
+  } catch (error: any) {
+    if (error.response?.status === 403 && openWebView) {
+      console.log(`WAF detected (403) for ${url}, using solver...`);
+      const wafResult = await openWebView(baseUrl, {
+        title: "Solve the captcha below and click done",
+        description: "Required to bypass anti-bot protection.",
+        headers: { ...headers, Referer: baseUrl },
+        waitForCookie: "cf_clearance",
+        force: true,
+      });
+      return await axios.get(url, {
+        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
+      });
+    }
+    throw error;
+  }
+}
+
 async function modExtractor(url: string, providerContext: ProviderContext) {
-  const { axios, cheerio } = providerContext;
+  const { axios, cheerio, openWebView } = providerContext;
   try {
     const wpHttp = url.split("sid=")[1];
     var bodyFormData0 = new FormData();
@@ -229,7 +256,7 @@ async function modExtractor(url: string, providerContext: ProviderContext) {
 
     // form data
     var bodyFormData = new FormData();
-    bodyFormData.append("_wp_http2", wpHttp2);
+    bodyFormData.append("_wp_http2", wpHttp2 as string);
     const formUrl1 = $("form").attr("action");
     const formUrl = formUrl1 || url.split("?")[0];
 
@@ -238,16 +265,16 @@ async function modExtractor(url: string, providerContext: ProviderContext) {
       body: bodyFormData,
     });
     const html2: any = await res2.text();
-    const link = html2.match(/setAttribute\("href",\s*"(.*?)"/)[1];
+    const linkMatch = html2.match(/setAttribute\("href",\s*"(.*?)"/);
+    if (!linkMatch) return null;
+    const link = linkMatch[1];
     console.log(link);
     const cookie = link.split("=")[1];
     console.log("cookie", cookie);
 
-    const downloadLink = await axios.get(link, {
-      headers: {
-        Referer: formUrl,
-        Cookie: `${cookie}=${wpHttp2}`,
-      },
+    const downloadLink = await getWithWAF(link, axios, openWebView, {
+      Referer: formUrl,
+      Cookie: `${cookie}=${wpHttp2}`,
     });
     return downloadLink;
   } catch (err) {

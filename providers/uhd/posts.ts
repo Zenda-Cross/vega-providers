@@ -61,6 +61,33 @@ export const getSearchPosts = async ({
   return posts(baseUrl, url, signal, providerContext);
 };
 
+async function getWithWAF(
+  url: string,
+  axios: any,
+  openWebView: any,
+  headers: any,
+): Promise<any> {
+  const baseUrl = url.split("/").slice(0, 3).join("/");
+  try {
+    return await axios.get(url, { headers: { ...headers, Referer: baseUrl } });
+  } catch (error: any) {
+    if (error.response?.status === 403 && openWebView) {
+      console.log(`WAF detected (403) for ${url}, using solver...`);
+      const wafResult = await openWebView(baseUrl, {
+        title: "Solve the captcha below and click done",
+        description: "Required to bypass anti-bot protection.",
+        headers: { ...headers, Referer: baseUrl },
+        waitForCookie: "cf_clearance",
+        force: true,
+      });
+      return await axios.get(url, {
+        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
+      });
+    }
+    throw error;
+  }
+}
+
 async function posts(
   baseURL: string,
   url: string,
@@ -68,8 +95,8 @@ async function posts(
   providerContext: ProviderContext
 ): Promise<Post[]> {
   try {
-    const { axios, cheerio } = providerContext;
-    const res = await axios.get(url, { headers, signal });
+    const { axios, cheerio, openWebView } = providerContext;
+    const res = await getWithWAF(url, axios, openWebView, headers);
     const html = res.data;
     const $ = cheerio.load(html);
     const uhdCatalog: Post[] = [];

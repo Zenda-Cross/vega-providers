@@ -19,6 +19,7 @@ async function getWithWAF(
         description: "Required to bypass anti-bot protection.",
         headers: { ...headers, Referer: baseUrl },
         waitForCookie: "cf_clearance",
+        force: true,
       });
       return await axios.get(url, {
         headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
