@@ -11,16 +11,8 @@ export const getEpisodes = async function ({
   try {
     const episodeLinks: EpisodeLink[] = [];
 
-    const response = await fetch("https://dob-worker.1proxy.workers.dev", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        url: url,
-        method: "GET",
-      }),
-    });
+    const proxyUrl = `https://worker.zendax.me/api/moviebox?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl);
 
     const data = await response.json();
     const list = data?.data?.list || [];

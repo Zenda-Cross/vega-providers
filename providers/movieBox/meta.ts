@@ -10,17 +10,8 @@ export const getMeta = async function ({
   try {
     const { axios, cheerio, getBaseUrl } = providerContext;
     const links: Link[] = [];
-    // this is just a proxy please host your own if you want to use this code:- https://github.com/himanshu8443/Cf-Workers/blob/main/src/dob-worker/index.js
-    const response = await fetch("https://dob-worker.1proxy.workers.dev", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        url: link,
-        method: "GET",
-      }),
-    });
+    const proxyUrl = `https://worker.zendax.me/api/moviebox?url=${encodeURIComponent(link)}`;
+    const response = await fetch(proxyUrl);
     const data = (await response.json()).data;
     console.log("data", data);
 
