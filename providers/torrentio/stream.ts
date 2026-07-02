@@ -69,9 +69,55 @@ export const getStream = async ({
           link = `magnet:?xt=urn:btih:${s.infoHash}`;
         }
 
+        let language = "English";
+        const flagsMatch = (s.title || "").match(/[\uD83C][\uDDE6-\uDDFF][\uD83C][\uDDE6-\uDDFF]/g);
+        if (flagsMatch && flagsMatch.length > 0) {
+          language = Array.from(new Set(flagsMatch)).join(" ");
+        } else {
+          const titleUpper = (s.title || "").toUpperCase();
+          const langs = [];
+          if (titleUpper.includes("MULTI")) langs.push("Multi");
+          if (titleUpper.includes("DUAL")) langs.push("Dual");
+          if (titleUpper.includes("HINDI")) langs.push("Hindi");
+          if (titleUpper.includes("TAMIL")) langs.push("Tamil");
+          if (titleUpper.includes("TELUGU")) langs.push("Telugu");
+          if (titleUpper.includes("SPANISH")) langs.push("Spanish");
+          if (titleUpper.includes("FRENCH")) langs.push("French");
+          if (titleUpper.includes("GERMAN")) langs.push("German");
+          if (titleUpper.includes("ITALIAN")) langs.push("Italian");
+          if (titleUpper.includes("KOREAN")) langs.push("Korean");
+          if (titleUpper.includes("JAPANESE")) langs.push("Japanese");
+          if (titleUpper.includes("DUBBED")) langs.push("Dubbed");
+          
+          if (langs.length > 0) {
+            language = langs.join(", ");
+          }
+        }
+
+        let seeders = "";
+        const seedersMatch = (s.title || "").match(/👤\s*\d+/);
+        if (seedersMatch) {
+          seeders = seedersMatch[0];
+        } else {
+          const slMatch = (s.title || "").match(/S:\s*\d+\s*L:\s*\d+/i);
+          if (slMatch) {
+            seeders = slMatch[0];
+          }
+        }
+
+        let resolution = quality ? `${quality}p` : "";
+        if (s.name && s.name.includes("\n")) {
+          resolution = s.name.split("\n")[1].trim();
+        }
+
+        let serverName = resolution ? `${resolution} | ${language}` : language;
+        if (seeders) {
+          serverName += ` | ${seeders}`;
+        }
+
         if (link) {
           streams.push({
-            server: (s.name || "Torrentio").replace(/\n/g, " "),
+            server: serverName,
             link: link,
             type: link.startsWith("magnet:") ? "torrent" : "mp4",
             quality: quality,
@@ -79,6 +125,8 @@ export const getStream = async ({
         }
       });
     }
+
+    console.log("Torrentio streams:", streams);
 
     return streams;
   } catch (err) {
