@@ -334,5 +334,13 @@
     "icon": "",
     "type": "english",
     "disabled": true
+  },
+  {
+    "display_name": "Torrentio",
+    "value": "torrentio",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
   }
 ]
