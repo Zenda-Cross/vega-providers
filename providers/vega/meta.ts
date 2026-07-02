@@ -59,11 +59,10 @@ export const getMeta = async ({
     if (!imdbId) {
       const heading = infoContainer?.find("h3");
       imdbId =
-        //@ts-ignore
         heading
           ?.next("p")
-          ?.find("a")?.[0]
-          ?.attribs?.href?.match(/tt\d+/g)?.[0] ||
+          ?.find("a")
+          ?.attr("href")?.match(/tt\d+/g)?.[0] ||
         infoContainer.text().match(/tt\d+/g)?.[0] ||
         "";
     }
@@ -137,7 +136,7 @@ export const getMeta = async ({
       }
     }
 
-    const list = hr?.nextUntil("hr");
+    const list = hr?.nextAll();
     const links: Link[] = [];
     list.each((index, element: any) => {
       element = $(element);
