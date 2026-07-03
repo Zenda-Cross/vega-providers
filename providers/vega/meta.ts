@@ -161,9 +161,7 @@ export const getMeta = async ({
       // episode links
       const vcloudLinks = element
         ?.next()
-        .find(
-          ".btn-outline[style='background:linear-gradient(135deg,#ed0b0b,#f2d152); color: white;'],.btn-outline[style='background:linear-gradient(135deg,#ed0b0b,#f2d152); color: #fdf8f2;'],.btn-outline[style='background:linear-gradient(135deg,#ed0b0b,#f2d152);color: white']",
-        )
+        .find(".btn-outline[style*='#ed0b0b']")
         ?.parent()
         ?.attr("href");
       const episodesLink =
@@ -179,9 +177,7 @@ export const getMeta = async ({
             : "") ||
         element
           ?.next()
-          .find(
-            ".btn-outline[style='background:linear-gradient(135deg,#0ebac3,#09d261); color: white;']",
-          )
+          .find(".btn-outline[style*='#0ebac3']")
           ?.parent()
           ?.attr("href");
       if (movieLinks || episodesLink) {
