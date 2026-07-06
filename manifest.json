@@ -342,5 +342,21 @@
     "icon": "",
     "type": "global",
     "disabled": false
+  },
+  {
+    "display_name": "Genga",
+    "value": "genga",
+    "version": "1.0",
+    "icon": "",
+    "type": "india",
+    "disabled": false
+  },
+  {
+    "display_name": "MXPlayer",
+    "value": "mxplayer",
+    "version": "1.0",
+    "icon": "",
+    "type": "india",
+    "disabled": false
   }
 ]
