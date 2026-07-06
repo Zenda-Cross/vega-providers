@@ -17,11 +17,12 @@ const getUserId = () => {
 
 const parseImage = (imageInfo: any[]): string => {
   if (!imageInfo || imageInfo.length === 0) return "";
-  const landscape = imageInfo.find((img: any) => img.type === "landscape");
-  const path = landscape ? landscape.url : imageInfo[0].url;
+  const portrait = imageInfo.find((img: any) => img.type === "portrait_large" || img.type === "portrait");
+  const fallback = imageInfo.find((img: any) => img.type === "landscape" || img.type === "bigpic");
+  const path = portrait ? portrait.url : fallback ? fallback.url : imageInfo[0].url;
   if (!path) return "";
   if (path.startsWith("http")) return path;
-  return `https://isa-1.mxplay.com/${path}`;
+  return `https://qqcdnpictest.mxplay.com/${path}`;
 };
 
 function parseState(str: string): any {
