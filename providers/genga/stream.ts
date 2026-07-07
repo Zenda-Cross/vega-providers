@@ -1,17 +1,22 @@
 import { Stream, ProviderContext } from "../types";
-import * as crypto from "crypto";
-import * as vm from "vm";
+import CryptoJS from "crypto-js";
 
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 
 function decryptAes(hexText: string): string {
-  const key = Buffer.from("kiemtienmua911ca", "utf8");
-  const iv = Buffer.from("1234567890oiuytr", "utf8");
-  const encryptedBytes = Buffer.from(hexText, "hex");
-  const decipher = crypto.createDecipheriv("aes-128-cbc", key, iv);
-  let decrypted = decipher.update(encryptedBytes);
-  decrypted = Buffer.concat([decrypted, decipher.final()]);
-  return decrypted.toString("utf8");
+  const key = CryptoJS.enc.Utf8.parse("kiemtienmua911ca");
+  const iv = CryptoJS.enc.Utf8.parse("1234567890oiuytr");
+  const base64 = CryptoJS.enc.Hex.parse(hexText).toString(CryptoJS.enc.Base64);
+  const decrypted = CryptoJS.AES.decrypt(
+    base64,
+    key,
+    {
+      iv: iv,
+      mode: CryptoJS.mode.CBC,
+      padding: CryptoJS.pad.Pkcs7
+    }
+  );
+  return decrypted.toString(CryptoJS.enc.Utf8);
 }
 
 function decodeBase64Embed(embedId: string): { name: string; url: string } | null {
@@ -81,108 +86,7 @@ export const getStream = async function ({
       }
     }
 
-    // A. Resolve CLOUD stream (Priority 3)
-    if (cloudExternalUrl) {
-      try {
-        const cloudHeaders = {
-          "User-Agent": USER_AGENT,
-          "Referer": "https://cloud.desidubanime.me/",
-        };
-
-        const extRes = await axios.get(cloudExternalUrl, { headers: cloudHeaders });
-        const extHtml = extRes.data || "";
-        
-        // Find sources list
-        const sourcesMatch = extHtml.match(/const\s+sources\s*=\s*(\[[\s\S]*?\]);/);
-        if (sourcesMatch) {
-          const sources = JSON.parse(sourcesMatch[1]);
-          const firstSource = sources[0];
-          if (firstSource && firstSource.url) {
-            const playUrl = `https://cloud.desidubanime.me${firstSource.url}`;
-            const playRes = await axios.get(playUrl, { headers: cloudHeaders });
-            const playHtml = playRes.data || "";
-            const $play = cheerio.load(playHtml);
-
-            // Execute inline player script in VM context to capture JW player config
-            const playerScript = $play("script").eq(1).text();
-            if (playerScript) {
-              const setupConfigs: any[] = [];
-              const dummyElement = {
-                appendChild: () => {},
-                removeChild: () => {},
-                setAttribute: () => {},
-                style: {},
-              };
-
-              const mockPlayer = {
-                setup: function (config: any) {
-                  setupConfigs.push(config);
-                  return this;
-                },
-                on: function () { return this; },
-                addButton: function () { return this; },
-                onReady: function (cb: any) { if (cb) cb(); return this; },
-                onTime: function () { return this; },
-                onComplete: function () { return this; },
-                onPlay: function () { return this; },
-                onPause: function () { return this; },
-                getPlaylist: function () { return []; },
-              };
-
-              const context = {
-                window: {},
-                document: {
-                  getElementById: () => dummyElement,
-                  querySelector: () => dummyElement,
-                  createElement: () => dummyElement,
-                  body: dummyElement,
-                  head: dummyElement,
-                  addEventListener: () => {},
-                },
-                navigator: {
-                  userAgent: USER_AGENT,
-                },
-                jwplayer: () => mockPlayer,
-                playerInstance: mockPlayer,
-                console: {
-                  log: () => {},
-                  error: () => {},
-                  warn: () => {},
-                },
-                setTimeout: () => {},
-                setInterval: () => {},
-                location: {
-                  href: playUrl,
-                  hostname: "cloud.desidubanime.me",
-                  protocol: "https:",
-                },
-              };
-              (context as any).window = context;
-
-              vm.createContext(context);
-              vm.runInContext(playerScript, context);
-
-              if (setupConfigs.length > 0 && setupConfigs[0].file) {
-                const hlsFile = setupConfigs[0].file;
-                streamLinks.push({
-                  server: "CLOUD",
-                  link: `https://cloud.desidubanime.me${hlsFile}`,
-                  type: "hls",
-                  headers: {
-                    "User-Agent": USER_AGENT,
-                    "Referer": "https://cloud.desidubanime.me/",
-                  },
-                });
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error("DesiDubAnime CLOUD resolver error:", err);
-      }
-    }
-
-    // B. Resolve IQSmartGames nested servers (Priority 2)
+    // A. Resolve IQSmartGames nested servers (Priority 1)
     if (gdMirrorSid) {
       try {
         const payload = new URLSearchParams();
@@ -244,18 +148,18 @@ export const getStream = async function ({
                     }
                   }
                 }
-              } catch (innerErr) {
-                console.error(`DesiDubAnime error resolving key ${key}:`, innerErr);
+              } catch (innerErr: any) {
+                console.error(`DesiDubAnime error resolving key ${key}:`, innerErr.message);
               }
             }
           }
         }
-      } catch (err) {
-        console.error("DesiDubAnime IQSmartGames helper error:", err);
+      } catch (err: any) {
+        console.error("DesiDubAnime IQSmartGames helper error:", err.message);
       }
     }
-  } catch (err) {
-    console.error("DesiDubAnime getStream error:", err);
+  } catch (err: any) {
+    console.error("DesiDubAnime getStream error:", err.message);
   }
 
   return streamLinks;
