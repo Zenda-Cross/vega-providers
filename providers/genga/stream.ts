@@ -143,7 +143,19 @@ export const getStream = async function ({
                   const hexText = videoRes.data || "";
                   if (hexText) {
                     const decrypted = JSON.parse(decryptAes(hexText));
-                    const sourceUrl = decrypted.source || decrypted.cf || "";
+                    let sourceUrl = decrypted.source || "";
+                    const cfUrl = decrypted.cf || "";
+
+                    // If sourceUrl starts with an IP address, replace it with the CF domain to prevent SSL handshake failure
+                    const ipMatch = sourceUrl.match(/https?:\/\/([0-9.]+)/);
+                    if (ipMatch) {
+                      const cfMatch = cfUrl.match(/https?:\/\/([^/]+)/);
+                      if (cfMatch) {
+                        const domain = cfMatch[1];
+                        sourceUrl = sourceUrl.replace(/https?:\/\/[0-9.]+/, `https://${domain}`);
+                      }
+                    }
+
                     if (sourceUrl) {
                       streamLinks.push({
                         server: serverName,

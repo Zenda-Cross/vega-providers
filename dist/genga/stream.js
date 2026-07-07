@@ -6759,7 +6759,16 @@ var getStream = /* @__PURE__ */ __name(function(_0) {
                     const hexText = videoRes.data || "";
                     if (hexText) {
                       const decrypted = JSON.parse(decryptAes(hexText));
-                      const sourceUrl = decrypted.source || decrypted.cf || "";
+                      let sourceUrl = decrypted.source || "";
+                      const cfUrl = decrypted.cf || "";
+                      const ipMatch = sourceUrl.match(/https?:\/\/([0-9.]+)/);
+                      if (ipMatch) {
+                        const cfMatch = cfUrl.match(/https?:\/\/([^/]+)/);
+                        if (cfMatch) {
+                          const domain = cfMatch[1];
+                          sourceUrl = sourceUrl.replace(/https?:\/\/[0-9.]+/, `https://${domain}`);
+                        }
+                      }
                       if (sourceUrl) {
                         streamLinks.push({
                           server: serverName,
