@@ -6657,6 +6657,16 @@ function decryptAes(hexText) {
   return decrypted.toString(import_crypto_js.default.enc.Utf8);
 }
 __name(decryptAes, "decryptAes");
+function decodeBase64(b64) {
+  try {
+    if (typeof atob === "function") {
+      return atob(b64);
+    }
+  } catch (e) {
+  }
+  return Buffer.from(b64, "base64").toString("utf8");
+}
+__name(decodeBase64, "decodeBase64");
 function decodeBase64Embed(embedId) {
   if (!embedId || !embedId.includes(":")) return null;
   try {
@@ -6665,8 +6675,8 @@ function decodeBase64Embed(embedId) {
     let urlB64 = parts[1];
     nameB64 += "=".repeat((4 - nameB64.length % 4) % 4);
     urlB64 += "=".repeat((4 - urlB64.length % 4) % 4);
-    const name = Buffer.from(nameB64, "base64").toString("utf8").trim();
-    const url = Buffer.from(urlB64, "base64").toString("utf8").trim();
+    const name = decodeBase64(nameB64).trim();
+    const url = decodeBase64(urlB64).trim();
     return { name, url };
   } catch (e) {
     return null;
@@ -6729,7 +6739,7 @@ var getStream = /* @__PURE__ */ __name(function(_0) {
           if (helperData.mresult && helperData.siteUrls) {
             let mresultB64 = helperData.mresult;
             mresultB64 += "=".repeat((4 - mresultB64.length % 4) % 4);
-            const decodedMresult = JSON.parse(Buffer.from(mresultB64, "base64").toString("utf8"));
+            const decodedMresult = JSON.parse(decodeBase64(mresultB64));
             const siteUrls = helperData.siteUrls;
             const friendlyNames = helperData.siteFriendlyNames || {};
             for (const [key, code] of Object.entries(decodedMresult)) {

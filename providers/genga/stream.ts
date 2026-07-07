@@ -19,6 +19,15 @@ function decryptAes(hexText: string): string {
   return decrypted.toString(CryptoJS.enc.Utf8);
 }
 
+function decodeBase64(b64: string): string {
+  try {
+    if (typeof atob === "function") {
+      return atob(b64);
+    }
+  } catch {}
+  return Buffer.from(b64, "base64").toString("utf8");
+}
+
 function decodeBase64Embed(embedId: string): { name: string; url: string } | null {
   if (!embedId || !embedId.includes(":")) return null;
   try {
@@ -29,8 +38,8 @@ function decodeBase64Embed(embedId: string): { name: string; url: string } | nul
     nameB64 += "=".repeat((4 - (nameB64.length % 4)) % 4);
     urlB64 += "=".repeat((4 - (urlB64.length % 4)) % 4);
 
-    const name = Buffer.from(nameB64, "base64").toString("utf8").trim();
-    const url = Buffer.from(urlB64, "base64").toString("utf8").trim();
+    const name = decodeBase64(nameB64).trim();
+    const url = decodeBase64(urlB64).trim();
     return { name, url };
   } catch {
     return null;
@@ -109,7 +118,7 @@ export const getStream = async function ({
           let mresultB64 = helperData.mresult;
           mresultB64 += "=".repeat((4 - (mresultB64.length % 4)) % 4);
 
-          const decodedMresult = JSON.parse(Buffer.from(mresultB64, "base64").toString("utf8"));
+          const decodedMresult = JSON.parse(decodeBase64(mresultB64));
           const siteUrls = helperData.siteUrls;
           const friendlyNames = helperData.siteFriendlyNames || {};
 
