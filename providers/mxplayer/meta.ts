@@ -86,6 +86,9 @@ export const getMeta = async function ({
       
       const match = html.match(/window\.__mxs__\s*=\s*({.*)/s) || html.match(/__mxs__\s*=\s*({.*)/s);
       const seasons: { id: string; title: string; sequence: number }[] = [];
+      let showTitle = "TV Show";
+      let showSynopsis = "";
+      let showImage = "";
 
       if (match) {
         try {
@@ -93,6 +96,10 @@ export const getMeta = async function ({
           const entities = data.entities || {};
           Object.values(entities).forEach((ev: any) => {
             if (ev.type === "tvshow" || ev.type === "tv_show") {
+              showTitle = ev.title || showTitle;
+              showSynopsis = ev.description || showSynopsis;
+              showImage = parseImage(ev.imageInfo) || showImage;
+              
               const tabs = ev.tabs || [];
               tabs.forEach((tab: any) => {
                 if (tab.type === "tvshowepisodes") {
@@ -119,9 +126,9 @@ export const getMeta = async function ({
       seasons.sort((a, b) => a.sequence - b.sequence);
 
       return {
-        title: "TV Show",
-        synopsis: "",
-        image: "",
+        title: showTitle,
+        synopsis: showSynopsis,
+        image: showImage,
         imdbId: "",
         type: "series",
         linkList: seasons.map((s) => ({
