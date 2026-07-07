@@ -1,16 +1,14 @@
 export const catalog = [
   {
-    title: "Movies",
-    filter: "movies",
+    title: "Latest",
+    filter: "date",
   },
   {
-    title: "Series",
-    filter: "series",
+    title: "Popular",
+    filter: "popular",
   },
   {
-    title: "Dramas",
-    filter: "dramas",
+    title: "Rating",
+    filter: "rating",
   },
 ];
-
-export const genres = [];

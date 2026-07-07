@@ -1,1 +1,110 @@
-"use strict";var __defProp=Object.defineProperty,__getOwnPropDesc=Object.getOwnPropertyDescriptor,__getOwnPropNames=Object.getOwnPropertyNames,__hasOwnProp=Object.prototype.hasOwnProperty,__name=(target,value)=>__defProp(target,"name",{value:value,configurable:!0}),__export=(target,all)=>{for(var name in all)__defProp(target,name,{get:all[name],enumerable:!0})},__copyProps=(to,from,except,desc)=>{if(from&&"object"==typeof from||"function"==typeof from)for(let key of __getOwnPropNames(from))__hasOwnProp.call(to,key)||key===except||__defProp(to,key,{get:()=>from[key],enumerable:!(desc=__getOwnPropDesc(from,key))||desc.enumerable});return to},__toCommonJS=mod=>__copyProps(__defProp({},"__esModule",{value:!0}),mod),__async=(__this,__arguments,generator)=>new Promise((resolve,reject)=>{var fulfilled=value=>{try{step(generator.next(value))}catch(e){reject(e)}},rejected=value=>{try{step(generator.throw(value))}catch(e){reject(e)}},step=x=>x.done?resolve(x.value):Promise.resolve(x.value).then(fulfilled,rejected);step((generator=generator.apply(__this,__arguments)).next())}),posts_exports={};__export(posts_exports,{getPosts:()=>getPosts,getSearchPosts:()=>getSearchPosts});var getPosts=__name(function(_0){return __async(this,arguments,function*({filter:filter,page:page,signal:signal,providerContext:providerContext}){const{getBaseUrl:getBaseUrl,cheerio:cheerio}=providerContext,url=`${(yield getBaseUrl("4khdhub"))+filter}/page/${page}`;return console.log("4khdhubGetPosts url",url),posts({url:url,signal:signal,cheerio:cheerio})})},"getPosts"),getSearchPosts=__name(function(_0){return __async(this,arguments,function*({searchQuery:searchQuery,page:page,signal:signal,providerContext:providerContext}){const{getBaseUrl:getBaseUrl,cheerio:cheerio}=providerContext,baseUrl=yield getBaseUrl("4khdhub"),url=1==page?`${baseUrl}/?s=${searchQuery}`:`${baseUrl}/page/${page}?s=${searchQuery}`;return console.log("4khdhubGetSearchPosts url",url),posts({url:url,signal:signal,cheerio:cheerio})})},"getSearchPosts");function posts(_0){return __async(this,arguments,function*({url:url,signal:signal,cheerio:cheerio}){try{const res=yield fetch(url,{signal:signal}),data=yield res.text(),$=cheerio.load(data),catalog=[];return $(".card-grid").children().map((i,element)=>{const title=$(element).find(".movie-card-title").text(),link=$(element).attr("href"),image=$(element).find("img").attr("src");title&&link&&image&&catalog.push({title:title,link:link,image:image})}),catalog}catch(err){return console.error("4khdhubGetPosts error ",err),[]}})}__name(posts,"posts"),exports.getPosts=getPosts,exports.getSearchPosts=getSearchPosts;
+"use strict";
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
+
+// providers/4khdhub/posts.ts
+var posts_exports = {};
+__export(posts_exports, {
+  getPosts: () => getPosts,
+  getSearchPosts: () => getSearchPosts
+});
+
+var getPosts = /* @__PURE__ */ __name(function(_0) {
+  return __async(this, arguments, function* ({
+    filter,
+    page,
+    signal,
+    providerContext
+  }) {
+    const { getBaseUrl, cheerio } = providerContext;
+    const baseUrl = yield getBaseUrl("4khdhub");
+    const url = `${baseUrl + filter}/page/${page}`;
+    console.log("4khdhubGetPosts url", url);
+    return posts({ url, signal, cheerio });
+  });
+}, "getPosts");
+var getSearchPosts = /* @__PURE__ */ __name(function(_0) {
+  return __async(this, arguments, function* ({
+    searchQuery,
+    page,
+    signal,
+    providerContext
+  }) {
+    const { getBaseUrl, cheerio } = providerContext;
+    const baseUrl = yield getBaseUrl("4khdhub");
+    const url = page == 1 ? `${baseUrl}/?s=${searchQuery}` : `${baseUrl}/page/${page}?s=${searchQuery}`;
+    console.log("4khdhubGetSearchPosts url", url);
+    return posts({ url, signal, cheerio });
+  });
+}, "getSearchPosts");
+function posts(_0) {
+  return __async(this, arguments, function* ({
+    url,
+    signal,
+    cheerio
+  }) {
+    try {
+      const res = yield fetch(url, { signal });
+      const data = yield res.text();
+      const $ = cheerio.load(data);
+      const catalog = [];
+      $(".card-grid").children().map((i, element) => {
+        const title = $(element).find(".movie-card-title").text();
+        const link = $(element).attr("href");
+        const image = $(element).find("img").attr("src");
+        if (title && link && image) {
+          catalog.push({
+            title,
+            link,
+            image
+          });
+        }
+      });
+      return catalog;
+    } catch (err) {
+      console.error("4khdhubGetPosts error ", err);
+      return [];
+    }
+  });
+}
+__name(posts, "posts");
+exports.getPosts = getPosts;
+exports.getSearchPosts = getSearchPosts;
+// Annotate the CommonJS export names for ESM import in node:
+

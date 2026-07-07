@@ -1,1 +1,130 @@
-"use strict";var __defProp=Object.defineProperty,__getOwnPropDesc=Object.getOwnPropertyDescriptor,__getOwnPropNames=Object.getOwnPropertyNames,__hasOwnProp=Object.prototype.hasOwnProperty,__name=(target,value)=>__defProp(target,"name",{value:value,configurable:!0}),__export=(target,all)=>{for(var name in all)__defProp(target,name,{get:all[name],enumerable:!0})},__copyProps=(to,from,except,desc)=>{if(from&&"object"==typeof from||"function"==typeof from)for(let key of __getOwnPropNames(from))__hasOwnProp.call(to,key)||key===except||__defProp(to,key,{get:()=>from[key],enumerable:!(desc=__getOwnPropDesc(from,key))||desc.enumerable});return to},__toCommonJS=mod=>__copyProps(__defProp({},"__esModule",{value:!0}),mod),__async=(__this,__arguments,generator)=>new Promise((resolve,reject)=>{var fulfilled=value=>{try{step(generator.next(value))}catch(e){reject(e)}},rejected=value=>{try{step(generator.throw(value))}catch(e){reject(e)}},step=x=>x.done?resolve(x.value):Promise.resolve(x.value).then(fulfilled,rejected);step((generator=generator.apply(__this,__arguments)).next())}),meta_exports={};__export(meta_exports,{getMeta:()=>getMeta});var getMeta=__name(function(_0){return __async(this,arguments,function*({link:data}){var _a,_b;try{const dataJson=JSON.parse(data),title=(null==dataJson?void 0:dataJson.kn)||(null==dataJson?void 0:dataJson.mn),image=(null==dataJson?void 0:dataJson.IH)||(null==dataJson?void 0:dataJson.IV),tags=null==dataJson?void 0:dataJson.gn.split(",").slice(0,3).map(tag=>tag.trim()),type="webSeries"===(null==dataJson?void 0:dataJson.cg)?"series":"movie",linkList=[];if("webSeries"===(null==dataJson?void 0:dataJson.cg))null==(_a=["1","2","3","4"])||_a.forEach(item=>{var _a2;const directLinks=[];"object"==typeof(null==dataJson?void 0:dataJson["eServer"+item])&&(null==(_a2=null==Object?void 0:Object.keys(null==dataJson?void 0:dataJson["eServer"+item]))?void 0:_a2.length)>0&&(Object.keys(null==dataJson?void 0:dataJson["eServer"+item]).forEach(key=>{directLinks.push({title:"Episode "+key,link:JSON.stringify({url:null==dataJson?void 0:dataJson["eServer"+item][key],server:"Server "+item})})}),linkList.push({title:(null==dataJson?void 0:dataJson.pn)+" (Server "+item+")",directLinks:directLinks}))});else{const directLinks=[];null==(_b=["1","2","3","4"])||_b.forEach(item=>{(null==dataJson?void 0:dataJson["s"+item])&&directLinks.push({title:"Server "+item+" (HD)",link:JSON.stringify({url:null==dataJson?void 0:dataJson.s1,server:"Server "+item})}),(null==dataJson?void 0:dataJson["4s"+item])&&directLinks.push({title:"Server "+item+" (480p)",link:JSON.stringify({url:null==dataJson?void 0:dataJson["4s"+item],server:"Server "+item})})}),linkList.push({title:null==dataJson?void 0:dataJson.pn,directLinks:directLinks})}return{title:title,image:image,imdbId:"",synopsis:"",type:type,linkList:linkList,tags:tags}}catch(err){return{title:"",image:"",imdbId:"",synopsis:"",type:"movie",linkList:[],tags:[]}}})},"getMeta");exports.getMeta=getMeta;
+"use strict";
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
+
+// providers/ringz/meta.ts
+var meta_exports = {};
+__export(meta_exports, {
+  getMeta: () => getMeta
+});
+
+var getMeta = /* @__PURE__ */ __name(function(_0) {
+  return __async(this, arguments, function* ({
+    link: data
+  }) {
+    var _a, _b;
+    try {
+      const dataJson = JSON.parse(data);
+      const title = (dataJson == null ? void 0 : dataJson.kn) || (dataJson == null ? void 0 : dataJson.mn);
+      const image = (dataJson == null ? void 0 : dataJson.IH) || (dataJson == null ? void 0 : dataJson.IV);
+      const tags = dataJson == null ? void 0 : dataJson.gn.split(",").slice(0, 3).map((tag) => tag.trim());
+      const type = (dataJson == null ? void 0 : dataJson.cg) === "webSeries" ? "series" : "movie";
+      const linkList = [];
+      if ((dataJson == null ? void 0 : dataJson.cg) === "webSeries") {
+        (_a = ["1", "2", "3", "4"]) == null ? void 0 : _a.forEach((item) => {
+          var _a2;
+          const directLinks = [];
+          if (typeof (dataJson == null ? void 0 : dataJson["eServer" + item]) === "object" && ((_a2 = Object == null ? void 0 : Object.keys(dataJson == null ? void 0 : dataJson["eServer" + item])) == null ? void 0 : _a2.length) > 0) {
+            Object.keys(dataJson == null ? void 0 : dataJson["eServer" + item]).forEach((key) => {
+              directLinks.push({
+                title: "Episode " + key,
+                link: JSON.stringify({
+                  url: dataJson == null ? void 0 : dataJson["eServer" + item][key],
+                  server: "Server " + item
+                })
+              });
+            });
+            linkList.push({
+              title: (dataJson == null ? void 0 : dataJson.pn) + " (Server " + item + ")",
+              directLinks
+            });
+          }
+        });
+      } else {
+        const directLinks = [];
+        (_b = ["1", "2", "3", "4"]) == null ? void 0 : _b.forEach((item) => {
+          if (dataJson == null ? void 0 : dataJson["s" + item]) {
+            directLinks.push({
+              title: "Server " + item + " (HD)",
+              link: JSON.stringify({
+                url: dataJson == null ? void 0 : dataJson.s1,
+                server: "Server " + item
+              })
+            });
+          }
+          if (dataJson == null ? void 0 : dataJson["4s" + item]) {
+            directLinks.push({
+              title: "Server " + item + " (480p)",
+              link: JSON.stringify({
+                url: dataJson == null ? void 0 : dataJson["4s" + item],
+                server: "Server " + item
+              })
+            });
+          }
+        });
+        linkList.push({
+          title: dataJson == null ? void 0 : dataJson.pn,
+          directLinks
+        });
+      }
+      return {
+        title,
+        image,
+        imdbId: "",
+        synopsis: "",
+        type,
+        linkList,
+        tags
+      };
+    } catch (err) {
+      return {
+        title: "",
+        image: "",
+        imdbId: "",
+        synopsis: "",
+        type: "movie",
+        linkList: [],
+        tags: []
+      };
+    }
+  });
+}, "getMeta");
+exports.getMeta = getMeta;
+// Annotate the CommonJS export names for ESM import in node:
+

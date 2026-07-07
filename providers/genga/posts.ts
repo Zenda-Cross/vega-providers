@@ -1,5 +1,7 @@
 import { Post, ProviderContext } from "../types";
 
+const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+
 export const getPosts = async function ({
   filter,
   page,
@@ -12,38 +14,54 @@ export const getPosts = async function ({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const { axios } = providerContext;
-    const res = await axios.get("https://test.blakiteapi.xyz/api/getAllAnime.php");
-    const catalogData = res.data?.data || {};
-    const categoryItems = catalogData[filter] ? Object.values(catalogData[filter]) : [];
+    const { axios, cheerio } = providerContext;
+    const url = "https://www.desidubanime.me/wp-admin/admin-ajax.php";
     
-    // Paginate client-side
-    const limit = 20;
-    const start = (page - 1) * limit;
-    const sliced = categoryItems.slice(start, start + limit);
+    const params = new URLSearchParams();
+    params.append("action", "advanced_search");
+    params.append("page", String(page));
+    params.append("orderby", filter || "date");
+    params.append("order", "DESC");
+    params.append("s_keyword", "");
 
+    const headers = {
+      "User-Agent": USER_AGENT,
+      "Referer": "https://www.desidubanime.me/search/",
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+
+    const res = await axios.post(url, params.toString(), { headers });
+    const html = res.data?.data?.html || "";
+    if (!html) return [];
+
+    const $ = cheerio.load(html);
     const postsList: Post[] = [];
-    sliced.forEach((item: any) => {
-      const title = item.title;
-      const link = item.tmdbId || item.originalTmdbId;
-      const image = item.IMAGES?.poster || item.IMAGES?.backdrop || "";
+
+    $("article.anime-card").each((_, el) => {
+      const imgEl = $(el).find("img").first();
+      const title = imgEl.attr("alt") || "";
+      const image = imgEl.attr("src") || "";
+      const link = $(el).find("a").first().attr("href") || "";
+
       if (title && link) {
         postsList.push({
-          title,
-          link,
-          image,
+          title: title.trim(),
+          link: link.trim(),
+          image: image.trim(),
         });
       }
     });
+
     return postsList;
   } catch (err) {
-    console.error("Genga getPosts error:", err);
+    console.error("DesiDubAnime getPosts error:", err);
     return [];
   }
 };
 
-export const getSearchPosts = async function ({
+export const search = async function ({
   searchQuery,
+  page,
   providerContext,
 }: {
   searchQuery: string;
@@ -53,36 +71,47 @@ export const getSearchPosts = async function ({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const { axios } = providerContext;
-    const res = await axios.get("https://test.blakiteapi.xyz/api/getAllAnime.php");
-    const catalogData = res.data?.data || {};
+    const { axios, cheerio } = providerContext;
+    const url = "https://www.desidubanime.me/wp-admin/admin-ajax.php";
     
-    const query = searchQuery.toLowerCase();
+    const params = new URLSearchParams();
+    params.append("action", "advanced_search");
+    params.append("page", String(page));
+    params.append("orderby", "date");
+    params.append("order", "DESC");
+    params.append("s_keyword", searchQuery);
+
+    const headers = {
+      "User-Agent": USER_AGENT,
+      "Referer": "https://www.desidubanime.me/search/",
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+
+    const res = await axios.post(url, params.toString(), { headers });
+    const html = res.data?.data?.html || "";
+    if (!html) return [];
+
+    const $ = cheerio.load(html);
     const postsList: Post[] = [];
 
-    // Search through all categories
-    for (const cat of ["movies", "series", "dramas"]) {
-      const items = catalogData[cat] ? Object.values(catalogData[cat]) : [];
-      items.forEach((item: any) => {
-        const title = item.title || "";
-        const genres = item.TMDB_DATA?.genres || [];
-        const isMatch = title.toLowerCase().includes(query) || 
-                        genres.some((g: string) => g.toLowerCase().includes(query));
-        
-        if (isMatch) {
-          const link = item.tmdbId || item.originalTmdbId;
-          const image = item.IMAGES?.poster || item.IMAGES?.backdrop || "";
-          postsList.push({
-            title,
-            link,
-            image,
-          });
-        }
-      });
-    }
+    $("article.anime-card").each((_, el) => {
+      const imgEl = $(el).find("img").first();
+      const title = imgEl.attr("alt") || "";
+      const image = imgEl.attr("src") || "";
+      const link = $(el).find("a").first().attr("href") || "";
+
+      if (title && link) {
+        postsList.push({
+          title: title.trim(),
+          link: link.trim(),
+          image: image.trim(),
+        });
+      }
+    });
+
     return postsList;
   } catch (err) {
-    console.error("Genga getSearchPosts error:", err);
+    console.error("DesiDubAnime search error:", err);
     return [];
   }
 };

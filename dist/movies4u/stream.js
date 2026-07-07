@@ -1,1 +1,377 @@
-"use strict";var __defProp=Object.defineProperty,__defProps=Object.defineProperties,__getOwnPropDesc=Object.getOwnPropertyDescriptor,__getOwnPropDescs=Object.getOwnPropertyDescriptors,__getOwnPropNames=Object.getOwnPropertyNames,__getOwnPropSymbols=Object.getOwnPropertySymbols,__hasOwnProp=Object.prototype.hasOwnProperty,__propIsEnum=Object.prototype.propertyIsEnumerable,__defNormalProp=(obj,key,value)=>key in obj?__defProp(obj,key,{enumerable:!0,configurable:!0,writable:!0,value:value}):obj[key]=value,__spreadValues=(a,b)=>{for(var prop in b||(b={}))__hasOwnProp.call(b,prop)&&__defNormalProp(a,prop,b[prop]);if(__getOwnPropSymbols)for(var prop of __getOwnPropSymbols(b))__propIsEnum.call(b,prop)&&__defNormalProp(a,prop,b[prop]);return a},__spreadProps=(a,b)=>__defProps(a,__getOwnPropDescs(b)),__name=(target,value)=>__defProp(target,"name",{value:value,configurable:!0}),__export=(target,all)=>{for(var name in all)__defProp(target,name,{get:all[name],enumerable:!0})},__copyProps=(to,from,except,desc)=>{if(from&&"object"==typeof from||"function"==typeof from)for(let key of __getOwnPropNames(from))__hasOwnProp.call(to,key)||key===except||__defProp(to,key,{get:()=>from[key],enumerable:!(desc=__getOwnPropDesc(from,key))||desc.enumerable});return to},__toCommonJS=mod=>__copyProps(__defProp({},"__esModule",{value:!0}),mod),__async=(__this,__arguments,generator)=>new Promise((resolve,reject)=>{var fulfilled=value=>{try{step(generator.next(value))}catch(e){reject(e)}},rejected=value=>{try{step(generator.throw(value))}catch(e){reject(e)}},step=x=>x.done?resolve(x.value):Promise.resolve(x.value).then(fulfilled,rejected);step((generator=generator.apply(__this,__arguments)).next())}),stream_exports={};__export(stream_exports,{getStream:()=>getStream});var hubcloudDecode=__name(function(value){return void 0===value?"":atob(value.toString())},"hubcloudDecode"),extractUrlFromScript=__name(html=>{var _a,_b,_c;const doubleAtobMatch=html.match(/var\s+url\s*=\s*atob\(atob\(['"]([^'"]+)['"]\)\)/);if(null==doubleAtobMatch?void 0:doubleAtobMatch[1])return atob(atob(doubleAtobMatch[1]));const plainMatch=html.match(/var\s+url\s*=\s*['"]([^'"]+)['"]/);return hubcloudDecode(null!=(_c=null==(_b=null==(_a=null==plainMatch?void 0:plainMatch[1])?void 0:_a.split("r="))?void 0:_b[1])?_c:"")||(null==plainMatch?void 0:plainMatch[1])||""},"extractUrlFromScript"),getPixelDrainUrl=__name(html=>{const match=html.match(/var\s+pxl\s*=\s*['"]([^'"]+)['"];?/i);return(null==match?void 0:match[1])||""},"getPixelDrainUrl"),getRedirectedPixelDrainUrl=__name((...htmlSources)=>{for(const html of htmlSources){if(!html)continue;const redirectedUrl=getPixelDrainUrl(html);if(redirectedUrl)return redirectedUrl}return""},"getRedirectedPixelDrainUrl");function hubcloudExtractor(link,signal,axios,cheerio,headers2){return __async(this,null,function*(){var _a,_b,_c,_d,_e;try{headers2.Cookie="ext_name=ojplmecpdpgccookcobabopnaifgidhf; xla=s4t; cf_clearance=woQrFGXtLfmEMBEiGUsVHrUBMT8s3cmguIzmMjmvpkg-1770053679-1.2.1.1-xBrQdciOJsweUF6F2T_OtH6jmyanN_TduQ0yslc_XqjU6RcHSxI7.YOKv6ry7oYo64868HYoULnVyww536H2eVI3R2e4wKzsky6abjPdfQPxqpUaXjxfJ02o6jl3_Vkwr4uiaU7Wy596Vdst3y78HXvVmKdIohhtPvp.vZ9_L7wvWdce0GRixjh_6JiqWmWMws46hwEt3hboaS1e1e4EoWCvj5b0M_jVwvSxBOAW5emFzvT3QrnRh4nyYmKDERnY",console.log("hubcloudExtractor",link);const baseUrl=link.split("/").slice(0,3).join("/"),streamLinks=[],vLinkText=(yield axios(`${link}`,{headers:headers2,signal:signal})).data,$vLink=cheerio.load(vLinkText);let vcloudLink=extractUrlFromScript(vLinkText)||$vLink(".fa-file-download.fa-lg").parent().attr("href")||link;console.log("vcloudLink",vcloudLink),(null==vcloudLink?void 0:vcloudLink.startsWith("/"))&&(vcloudLink=`${baseUrl}${vcloudLink}`,console.log("New vcloudLink",vcloudLink));const vcloudRes=yield fetch(vcloudLink,{headers:headers2,signal:signal,redirect:"follow"}),vcloudText=yield vcloudRes.text(),$=cheerio.load(vcloudText),linkClass=$(".btn-success.btn-lg.h6,.btn-danger,.btn-secondary");for(const element of linkClass){let link2=$(element).attr("href")||"";switch(!0){case null==link2?void 0:link2.includes("pixeld"):if(console.log("Pixeldrain link found:",link2),!(null==link2?void 0:link2.includes("api"))){const redirectedPixelDrainUrl=getRedirectedPixelDrainUrl(vLinkText,vcloudText);redirectedPixelDrainUrl&&(console.log("Special case for token negn6f",redirectedPixelDrainUrl),link2=redirectedPixelDrainUrl);const token=null==(_a=link2.split("/").pop())?void 0:_a.split("?")[0],baseUrl2=link2.split("/").slice(0,-2).join("/");link2=`${baseUrl2}/api/file/${token}`}streamLinks.push({server:"Pixeldrain",link:link2,type:"mkv"});break;case(null==link2?void 0:link2.includes(".dev"))&&!(null==link2?void 0:link2.includes("/?id=")):streamLinks.push({server:"Cf Worker",link:link2,type:"mkv"});break;case(null==link2?void 0:link2.includes("hubcloud"))||(null==link2?void 0:link2.includes("/?id=")):try{const newLinkRes=yield fetch(link2,{method:"HEAD",headers:headers2,signal:signal,redirect:"manual"});let newLink=link2;if(newLink=newLinkRes.status>=300&&newLinkRes.status<400?newLinkRes.headers.get("location")||link2:newLinkRes.url&&newLinkRes.url!==link2?newLinkRes.url:newLinkRes.headers.get("location")||link2,newLink.includes("googleusercontent"))newLink=newLink.split("?link=")[1];else{const newLinkRes2=yield fetch(newLink,{method:"HEAD",headers:headers2,signal:signal,redirect:"manual"});newLink=newLinkRes2.status>=300&&newLinkRes2.status<400?(null==(_b=newLinkRes2.headers.get("location"))?void 0:_b.split("?link=")[1])||newLink:newLinkRes2.url&&newLinkRes2.url!==newLink?newLinkRes2.url.split("?link=")[1]||newLinkRes2.url:(null==(_c=newLinkRes2.headers.get("location"))?void 0:_c.split("?link=")[1])||newLink}streamLinks.push({server:"hubcloud",link:newLink,type:"mkv"})}catch(error){console.log("hubcloudExtractor error in hubcloud link: ",error)}break;case null==link2?void 0:link2.includes("cloudflarestorage"):streamLinks.push({server:"CfStorage",link:link2,type:"mkv"});break;case(null==link2?void 0:link2.includes("fastdl"))||(null==link2?void 0:link2.includes("fsl.")):streamLinks.push({server:"FastDl",link:link2,type:"mkv"});break;case link2.includes("hubcdn")&&!link2.includes("/?id="):streamLinks.push({server:"HubCdn",link:link2,type:"mkv"});break;default:if((null==link2?void 0:link2.includes(".mkv"))||(null==link2?void 0:link2.includes("?token="))){const serverName=(null==(_e=null==(_d=link2.match(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/i))?void 0:_d[1])?void 0:_e.replace(/\./g," "))||"Unknown";streamLinks.push({server:serverName,link:link2,type:"mkv"})}}}return console.log("streamLinks",streamLinks),streamLinks}catch(error){return console.log("hubcloudExtractor error: ",(null==error?void 0:error.message)||error),[]}})}__name(hubcloudExtractor,"hubcloudExtractor");var headers={Accept:"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7","Cache-Control":"no-store","Accept-Language":"en-US,en;q=0.9",DNT:"1","sec-ch-ua":'"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',"sec-ch-ua-mobile":"?0","sec-ch-ua-platform":'"Windows"',"Sec-Fetch-Dest":"document","Sec-Fetch-Mode":"navigate","Sec-Fetch-Site":"none","Sec-Fetch-User":"?1"};function getStream(_0){return __async(this,arguments,function*({link:link,type:type,signal:signal,providerContext:providerContext}){var _a,_b,_c,_d,_e;const{axios:axios,cheerio:cheerio,commonHeaders:commonHeaders,openWebView:openWebView}=providerContext;try{const streamLinks=[];if(console.log("dotlink",link),"movie"===type){let dotlinkRes,cookies;try{dotlinkRes=yield axios(`${link}`,{headers:__spreadProps(__spreadValues({},commonHeaders),{Referer:link})})}catch(error){if(403!==(null==(_a=error.response)?void 0:_a.status))throw error;{console.log("Solving WAF for Movies4U...");const wafResult=yield openWebView(link,{title:"Solve the captcha below and click done",description:"This is required to bypass the anti-bot protection and retrieve the stream link.",headers:__spreadProps(__spreadValues({},commonHeaders),{Referer:link}),force:!0,waitForCookie:"cf_clearance"});console.log("WAF solved",wafResult.cookies),cookies=wafResult.cookies,dotlinkRes=yield axios(`${link}`,{headers:__spreadProps(__spreadValues({},commonHeaders),{Referer:link,Cookie:cookies})})}}const dotlinkText=dotlinkRes.data,vlink=dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i)||[];if(vlink[1])link=vlink[1];else{const $=cheerio.load(dotlinkText),directLink=$("a").filter((i,el)=>{const href=$(el).attr("href")||"";return href.includes("hubcloud")||href.includes("gdflix")||href.includes("filebee")||href.includes("fastdl")}).first().attr("href");directLink&&(link=directLink)}if(link.includes("fastdl.zip"))try{const reurlMatch=(yield axios.get(link,{headers:headers})).data.match(/var reurl = "([^"]+)";/);if(reurlMatch&&reurlMatch[1]){const actualLink=reurlMatch[1].replace("https://fastdl.zip/dl.php?link=","");return streamLinks.push({server:"fastdl",link:actualLink,type:"mkv"}),streamLinks}}catch(error){console.log("fastdl error: ",error)}try{const filepressLink=cheerio.load(dotlinkText)('.btn.btn-sm.btn-outline[style="background:linear-gradient(135deg,rgb(252,185,0) 0%,rgb(0,0,0)); color: #fdf8f2;"]').parent().attr("href"),filepressID=null==filepressLink?void 0:filepressLink.split("/").pop(),filepressBaseUrl=null==filepressLink?void 0:filepressLink.split("/").slice(0,-2).join("/"),filepressTokenRes=yield axios.post(filepressBaseUrl+"/api/file/downlaod/",{id:filepressID,method:"indexDownlaod",captchaValue:null},{headers:{"Content-Type":"application/json",Referer:filepressBaseUrl}});if(null==(_b=filepressTokenRes.data)?void 0:_b.status){const filepressToken=null==(_c=filepressTokenRes.data)?void 0:_c.data,filepressStreamLink=yield axios.post(filepressBaseUrl+"/api/file/downlaod2/",{id:filepressToken,method:"indexDownlaod",captchaValue:null},{headers:{"Content-Type":"application/json",Referer:filepressBaseUrl}});streamLinks.push({server:"filepress",link:null==(_e=null==(_d=filepressStreamLink.data)?void 0:_d.data)?void 0:_e[0],type:"mkv"})}}catch(error){console.log("filepress error: ")}}return yield hubcloudExtractor(link,signal,axios,cheerio,commonHeaders)}catch(error){return console.log("getStream error: ",error),error.message.includes("Aborted"),[]}})}__name(getStream,"getStream"),exports.getStream=getStream;
+"use strict";
+var __defProp = Object.defineProperty;
+var __defProps = Object.defineProperties;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __propIsEnum = Object.prototype.propertyIsEnumerable;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __spreadValues = (a, b) => {
+  for (var prop in b || (b = {}))
+    if (__hasOwnProp.call(b, prop))
+      __defNormalProp(a, prop, b[prop]);
+  if (__getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(b)) {
+      if (__propIsEnum.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    }
+  return a;
+};
+var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
+
+// providers/movies4u/stream.ts
+var stream_exports = {};
+__export(stream_exports, {
+  getStream: () => getStream
+});
+
+
+// providers/extractors/hubcloud.ts
+var hubcloudDecode = /* @__PURE__ */ __name(function(value) {
+  if (value === void 0) {
+    return "";
+  }
+  return atob(value.toString());
+}, "hubcloudDecode");
+var extractUrlFromScript = /* @__PURE__ */ __name((html) => {
+  var _a, _b, _c;
+  const doubleAtobMatch = html.match(
+    /var\s+url\s*=\s*atob\(atob\(['"]([^'"]+)['"]\)\)/
+  );
+  if (doubleAtobMatch == null ? void 0 : doubleAtobMatch[1]) {
+    return atob(atob(doubleAtobMatch[1]));
+  }
+  const plainMatch = html.match(/var\s+url\s*=\s*['"]([^'"]+)['"]/);
+  return hubcloudDecode((_c = (_b = (_a = plainMatch == null ? void 0 : plainMatch[1]) == null ? void 0 : _a.split("r=")) == null ? void 0 : _b[1]) != null ? _c : "") || (plainMatch == null ? void 0 : plainMatch[1]) || "";
+}, "extractUrlFromScript");
+var getPixelDrainUrl = /* @__PURE__ */ __name((html) => {
+  const match = html.match(/var\s+pxl\s*=\s*['"]([^'"]+)['"];?/i);
+  return (match == null ? void 0 : match[1]) || "";
+}, "getPixelDrainUrl");
+var getRedirectedPixelDrainUrl = /* @__PURE__ */ __name((...htmlSources) => {
+  for (const html of htmlSources) {
+    if (!html) {
+      continue;
+    }
+    const redirectedUrl = getPixelDrainUrl(html);
+    if (redirectedUrl) {
+      return redirectedUrl;
+    }
+  }
+  return "";
+}, "getRedirectedPixelDrainUrl");
+function hubcloudExtractor(link, signal, axios, cheerio, headers2) {
+  return __async(this, null, function* () {
+    var _a, _b, _c, _d, _e;
+    try {
+      headers2["Cookie"] = "ext_name=ojplmecpdpgccookcobabopnaifgidhf; xla=s4t; cf_clearance=woQrFGXtLfmEMBEiGUsVHrUBMT8s3cmguIzmMjmvpkg-1770053679-1.2.1.1-xBrQdciOJsweUF6F2T_OtH6jmyanN_TduQ0yslc_XqjU6RcHSxI7.YOKv6ry7oYo64868HYoULnVyww536H2eVI3R2e4wKzsky6abjPdfQPxqpUaXjxfJ02o6jl3_Vkwr4uiaU7Wy596Vdst3y78HXvVmKdIohhtPvp.vZ9_L7wvWdce0GRixjh_6JiqWmWMws46hwEt3hboaS1e1e4EoWCvj5b0M_jVwvSxBOAW5emFzvT3QrnRh4nyYmKDERnY";
+      console.log("hubcloudExtractor", link);
+      const baseUrl = link.split("/").slice(0, 3).join("/");
+      const streamLinks = [];
+      const vLinkRes = yield axios(`${link}`, { headers: headers2, signal });
+      const vLinkText = vLinkRes.data;
+      const $vLink = cheerio.load(vLinkText);
+      let vcloudLink = extractUrlFromScript(vLinkText) || $vLink(".fa-file-download.fa-lg").parent().attr("href") || link;
+      console.log("vcloudLink", vcloudLink);
+      if (vcloudLink == null ? void 0 : vcloudLink.startsWith("/")) {
+        vcloudLink = `${baseUrl}${vcloudLink}`;
+        console.log("New vcloudLink", vcloudLink);
+      }
+      const vcloudRes = yield fetch(vcloudLink, {
+        headers: headers2,
+        signal,
+        redirect: "follow"
+      });
+      const vcloudText = yield vcloudRes.text();
+      const $ = cheerio.load(vcloudText);
+      const linkClass = $(".btn-success.btn-lg.h6,.btn-danger,.btn-secondary");
+      for (const element of linkClass) {
+        const itm = $(element);
+        let link2 = itm.attr("href") || "";
+        switch (true) {
+          case (link2 == null ? void 0 : link2.includes("pixeld")):
+            console.log("Pixeldrain link found:", link2);
+            if (!(link2 == null ? void 0 : link2.includes("api"))) {
+              const redirectedPixelDrainUrl = getRedirectedPixelDrainUrl(
+                vLinkText,
+                vcloudText
+              );
+              if (redirectedPixelDrainUrl) {
+                console.log(
+                  "Special case for token negn6f",
+                  redirectedPixelDrainUrl
+                );
+                link2 = redirectedPixelDrainUrl;
+              }
+              const token = (_a = link2.split("/").pop()) == null ? void 0 : _a.split("?")[0];
+              const baseUrl2 = link2.split("/").slice(0, -2).join("/");
+              link2 = `${baseUrl2}/api/file/${token}`;
+            }
+            streamLinks.push({ server: "Pixeldrain", link: link2, type: "mkv" });
+            break;
+          case ((link2 == null ? void 0 : link2.includes(".dev")) && !(link2 == null ? void 0 : link2.includes("/?id="))):
+            streamLinks.push({ server: "Cf Worker", link: link2, type: "mkv" });
+            break;
+          case ((link2 == null ? void 0 : link2.includes("hubcloud")) || (link2 == null ? void 0 : link2.includes("/?id="))):
+            try {
+              const newLinkRes = yield fetch(link2, {
+                method: "HEAD",
+                headers: headers2,
+                signal,
+                redirect: "manual"
+              });
+              let newLink = link2;
+              if (newLinkRes.status >= 300 && newLinkRes.status < 400) {
+                newLink = newLinkRes.headers.get("location") || link2;
+              } else if (newLinkRes.url && newLinkRes.url !== link2) {
+                newLink = newLinkRes.url;
+              } else {
+                newLink = newLinkRes.headers.get("location") || link2;
+              }
+              if (newLink.includes("googleusercontent")) {
+                newLink = newLink.split("?link=")[1];
+              } else {
+                const newLinkRes2 = yield fetch(newLink, {
+                  method: "HEAD",
+                  headers: headers2,
+                  signal,
+                  redirect: "manual"
+                });
+                if (newLinkRes2.status >= 300 && newLinkRes2.status < 400) {
+                  newLink = ((_b = newLinkRes2.headers.get("location")) == null ? void 0 : _b.split("?link=")[1]) || newLink;
+                } else if (newLinkRes2.url && newLinkRes2.url !== newLink) {
+                  newLink = newLinkRes2.url.split("?link=")[1] || newLinkRes2.url;
+                } else {
+                  newLink = ((_c = newLinkRes2.headers.get("location")) == null ? void 0 : _c.split("?link=")[1]) || newLink;
+                }
+              }
+              streamLinks.push({
+                server: "hubcloud",
+                link: newLink,
+                type: "mkv"
+              });
+            } catch (error) {
+              console.log("hubcloudExtractor error in hubcloud link: ", error);
+            }
+            break;
+          case (link2 == null ? void 0 : link2.includes("cloudflarestorage")):
+            streamLinks.push({ server: "CfStorage", link: link2, type: "mkv" });
+            break;
+          case ((link2 == null ? void 0 : link2.includes("fastdl")) || (link2 == null ? void 0 : link2.includes("fsl."))):
+            streamLinks.push({ server: "FastDl", link: link2, type: "mkv" });
+            break;
+          case (link2.includes("hubcdn") && !link2.includes("/?id=")):
+            streamLinks.push({
+              server: "HubCdn",
+              link: link2,
+              type: "mkv"
+            });
+            break;
+          default:
+            if ((link2 == null ? void 0 : link2.includes(".mkv")) || (link2 == null ? void 0 : link2.includes("?token="))) {
+              const serverName = ((_e = (_d = link2.match(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/i)) == null ? void 0 : _d[1]) == null ? void 0 : _e.replace(/\./g, " ")) || "Unknown";
+              streamLinks.push({ server: serverName, link: link2, type: "mkv" });
+            }
+            break;
+        }
+      }
+      console.log("streamLinks", streamLinks);
+      return streamLinks;
+    } catch (error) {
+      console.log("hubcloudExtractor error: ", (error == null ? void 0 : error.message) || error);
+      return [];
+    }
+  });
+}
+__name(hubcloudExtractor, "hubcloudExtractor");
+
+// providers/movies4u/stream.ts
+var headers = {
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+  "Cache-Control": "no-store",
+  "Accept-Language": "en-US,en;q=0.9",
+  DNT: "1",
+  "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1"
+};
+function getStream(_0) {
+  return __async(this, arguments, function* ({
+    link,
+    type,
+    signal,
+    providerContext
+  }) {
+    var _a, _b, _c, _d, _e;
+    const { axios, cheerio, commonHeaders, openWebView } = providerContext;
+    try {
+      const streamLinks = [];
+      console.log("dotlink", link);
+      if (type === "movie") {
+        let dotlinkRes;
+        let cookies;
+        try {
+          dotlinkRes = yield axios(`${link}`, {
+            headers: __spreadProps(__spreadValues({}, commonHeaders), {
+              Referer: link
+            })
+          });
+        } catch (error) {
+          if (((_a = error.response) == null ? void 0 : _a.status) === 403) {
+            console.log("Solving WAF for Movies4U...");
+            const wafResult = yield openWebView(link, {
+              title: "Solve the captcha below and click done",
+              description: "This is required to bypass the anti-bot protection and retrieve the stream link.",
+              headers: __spreadProps(__spreadValues({}, commonHeaders), {
+                Referer: link
+              }),
+              force: true,
+              waitForCookie: "cf_clearance"
+            });
+            console.log("WAF solved", wafResult.cookies);
+            cookies = wafResult.cookies;
+            dotlinkRes = yield axios(`${link}`, {
+              headers: __spreadProps(__spreadValues({}, commonHeaders), {
+                Referer: link,
+                Cookie: cookies
+              })
+            });
+          } else {
+            throw error;
+          }
+        }
+        const dotlinkText = dotlinkRes.data;
+        const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
+        if (vlink[1]) {
+          link = vlink[1];
+        } else {
+          const $ = cheerio.load(dotlinkText);
+          const directLink = $("a").filter((i, el) => {
+            const href = $(el).attr("href") || "";
+            return href.includes("hubcloud") || href.includes("gdflix") || href.includes("filebee") || href.includes("fastdl");
+          }).first().attr("href");
+          if (directLink) {
+            link = directLink;
+          }
+        }
+        if (link.includes("fastdl.zip")) {
+          try {
+            const fastdlRes = yield axios.get(link, { headers });
+            const reurlMatch = fastdlRes.data.match(/var reurl = "([^"]+)";/);
+            if (reurlMatch && reurlMatch[1]) {
+              const actualLink = reurlMatch[1].replace(
+                "https://fastdl.zip/dl.php?link=",
+                ""
+              );
+              streamLinks.push({
+                server: "fastdl",
+                link: actualLink,
+                type: "mkv"
+              });
+              return streamLinks;
+            }
+          } catch (error) {
+            console.log("fastdl error: ", error);
+          }
+        }
+        try {
+          const $ = cheerio.load(dotlinkText);
+          const filepressLink = $(
+            '.btn.btn-sm.btn-outline[style="background:linear-gradient(135deg,rgb(252,185,0) 0%,rgb(0,0,0)); color: #fdf8f2;"]'
+          ).parent().attr("href");
+          const filepressID = filepressLink == null ? void 0 : filepressLink.split("/").pop();
+          const filepressBaseUrl = filepressLink == null ? void 0 : filepressLink.split("/").slice(0, -2).join("/");
+          const filepressTokenRes = yield axios.post(
+            filepressBaseUrl + "/api/file/downlaod/",
+            {
+              id: filepressID,
+              method: "indexDownlaod",
+              captchaValue: null
+            },
+            {
+              headers: {
+                "Content-Type": "application/json",
+                Referer: filepressBaseUrl
+              }
+            }
+          );
+          if ((_b = filepressTokenRes.data) == null ? void 0 : _b.status) {
+            const filepressToken = (_c = filepressTokenRes.data) == null ? void 0 : _c.data;
+            const filepressStreamLink = yield axios.post(
+              filepressBaseUrl + "/api/file/downlaod2/",
+              {
+                id: filepressToken,
+                method: "indexDownlaod",
+                captchaValue: null
+              },
+              {
+                headers: {
+                  "Content-Type": "application/json",
+                  Referer: filepressBaseUrl
+                }
+              }
+            );
+            streamLinks.push({
+              server: "filepress",
+              link: (_e = (_d = filepressStreamLink.data) == null ? void 0 : _d.data) == null ? void 0 : _e[0],
+              type: "mkv"
+            });
+          }
+        } catch (error) {
+          console.log("filepress error: ");
+        }
+      }
+      return yield hubcloudExtractor(link, signal, axios, cheerio, commonHeaders);
+    } catch (error) {
+      console.log("getStream error: ", error);
+      if (error.message.includes("Aborted")) {
+      } else {
+      }
+      return [];
+    }
+  });
+}
+__name(getStream, "getStream");
+exports.getStream = getStream;
+// Annotate the CommonJS export names for ESM import in node:
+

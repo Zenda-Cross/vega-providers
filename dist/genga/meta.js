@@ -1,1 +1,162 @@
-"use strict";var __defProp=Object.defineProperty,__getOwnPropDesc=Object.getOwnPropertyDescriptor,__getOwnPropNames=Object.getOwnPropertyNames,__hasOwnProp=Object.prototype.hasOwnProperty,__name=(target,value)=>__defProp(target,"name",{value:value,configurable:!0}),__export=(target,all)=>{for(var name in all)__defProp(target,name,{get:all[name],enumerable:!0})},__copyProps=(to,from,except,desc)=>{if(from&&"object"==typeof from||"function"==typeof from)for(let key of __getOwnPropNames(from))__hasOwnProp.call(to,key)||key===except||__defProp(to,key,{get:()=>from[key],enumerable:!(desc=__getOwnPropDesc(from,key))||desc.enumerable});return to},__toCommonJS=mod=>__copyProps(__defProp({},"__esModule",{value:!0}),mod),__async=(__this,__arguments,generator)=>new Promise((resolve,reject)=>{var fulfilled=value=>{try{step(generator.next(value))}catch(e){reject(e)}},rejected=value=>{try{step(generator.throw(value))}catch(e){reject(e)}},step=x=>x.done?resolve(x.value):Promise.resolve(x.value).then(fulfilled,rejected);step((generator=generator.apply(__this,__arguments)).next())}),meta_exports={};__export(meta_exports,{getMeta:()=>getMeta});var getMeta=__name(function(_0){return __async(this,arguments,function*({link:link,providerContext:providerContext}){var _a,_b,_c;try{const{axios:axios}=providerContext,catalogData=(null==(_a=(yield axios.get("https://test.blakiteapi.xyz/api/getAllAnime.php")).data)?void 0:_a.data)||{};let targetItem=null,category="movie";for(const cat of["movies","series","dramas"]){const found=(catalogData[cat]?Object.values(catalogData[cat]):[]).find(item=>(item.tmdbId||item.originalTmdbId)===link);if(found){targetItem=found,category=cat;break}}if(!targetItem)throw new Error(`Item not found in catalog: ${link}`);const tmdbData=targetItem.TMDB_DATA||{},title=targetItem.title||"",synopsis=tmdbData.synopsis||"",image=(null==(_b=targetItem.IMAGES)?void 0:_b.poster)||(null==(_c=targetItem.IMAGES)?void 0:_c.backdrop)||"",rating=tmdbData.rating||"",type="movies"===category?"movie":"series",linkList=[];if("movie"===type)linkList.push({title:"Movie",directLinks:[{title:title,link:`${link}-1-1`,type:"movie"}]});else{const seasons=targetItem.seasons||{};Object.keys(seasons).forEach(seasonNum=>{const totalEpisodes=seasons[seasonNum].totalEpisodes||1,directLinks=[];for(let ep=1;ep<=totalEpisodes;ep++)directLinks.push({title:`Episode ${ep}`,link:`${link}-${seasonNum}-${ep}`,type:"series"});linkList.push({title:`Season ${seasonNum}`,directLinks:directLinks})})}return{title:title,image:image,synopsis:synopsis,imdbId:"",type:type,rating:rating,linkList:linkList}}catch(err){return console.error("Genga getMeta error:",err),{title:"",image:"",synopsis:"",imdbId:"",type:"movie",linkList:[]}}})},"getMeta");exports.getMeta=getMeta;
+"use strict";
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
+
+// providers/genga/meta.ts
+var meta_exports = {};
+__export(meta_exports, {
+  getMeta: () => getMeta
+});
+
+var USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+function fetchAllEpisodes(animeId, axios) {
+  return __async(this, null, function* () {
+    const episodesList = [];
+    let page = 1;
+    let maxPage = 1;
+    const headers = {
+      "User-Agent": USER_AGENT,
+      "Referer": "https://www.desidubanime.me/"
+    };
+    try {
+      do {
+        const url = `https://www.desidubanime.me/wp-admin/admin-ajax.php?action=get_episodes&anime_id=${animeId}&page=${page}&order=asc`;
+        const res = yield axios.get(url, { headers });
+        const data = res.data;
+        if (data && data.success && data.data) {
+          const episodes = data.data.episodes || [];
+          episodes.forEach((ep) => {
+            const numberStr = ep.number || "";
+            const titleStr = ep.title || "";
+            const displayTitle = numberStr && titleStr ? `${numberStr} - ${titleStr}` : numberStr || titleStr || "Episode";
+            episodesList.push({
+              title: displayTitle.trim(),
+              link: `${ep.url}*episode`,
+              type: "series"
+            });
+          });
+          maxPage = data.data.max_episodes_page || 1;
+          page++;
+        } else {
+          break;
+        }
+      } while (page <= maxPage);
+    } catch (err) {
+      console.error(`Error fetching episodes for animeId ${animeId}:`, err);
+    }
+    return episodesList;
+  });
+}
+__name(fetchAllEpisodes, "fetchAllEpisodes");
+var getMeta = /* @__PURE__ */ __name(function(_0) {
+  return __async(this, arguments, function* ({
+    link,
+    providerContext
+  }) {
+    try {
+      const { axios, cheerio } = providerContext;
+      const headers = { "User-Agent": USER_AGENT };
+      const watchRes = yield axios.get(link, { headers });
+      const watchHtml = watchRes.data || "";
+      const $watch = cheerio.load(watchHtml);
+      let detailsUrl = $watch('a[href*="/anime/"]').first().attr("href") || "";
+      if (!detailsUrl) {
+        detailsUrl = link;
+      }
+      const detailsRes = yield axios.get(detailsUrl, { headers });
+      const html = detailsRes.data || "";
+      const $ = cheerio.load(html);
+      const title = $("h1 span.anime").first().text().trim() || $("h1").text().trim() || "Anime Details";
+      const synopsis = $("div[data-synopsis] p").text().trim() || $("div.prose p").text().trim() || "";
+      let image = $('img[src*="cdn.myanimelist.net/images/anime"]').first().attr("src") || "";
+      if (!image) {
+        image = $("img.anime-main-image").first().attr("src") || "";
+      }
+      if (!image) {
+        image = $("img.object-cover").first().attr("src") || "";
+      }
+      let postId = $("input#comment_post_ID").val() || "";
+      if (!postId) {
+        const match = html.match(/"postId"\s*:\s*"(\d+)"/);
+        if (match) postId = match[1];
+      }
+      const seasons = [];
+      $("#seasonButtonsContainer button").each((_, el) => {
+        const seasonId = $(el).attr("data-season") || "";
+        const seasonTitle = $(el).text().trim() || "Season";
+        if (seasonId) {
+          seasons.push({ id: seasonId, title: seasonTitle });
+        }
+      });
+      if (seasons.length === 0 && postId) {
+        seasons.push({ id: String(postId), title: "Season 1" });
+      }
+      const linkList = yield Promise.all(
+        seasons.map((s) => __async(null, null, function* () {
+          const episodes = yield fetchAllEpisodes(s.id, axios);
+          return {
+            title: s.title,
+            directLinks: episodes
+          };
+        }))
+      );
+      return {
+        title,
+        synopsis,
+        image,
+        imdbId: "",
+        type: "series",
+        linkList
+      };
+    } catch (err) {
+      console.error("DesiDubAnime getMeta error:", err);
+      return {
+        title: "Anime Details",
+        synopsis: "",
+        image: "",
+        imdbId: "",
+        type: "series",
+        linkList: []
+      };
+    }
+  });
+}, "getMeta");
+exports.getMeta = getMeta;
+// Annotate the CommonJS export names for ESM import in node:
+

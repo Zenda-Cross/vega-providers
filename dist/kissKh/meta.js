@@ -1,1 +1,117 @@
-"use strict";var __defProp=Object.defineProperty,__defProps=Object.defineProperties,__getOwnPropDesc=Object.getOwnPropertyDescriptor,__getOwnPropDescs=Object.getOwnPropertyDescriptors,__getOwnPropNames=Object.getOwnPropertyNames,__getOwnPropSymbols=Object.getOwnPropertySymbols,__hasOwnProp=Object.prototype.hasOwnProperty,__propIsEnum=Object.prototype.propertyIsEnumerable,__defNormalProp=(obj,key,value)=>key in obj?__defProp(obj,key,{enumerable:!0,configurable:!0,writable:!0,value:value}):obj[key]=value,__spreadValues=(a,b)=>{for(var prop in b||(b={}))__hasOwnProp.call(b,prop)&&__defNormalProp(a,prop,b[prop]);if(__getOwnPropSymbols)for(var prop of __getOwnPropSymbols(b))__propIsEnum.call(b,prop)&&__defNormalProp(a,prop,b[prop]);return a},__spreadProps=(a,b)=>__defProps(a,__getOwnPropDescs(b)),__name=(target,value)=>__defProp(target,"name",{value:value,configurable:!0}),__export=(target,all)=>{for(var name in all)__defProp(target,name,{get:all[name],enumerable:!0})},__copyProps=(to,from,except,desc)=>{if(from&&"object"==typeof from||"function"==typeof from)for(let key of __getOwnPropNames(from))__hasOwnProp.call(to,key)||key===except||__defProp(to,key,{get:()=>from[key],enumerable:!(desc=__getOwnPropDesc(from,key))||desc.enumerable});return to},__toCommonJS=mod=>__copyProps(__defProp({},"__esModule",{value:!0}),mod),__async=(__this,__arguments,generator)=>new Promise((resolve,reject)=>{var fulfilled=value=>{try{step(generator.next(value))}catch(e){reject(e)}},rejected=value=>{try{step(generator.throw(value))}catch(e){reject(e)}},step=x=>x.done?resolve(x.value):Promise.resolve(x.value).then(fulfilled,rejected);step((generator=generator.apply(__this,__arguments)).next())}),meta_exports={};__export(meta_exports,{getMeta:()=>getMeta});var getMeta=__name(function(_0){return __async(this,arguments,function*({link:link,providerContext:providerContext}){var _a,_b;try{const{axios:axios}=providerContext,data=(yield axios.get(link)).data,meta={title:data.title,synopsis:data.description,image:data.thumbnail,tags:[null==(_a=null==data?void 0:data.releaseDate)?void 0:_a.split("-")[0],null==data?void 0:data.status,null==data?void 0:data.type],imdbId:"",type:data.episodesCount>1?"series":"movie"},linkList=[],subLinks=[];return null==(_b=null==data?void 0:data.episodes)||_b.reverse().map(episode=>{var _a2;const title="Episode "+(null==episode?void 0:episode.number),link2=null==(_a2=null==episode?void 0:episode.id)?void 0:_a2.toString();link2&&title&&subLinks.push({title:title,link:link2})}),linkList.push({title:meta.title,directLinks:subLinks}),__spreadProps(__spreadValues({},meta),{linkList:linkList})}catch(err){return console.error(err),{title:"",synopsis:"",image:"",imdbId:"",type:"movie",linkList:[]}}})},"getMeta");exports.getMeta=getMeta;
+"use strict";
+var __defProp = Object.defineProperty;
+var __defProps = Object.defineProperties;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __propIsEnum = Object.prototype.propertyIsEnumerable;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __spreadValues = (a, b) => {
+  for (var prop in b || (b = {}))
+    if (__hasOwnProp.call(b, prop))
+      __defNormalProp(a, prop, b[prop]);
+  if (__getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(b)) {
+      if (__propIsEnum.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    }
+  return a;
+};
+var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
+
+// providers/kissKh/meta.ts
+var meta_exports = {};
+__export(meta_exports, {
+  getMeta: () => getMeta
+});
+
+var getMeta = /* @__PURE__ */ __name(function(_0) {
+  return __async(this, arguments, function* ({
+    link,
+    providerContext
+  }) {
+    var _a, _b;
+    try {
+      const { axios } = providerContext;
+      const res = yield axios.get(link);
+      const data = res.data;
+      const meta = {
+        title: data.title,
+        synopsis: data.description,
+        image: data.thumbnail,
+        tags: [(_a = data == null ? void 0 : data.releaseDate) == null ? void 0 : _a.split("-")[0], data == null ? void 0 : data.status, data == null ? void 0 : data.type],
+        imdbId: "",
+        type: data.episodesCount > 1 ? "series" : "movie"
+      };
+      const linkList = [];
+      const subLinks = [];
+      (_b = data == null ? void 0 : data.episodes) == null ? void 0 : _b.reverse().map((episode) => {
+        var _a2;
+        const title = "Episode " + (episode == null ? void 0 : episode.number);
+        const link2 = (_a2 = episode == null ? void 0 : episode.id) == null ? void 0 : _a2.toString();
+        if (link2 && title) {
+          subLinks.push({
+            title,
+            link: link2
+          });
+        }
+      });
+      linkList.push({
+        title: meta.title,
+        directLinks: subLinks
+      });
+      return __spreadProps(__spreadValues({}, meta), {
+        linkList
+      });
+    } catch (err) {
+      console.error(err);
+      return {
+        title: "",
+        synopsis: "",
+        image: "",
+        imdbId: "",
+        type: "movie",
+        linkList: []
+      };
+    }
+  });
+}, "getMeta");
+exports.getMeta = getMeta;
+// Annotate the CommonJS export names for ESM import in node:
+
