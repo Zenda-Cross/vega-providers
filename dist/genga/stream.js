@@ -6742,7 +6742,7 @@ var getStream = /* @__PURE__ */ __name(function(_0) {
             const decodedMresult = JSON.parse(decodeBase64(mresultB64));
             const siteUrls = helperData.siteUrls;
             const friendlyNames = helperData.siteFriendlyNames || {};
-            for (const [key, code] of Object.entries(decodedMresult)) {
+            const promises = Object.entries(decodedMresult).map((_02) => __async(null, [_02], function* ([key, code]) {
               const baseUrl = siteUrls[key];
               const serverName = friendlyNames[key] || key;
               if (baseUrl && (key === "rpmshre" || key === "upnshr" || key === "strmp2")) {
@@ -6786,7 +6786,8 @@ var getStream = /* @__PURE__ */ __name(function(_0) {
                   console.error(`DesiDubAnime error resolving key ${key}:`, innerErr.message);
                 }
               }
-            }
+            }));
+            yield Promise.all(promises);
           }
         } catch (err) {
           console.error("DesiDubAnime IQSmartGames helper error:", err.message);

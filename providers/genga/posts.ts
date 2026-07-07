@@ -17,10 +17,18 @@ export const getPosts = async function ({
     const { axios, cheerio } = providerContext;
     const url = "https://www.desidubanime.me/wp-admin/admin-ajax.php";
     
+    const genresList = ["action", "comedy", "adventure", "isekai"];
+    
     const params = new URLSearchParams();
     params.append("action", "advanced_search");
     params.append("page", String(page));
-    params.append("orderby", filter || "date");
+    
+    if (genresList.includes(filter)) {
+      params.append("genre[]", filter);
+      params.append("orderby", "date");
+    } else {
+      params.append("orderby", filter || "date");
+    }
     params.append("order", "DESC");
     params.append("s_keyword", "");
 

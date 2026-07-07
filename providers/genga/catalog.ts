@@ -8,7 +8,23 @@ export const catalog = [
     filter: "popular",
   },
   {
-    title: "Rating",
-    filter: "rating",
+    title: "Updated",
+    filter: "updated",
+  },
+  {
+    title: "Action",
+    filter: "action",
+  },
+  {
+    title: "Comedy",
+    filter: "comedy",
+  },
+  {
+    title: "Adventure",
+    filter: "adventure",
+  },
+  {
+    title: "Isekai",
+    filter: "isekai",
   },
 ];

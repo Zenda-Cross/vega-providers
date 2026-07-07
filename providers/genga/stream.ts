@@ -122,7 +122,7 @@ export const getStream = async function ({
           const siteUrls = helperData.siteUrls;
           const friendlyNames = helperData.siteFriendlyNames || {};
 
-          for (const [key, code] of Object.entries(decodedMresult)) {
+          const promises = Object.entries(decodedMresult).map(async ([key, code]) => {
             const baseUrl = siteUrls[key];
             const serverName = friendlyNames[key] || key;
 
@@ -173,7 +173,9 @@ export const getStream = async function ({
                 console.error(`DesiDubAnime error resolving key ${key}:`, innerErr.message);
               }
             }
-          }
+          });
+
+          await Promise.all(promises);
         }
       } catch (err: any) {
         console.error("DesiDubAnime IQSmartGames helper error:", err.message);
