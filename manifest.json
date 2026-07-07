@@ -85,7 +85,7 @@
     "version": "1.4",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "CinemaLuxe",
@@ -229,7 +229,7 @@
     "version": "1.0",
     "icon": "",
     "type": "english",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "FlixHQ",
