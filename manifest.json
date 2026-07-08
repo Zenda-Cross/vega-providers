@@ -342,5 +342,29 @@
     "icon": "",
     "type": "global",
     "disabled": false
+  },
+  {
+    "display_name": "KatDrama",
+    "value": "katdrama",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "display_name": "KDHindiDubbed",
+    "value": "kdhindidubbed",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "display_name": "KDramasMaza",
+    "value": "kdramasmaza",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
   }
 ]

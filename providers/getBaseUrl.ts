@@ -17,7 +17,10 @@ export const getBaseUrl = async (providerValue: string) => {
       "https://himanshu8443.github.io/providers/modflix.json"
     );
     const baseUrlData = await baseUrlRes.json();
-    baseUrl = baseUrlData[providerValue].url;
+    baseUrl = baseUrlData[providerValue]?.url || 
+      (providerValue === "katdrama" ? "https://new.katdrama.my" : 
+       providerValue === "kdhindidubbed" ? "https://kdhindidubbed.cfd" : 
+       providerValue === "kdramasmaza" ? "https://kdramasmaza.net" : "");
     // cacheStorageService.setString(cacheKey, baseUrl);
     // cacheStorageService.setObject(timeKey, Date.now());
     // }
