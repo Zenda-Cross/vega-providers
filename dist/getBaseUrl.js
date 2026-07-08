@@ -59,7 +59,7 @@ var getBaseUrl = /* @__PURE__ */ __name((providerValue) => __async(null, null, f
     return baseUrl;
   } catch (error) {
     console.error(`Error fetching baseUrl: ${providerValue}`, error);
-    return "";
+    return providerValue === "katdrama" ? "https://new.katdrama.my" : providerValue === "kdhindidubbed" ? "https://kdhindidubbed.cfd" : providerValue === "kdramasmaza" ? "https://kdramasmaza.net" : "";
   }
 }), "getBaseUrl");
 // Annotate the CommonJS export names for ESM import in node:
