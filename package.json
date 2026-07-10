@@ -1,0 +1,42 @@
+{
+  "name": "vega-providers",
+  "version": "1.0.0",
+  "description": "providers for vega-app",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test-providers.js",
+    "test:single": "node test-providers.js",
+    "test:provider": "node test-provider.js",
+    "test:ui": "npm run test:interactive",
+    "build": "node build-bundled.js",
+    "build:dev": "cross-env SKIP_MINIFY=true node build-bundled.js",
+    "dev": "node dev-server.js",
+    "dev:build": "npm run build && npm run dev",
+    "watch": "nodemon",
+    "watch:dev": "nodemon --watch providers --ext ts --exec \"npm run build\" & npm run dev",
+    "dev:auto": "concurrently \"nodemon --watch providers --ext ts --exec \\\"npm run build:dev\\\"\" \"npm run dev\"",
+    "auto": "node auto-dev.js",
+    "start": "npm run build && npm run dev"
+  },
+  "devDependencies": {
+    "@types/cheerio": "^0.22.35",
+    "@types/node": "^24.0.1",
+    "concurrently": "^8.2.2",
+    "cors": "^2.8.5",
+    "cross-env": "^7.0.3",
+    "esbuild": "^0.27.2",
+    "express": "^4.21.2",
+    "nodemon": "^3.1.10",
+    "terser": "^5.43.1",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "cheerio": "^1.1.0",
+    "rimraf": "^6.0.1",
+    "zod": "^4.0.2"
+  }
+}

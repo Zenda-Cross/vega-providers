@@ -1,0 +1,16 @@
+{
+  "watch": ["providers"],
+  "ext": "ts",
+  "ignore": ["node_modules", "dist", "*.test.ts"],
+  "exec": "node build-simple.js",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": "1000",
+  "verbose": true,
+  "colours": true,
+  "events": {
+    "restart": "echo '\n🔄 File changes detected, rebuilding providers...\n'",
+    "crash": "echo '\n❌ Build crashed, waiting for file changes...\n'"
+  }
+}
