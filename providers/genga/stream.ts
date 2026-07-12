@@ -1,22 +1,27 @@
 import { Stream, ProviderContext } from "../types";
-import CryptoJS from "crypto-js";
 
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 
-function decryptAes(hexText: string): string {
-  const key = CryptoJS.enc.Utf8.parse("kiemtienmua911ca");
-  const iv = CryptoJS.enc.Utf8.parse("1234567890oiuytr");
-  const base64 = CryptoJS.enc.Hex.parse(hexText).toString(CryptoJS.enc.Base64);
-  const decrypted = CryptoJS.AES.decrypt(
+function hexToBase64(hex: string): string {
+  const clean = hex.trim();
+  let binary = "";
+  for (let i = 0; i < clean.length; i += 2) {
+    binary += String.fromCharCode(parseInt(clean.substr(i, 2), 16));
+  }
+  if (typeof btoa !== "undefined") {
+    return btoa(binary);
+  }
+  return Buffer.from(binary, "binary").toString("base64");
+}
+
+async function decryptAes(hexText: string, providerContext: ProviderContext): Promise<string> {
+  const base64 = hexToBase64(hexText);
+  return await providerContext.Aes.decrypt(
     base64,
-    key,
-    {
-      iv: iv,
-      mode: CryptoJS.mode.CBC,
-      padding: CryptoJS.pad.Pkcs7
-    }
+    "6b69656d7469656e6d75613931316361",
+    "313233343536373839306f6975797472",
+    "aes-128-cbc"
   );
-  return decrypted.toString(CryptoJS.enc.Utf8);
 }
 
 function decodeBase64(b64: string): string {
@@ -81,6 +86,7 @@ export const getStream = async function ({
     });
 
     let gdMirrorSid: string | null = null;
+    let gdMirrorUrl: string | null = null;
     let cloudExternalUrl: string | null = null;
 
     for (const s of servers) {
@@ -88,6 +94,7 @@ export const getStream = async function ({
         cloudExternalUrl = s.url;
       }
       if (s.url.includes("gdmirrorbot.nl")) {
+        gdMirrorUrl = s.url;
         const sidMatch = s.url.match(/\/embed\/([^/]+)/);
         if (sidMatch) {
           gdMirrorSid = sidMatch[1];
@@ -96,7 +103,7 @@ export const getStream = async function ({
     }
 
     // A. Resolve IQSmartGames nested servers (Priority 1)
-    if (gdMirrorSid) {
+    if (gdMirrorSid && gdMirrorUrl) {
       try {
         const payload = new URLSearchParams();
         payload.append("sid", gdMirrorSid);
@@ -105,7 +112,7 @@ export const getStream = async function ({
 
         const helperHeaders = {
           "User-Agent": USER_AGENT,
-          "Referer": "https://pro.iqsmartgames.com/",
+          "Referer": gdMirrorUrl,
           "Content-Type": "application/x-www-form-urlencoded",
         };
 
@@ -142,7 +149,7 @@ export const getStream = async function ({
                   const videoRes = await axios.get(videoApiUrl, { headers: playerHeaders });
                   const hexText = videoRes.data || "";
                   if (hexText) {
-                    const decrypted = JSON.parse(decryptAes(hexText));
+                    const decrypted = JSON.parse(await decryptAes(hexText, providerContext));
                     let sourceUrl = decrypted.source || "";
                     const cfUrl = decrypted.cf || "";
 
