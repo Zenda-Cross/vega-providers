@@ -1,5 +1,43 @@
 import { Stream, ProviderContext } from "../types";
 
+const languageCodes = [
+  ["MULTI", "MULTI"],
+  ["DUAL", "DUAL"],
+  ["HINDI", "HI"],
+  ["TAMIL", "TA"],
+  ["TELUGU", "Tz"],
+  ["SPANISH", "SP"],
+  ["FRENCH", "FR"],
+  ["GERMAN", "DE"],
+  ["ITALIAN", "IT"],
+  ["KOREAN", "KO"],
+  ["JAPANESE", "JP"],
+  ["ENGLISH", "EN"],
+] as const;
+
+function getLanguageCodes(title: string): string {
+  const flagCodes = (
+    title.match(/[\uD83C][\uDDE6-\uDDFF][\uD83C][\uDDE6-\uDDFF]/g) || []
+  ).map((flag: string) =>
+    [...flag]
+      .map((character) =>
+        String.fromCharCode(65 + character.codePointAt(0)! - 0x1f1e6),
+      )
+      .join(""),
+  );
+
+  if (flagCodes.length > 0) {
+    return [...new Set(flagCodes)].join(", ");
+  }
+
+  const uppercaseTitle = title.toUpperCase();
+  const matches = languageCodes
+    .filter(([language]) => uppercaseTitle.includes(language))
+    .map(([, code]) => code);
+
+  return matches.length > 0 ? [...new Set(matches)].join(", ") : "ENG";
+}
+
 export const getStream = async ({
   link: id,
   type,
@@ -56,8 +94,10 @@ export const getStream = async ({
       res.data.streams.forEach((s: any) => {
         // Extract quality from the name or title if possible, or leave undefined
         let quality: any = undefined;
-        const lowerName = (s.name || "").toLowerCase() + " " + (s.title || "").toLowerCase();
-        if (lowerName.includes("2160") || lowerName.includes("4k")) quality = "2160";
+        const lowerName =
+          (s.name || "").toLowerCase() + " " + (s.title || "").toLowerCase();
+        if (lowerName.includes("2160") || lowerName.includes("4k"))
+          quality = "2160";
         else if (lowerName.includes("1080")) quality = "1080";
         else if (lowerName.includes("720")) quality = "720";
         else if (lowerName.includes("480")) quality = "480";
@@ -69,37 +109,17 @@ export const getStream = async ({
           link = `magnet:?xt=urn:btih:${s.infoHash}`;
         }
 
-        let language = "English";
-        const flagsMatch = (s.title || "").match(/[\uD83C][\uDDE6-\uDDFF][\uD83C][\uDDE6-\uDDFF]/g);
-        if (flagsMatch && flagsMatch.length > 0) {
-          language = Array.from(new Set(flagsMatch)).join(" ");
-        } else {
-          const titleUpper = (s.title || "").toUpperCase();
-          const langs = [];
-          if (titleUpper.includes("MULTI")) langs.push("Multi");
-          if (titleUpper.includes("DUAL")) langs.push("Dual");
-          if (titleUpper.includes("HINDI")) langs.push("Hindi");
-          if (titleUpper.includes("TAMIL")) langs.push("Tamil");
-          if (titleUpper.includes("TELUGU")) langs.push("Telugu");
-          if (titleUpper.includes("SPANISH")) langs.push("Spanish");
-          if (titleUpper.includes("FRENCH")) langs.push("French");
-          if (titleUpper.includes("GERMAN")) langs.push("German");
-          if (titleUpper.includes("ITALIAN")) langs.push("Italian");
-          if (titleUpper.includes("KOREAN")) langs.push("Korean");
-          if (titleUpper.includes("JAPANESE")) langs.push("Japanese");
-          if (titleUpper.includes("DUBBED")) langs.push("Dubbed");
-          
-          if (langs.length > 0) {
-            language = langs.join(", ");
-          }
-        }
+        const title = s.title || "";
+        const language = getLanguageCodes(title);
+        const size = title.match(/💾\s*([\d.]+\s*(?:KB|MB|GB|TB))/i)?.[1] || "";
+        const uploader = title.match(/⚙️\s*([^\n]+)/)?.[1]?.trim() || "";
 
         let seeders = "";
-        const seedersMatch = (s.title || "").match(/👤\s*\d+/);
+        const seedersMatch = title.match(/👤\s*\d+/);
         if (seedersMatch) {
           seeders = seedersMatch[0];
         } else {
-          const slMatch = (s.title || "").match(/S:\s*\d+\s*L:\s*\d+/i);
+          const slMatch = title.match(/S:\s*\d+\s*L:\s*\d+/i);
           if (slMatch) {
             seeders = slMatch[0];
           }
@@ -110,17 +130,16 @@ export const getStream = async ({
           resolution = s.name.split("\n")[1].trim();
         }
 
-        let serverName = resolution ? `${resolution} | ${language}` : language;
-        if (seeders) {
-          serverName += ` | ${seeders}`;
-        }
+        const serverName = [resolution, language, size, uploader, seeders]
+          .filter(Boolean)
+          .join(" | ");
 
         if (link) {
           streams.push({
             server: serverName,
             link: link,
             type: link.startsWith("magnet:") ? "torrent" : "mp4",
-            quality: quality,
+            // quality: quality,
           });
         }
       });

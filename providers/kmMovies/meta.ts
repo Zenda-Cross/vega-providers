@@ -35,7 +35,6 @@ async function getWithWAF(
   }
 }
 
-
 export const getMeta = async function ({
   link,
   providerContext,
@@ -45,10 +44,17 @@ export const getMeta = async function ({
 }): Promise<Info> {
   try {
     const { axios, cheerio, openWebView } = providerContext;
+    const baseUrl = await providerContext.getBaseUrl("kmmovies");
 
-    if (!link.startsWith("http")) {
-      const baseUrl = await providerContext.getBaseUrl("kmmovies");
-      link = `${baseUrl}${link.startsWith("/") ? "" : "/"}${link}`;
+    if (link.startsWith("http")) {
+      const postUrl = new URL(link);
+      const currentBaseUrl = new URL(baseUrl);
+      if (postUrl.hostname.includes("kmmovies")) {
+        link = new URL(`${postUrl.pathname}${postUrl.search}`, currentBaseUrl)
+          .href;
+      }
+    } else {
+      link = new URL(link, `${baseUrl}/`).href;
     }
 
     const res = await getWithWAF(link, axios, openWebView, kmmHeaders);
@@ -130,25 +136,29 @@ export const getMeta = async function ({
       const el = $(a);
       const text = el.text().trim(); // e.g. "720p\n\t\t\t\t\t\t\t\t\t623 MB"
       // Replace multiple whitespaces/newlines with a single space
-      const titleText = text.replace(/\s+/g, ' ').trim();
+      const titleText = text.replace(/\s+/g, " ").trim();
       let quality = "AUTO";
-      if (titleText.toLowerCase().includes('480p')) quality = '480p';
-      else if (titleText.toLowerCase().includes('720p')) quality = '720p';
-      else if (titleText.toLowerCase().includes('1080p')) quality = '1080p';
-      else if (titleText.toLowerCase().includes('2160p') || titleText.toLowerCase().includes('4k')) quality = '2160p';
-      
+      if (titleText.toLowerCase().includes("480p")) quality = "480p";
+      else if (titleText.toLowerCase().includes("720p")) quality = "720p";
+      else if (titleText.toLowerCase().includes("1080p")) quality = "1080p";
+      else if (
+        titleText.toLowerCase().includes("2160p") ||
+        titleText.toLowerCase().includes("4k")
+      )
+        quality = "2160p";
+
       const href = el.attr("href") || "";
       if (href) {
         linkList.push({
-            title: `Download ${titleText}`,
-            quality,
-            directLinks: [
-                {
-                    link: href,
-                    title: `Download ${titleText}`,
-                    type: href.includes("/series/") ? "series" : "movie",
-                },
-            ],
+          title: `Download ${titleText}`,
+          quality,
+          directLinks: [
+            {
+              link: href,
+              title: `Download ${titleText}`,
+              type: href.includes("/series/") ? "series" : "movie",
+            },
+          ],
         });
       }
     });
@@ -158,11 +168,17 @@ export const getMeta = async function ({
       synopsis,
       image,
       imdbId,
-      type: linkList.some(l => l.directLinks && l.directLinks.some(dl => dl.type === "series")) ? "series" : "movie",
+      type: linkList.some(
+        (l) =>
+          l.directLinks && l.directLinks.some((dl) => dl.type === "series"),
+      )
+        ? "series"
+        : "movie",
       tags,
       cast,
       rating,
       linkList,
+      webUrl: link,
     };
   } catch (err) {
     console.error("KMMOVIES getMeta error:", err);
