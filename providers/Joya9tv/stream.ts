@@ -39,7 +39,9 @@ export async function getStream({
       const dotlinkRes = await fetch(`${link}`, { headers });
       const dotlinkText = await dotlinkRes.text();
       // console.log('dotlinkText', dotlinkText);
-      const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
+      let vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i);
+      if (!vlink) vlink = dotlinkText.match(/<a\s+href="([^"]*multicloudlinks\.[^"]*)"/i);
+      if (!vlink) vlink = [];
       // console.log('vLink', vlink[1]);
       link = vlink[1];
 

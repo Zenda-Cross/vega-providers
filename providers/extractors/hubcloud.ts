@@ -77,7 +77,17 @@ export async function hubcloudExtractor(
     const $ = cheerio.load(vcloudText);
     // console.log("vcloudRes", $.text());
 
-    const linkClass = $(".btn-success.btn-lg.h6,.btn-danger,.btn-secondary");
+    let linkClass = $(".btn-success.btn-lg.h6,.btn-danger,.btn-secondary");
+    if (linkClass.length === 0) {
+      const dlinks: any[] = [];
+      $(".btn-outline-primary, .btn-primary, .btn-success, .btn, a").each((i: any, el: any) => {
+        let href = $(el).attr("href");
+        if (href && !href.startsWith("/") && !href.includes("facebook") && !href.includes("twitter") && !href.includes("whatsapp") && !href.includes("t.me") && !href.includes("multicloudlinks.com/player")) {
+          dlinks.push(el);
+        }
+      });
+      linkClass = $(dlinks);
+    }
     for (const element of linkClass) {
       const itm = $(element);
       let link = itm.attr("href") || "";
