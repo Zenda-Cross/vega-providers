@@ -43,6 +43,7 @@ export interface Info {
   cast?: string[];
   rating?: string;
   linkList: Link[];
+  webUrl?: string;
 }
 // getEpisodeLinks
 export interface EpisodeLink {

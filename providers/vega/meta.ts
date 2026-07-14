@@ -29,8 +29,11 @@ export const getMeta = async ({
   providerContext: ProviderContext;
 }): Promise<Info> => {
   try {
-    const { axios, cheerio } = providerContext;
-    const url = link;
+    const { axios, cheerio, getBaseUrl } = providerContext;
+    const currentBaseUrl = await getBaseUrl("Vega");
+    const url = link.startsWith("http")
+      ? link
+      : new URL(link, `${currentBaseUrl}/`).href;
     console.log("url", url);
     const baseUrl = url.split("/").slice(0, 3).join("/");
     const response = await axios.get(url, {
@@ -59,10 +62,7 @@ export const getMeta = async ({
     if (!imdbId) {
       const heading = infoContainer?.find("h3");
       imdbId =
-        heading
-          ?.next("p")
-          ?.find("a")
-          ?.attr("href")?.match(/tt\d+/g)?.[0] ||
+        heading?.next("p")?.find("a")?.attr("href")?.match(/tt\d+/g)?.[0] ||
         infoContainer.text().match(/tt\d+/g)?.[0] ||
         "";
     }
@@ -199,18 +199,12 @@ export const getMeta = async ({
       imdbId,
       type,
       linkList: links,
+      webUrl: url,
     };
   } catch (error) {
     console.log("getInfo error");
     console.error(error);
     // ToastAndroid.show('No response', ToastAndroid.SHORT);
-    return {
-      title: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "",
-      linkList: [],
-    };
+    throw error;
   }
 };
