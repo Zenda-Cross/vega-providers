@@ -237,24 +237,35 @@ export async function getStream({
     const res = await getWithWAF(link, axios, openWebView, headers);
     const $ = cheerio.load(new TextDecoder().decode(res.data));
     const downloadLinks = extractDownloadLinks($);
-    for (const server of ["ZIP-ZAP", "BUZZHEAVIER", "SKYDROP"] as const) {
-      const downloadLink = downloadLinks.find((item) => item.server === server);
-      if (!downloadLink) continue;
+    const streams: Stream[] = [];
+    const seenStreamLinks = new Set<string>();
 
-      try {
-        const streams = await resolveDownloadLink(
-          downloadLink,
-          axios,
-          commonHeaders || {},
-          cheerio,
-        );
-        if (streams.length > 0) return streams;
-      } catch (error: any) {
-        console.log(`${server} resolution failed:`, error.message);
+    for (const server of ["ZIP-ZAP", "BUZZHEAVIER", "SKYDROP"] as const) {
+      const serverLinks = downloadLinks.filter(
+        (item) => item.server === server,
+      );
+
+      for (const downloadLink of serverLinks) {
+        try {
+          const resolvedStreams = await resolveDownloadLink(
+            downloadLink,
+            axios,
+            commonHeaders || {},
+            cheerio,
+          );
+
+          for (const stream of resolvedStreams) {
+            if (seenStreamLinks.has(stream.link)) continue;
+            seenStreamLinks.add(stream.link);
+            streams.push(stream);
+          }
+        } catch (error: any) {
+          console.log(`${server} resolution failed:`, error.message);
+        }
       }
     }
 
-    return [];
+    return streams;
   } catch (error: any) {
     console.log("getStream error: ", error.message);
     return [];
