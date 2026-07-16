@@ -46,37 +46,44 @@ const SERVER_PATTERNS: Record<
     name.includes("GOFILE") || href.includes("gofile.io/"),
 };
 
-function getResponseCookies(setCookie: string | string[] | undefined): string {
-  const cookies = Array.isArray(setCookie)
-    ? setCookie
-    : setCookie
-      ? [setCookie]
-      : [];
-  return cookies.map((cookie) => cookie.split(";")[0]).join("; ");
-}
-
-async function getMagicLinksPage(url: string, axios: any, requestHeaders: any) {
-  const redirectResponse = await axios.get(url, {
+async function getMagicLinksPage(
+  url: string,
+  requestHeaders: Record<string, string>,
+) {
+  const initialResponse = await fetch(url, {
     headers: requestHeaders,
-    maxRedirects: 0,
-    responseType: "text",
-    validateStatus: (status: number) => status >= 200 && status < 400,
+    credentials: "include",
+    cache: "no-store",
+    redirect: "manual",
   });
+  const location = initialResponse.headers.get("location");
+  const setCookie = initialResponse.headers.get("set-cookie");
 
-  const location = redirectResponse.headers?.location;
-  if (!location || redirectResponse.status < 300) return redirectResponse;
+  if (!location || !setCookie) {
+    if (!initialResponse.ok) {
+      throw new Error(`Magic Links returned HTTP ${initialResponse.status}`);
+    }
+    return { data: await initialResponse.text() };
+  }
 
-  const destination = new URL(location, url);
-  destination.searchParams.set("_ml", Date.now().toString());
-
-  return axios.get(destination.href, {
+  const cookie = setCookie.split(";", 1)[0];
+  const destination = new URL(location, url).href;
+  const response = await fetch(destination, {
     headers: {
       ...requestHeaders,
-      Cookie: getResponseCookies(redirectResponse.headers?.["set-cookie"]),
+      Cookie: cookie,
       Referer: url,
     },
-    responseType: "text",
+    credentials: "include",
+    cache: "no-store",
+    redirect: "follow",
   });
+
+  if (!response.ok) {
+    throw new Error(`Magic Links returned HTTP ${response.status}`);
+  }
+
+  return { data: await response.text() };
 }
 
 async function getWithWAF(
@@ -87,8 +94,8 @@ async function getWithWAF(
   const baseUrl = url.split("/").slice(0, 3).join("/");
   const requestHeaders = { ...headers, Referer: baseUrl };
   try {
-    if (new URL(url).hostname.includes("magiclinks.lol")) {
-      return await getMagicLinksPage(url, axios, requestHeaders);
+    if (new URL(url).hostname.includes("magiclinks")) {
+      return await getMagicLinksPage(url, requestHeaders);
     }
     return await axios.get(url, {
       headers: requestHeaders,
