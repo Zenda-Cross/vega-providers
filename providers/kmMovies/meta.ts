@@ -51,6 +51,12 @@ function getQuality(title: string): string {
   return match ? `${match[1]}p` : "AUTO";
 }
 
+function getVersionTitle(anchor: any, $: any): string {
+  if ($(anchor).hasClass("webdl")) return "WebDL Version";
+  if ($(anchor).hasClass("encoded")) return "Encoded Version";
+  return "";
+}
+
 function extractImdbId($: any, html: string): string {
   const imdbUrl = $("a[href*='imdb.com/title/tt']").first().attr("href") || "";
   return imdbUrl.match(/tt\d+/i)?.[0] || html.match(/tt\d{7,}/i)?.[0] || "";
@@ -76,13 +82,17 @@ function extractLinkList($: any, pageUrl: string): Link[] {
         const label = $(anchor).text().replace(/\s+/g, " ").trim();
         if (!href || !label) return;
 
+        const versionTitle = getVersionTitle(anchor, $);
+        const title = [versionTitle, groupTitle, label]
+          .filter(Boolean)
+          .join(" - ");
         const resolvedUrl = new URL(href, pageUrl).href;
-        const key = `${group}:${resolvedUrl}`;
+        const key = `${versionTitle}:${group}:${resolvedUrl}`;
         if (seen.has(key)) return;
         seen.add(key);
 
         const link: Link = {
-          title: `${groupTitle} ${label}`,
+          title,
           quality: getQuality(label),
         };
 
@@ -91,7 +101,7 @@ function extractLinkList($: any, pageUrl: string): Link[] {
         } else {
           link.directLinks = [
             {
-              title: `${groupTitle} ${label}`,
+              title,
               link: resolvedUrl,
               type: "series",
             },
@@ -109,15 +119,20 @@ function extractLinkList($: any, pageUrl: string): Link[] {
     const label = $(anchor).text().replace(/\s+/g, " ").trim();
     if (!href || !label) return;
 
+    const versionTitle = getVersionTitle(anchor, $);
+    const title = versionTitle
+      ? `${versionTitle} - ${label}`
+      : `Download ${label}`;
     const resolvedUrl = new URL(href, pageUrl).href;
-    if (seen.has(resolvedUrl)) return;
-    seen.add(resolvedUrl);
+    const key = `${versionTitle}:${resolvedUrl}`;
+    if (seen.has(key)) return;
+    seen.add(key);
     links.push({
-      title: `Download ${label}`,
+      title,
       quality: getQuality(label),
       directLinks: [
         {
-          title: `Download ${label}`,
+          title,
           link: resolvedUrl,
           type: "movie",
         },

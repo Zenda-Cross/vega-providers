@@ -1,5 +1,6 @@
 import { ProviderContext, Stream } from "../types";
 import { gofileExtractor } from "../extractors/gofile";
+import { hubcloudExtractor } from "../extractors/hubcloud";
 
 const headers = {
   "User-Agent":
@@ -28,7 +29,7 @@ const browserHeaders = {
   "Upgrade-Insecure-Requests": "1",
 };
 
-type ServerName = "ZIP-ZAP" | "BUZZHEAVIER" | "SKYDROP" | "GOFILE";
+type ServerName = "ZIP-ZAP" | "BUZZHEAVIER" | "SKYDROP" | "GOFILE" | "HUBCLOUD";
 
 const SERVER_PATTERNS: Record<
   ServerName,
@@ -44,6 +45,8 @@ const SERVER_PATTERNS: Record<
     name.includes("SKYDROP") || href.includes("skydrop.sbs/"),
   GOFILE: (name, href) =>
     name.includes("GOFILE") || href.includes("gofile.io/"),
+  HUBCLOUD: (name, href) =>
+    name.includes("HUBCLOUD") || href.includes("hubcloud."),
 };
 
 async function getMagicLinksPage(
@@ -248,6 +251,20 @@ async function resolveGofile(link: string, axios: any): Promise<Stream | null> {
   };
 }
 
+async function resolveHubcloud(
+  link: string,
+  signal: AbortSignal,
+  axios: any,
+  cheerio: any,
+  commonHeaders: Record<string, string>,
+): Promise<Stream | null> {
+  const streams = await hubcloudExtractor(link, signal, axios, cheerio, {
+    ...headers,
+    ...commonHeaders,
+  });
+  return streams.find((stream: Stream) => stream?.link) || null;
+}
+
 export async function getStream({
   link,
   type,
@@ -275,6 +292,8 @@ export async function getStream({
         resolveBuzzheavier(l, axios, cheerio, commonHeaders || {}),
       SKYDROP: (l) => resolveSkyDrop(l, axios),
       GOFILE: (l) => resolveGofile(l, axios),
+      HUBCLOUD: (l) =>
+        resolveHubcloud(l, signal, axios, cheerio, commonHeaders || {}),
     };
 
     const streams: Stream[] = [];
@@ -285,6 +304,7 @@ export async function getStream({
       "BUZZHEAVIER",
       "SKYDROP",
       "GOFILE",
+      "HUBCLOUD",
     ] as ServerName[]) {
       for (const { link } of downloadLinks.filter((d) => d.server === server)) {
         try {

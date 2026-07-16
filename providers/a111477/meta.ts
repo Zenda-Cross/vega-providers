@@ -14,10 +14,15 @@ export const getMeta = async function ({
     const data = res.data;
     const $ = cheerio.load(data);
 
-    // Extract title from the page header or URL
-    const pageTitle =
-      $("h1").text().trim() || url.split("/").filter(Boolean).pop() || "";
-    const title = pageTitle.replace("Index of /", "").replace(/\/$/, "");
+    const urlTitle = decodeURIComponent(
+      new URL(url).pathname.split("/").filter(Boolean).pop() || "",
+    );
+    const heading = $("h1")
+      .text()
+      .trim()
+      .replace(/^Index of\s*/i, "");
+    const title =
+      heading && heading !== "/" ? heading.replace(/\/$/, "") : urlTitle;
 
     const links: Link[] = [];
     const directLinks: EpisodeLink[] = [];
@@ -25,7 +30,7 @@ export const getMeta = async function ({
     // Parse directory structure
     $("table tbody tr").each((i, element) => {
       const $row = $(element);
-      const linkElement = $row.find("td:first-child a");
+      const linkElement = $row.find("a[href]").first();
       const itemTitle = linkElement.text().trim();
       const itemLink = linkElement.attr("href");
 
@@ -35,13 +40,13 @@ export const getMeta = async function ({
         itemTitle !== "../" &&
         itemTitle !== "Parent Directory"
       ) {
-        const fullLink = itemLink;
+        const fullLink = new URL(itemLink, url).href;
 
         // If it's a directory (ends with /)
         if (itemTitle.endsWith("/")) {
           const cleanTitle = itemTitle.replace(/\/$/, "");
           links.push({
-            episodesLink: link + itemLink,
+            episodesLink: fullLink,
             title: cleanTitle,
           });
         }
@@ -69,21 +74,20 @@ export const getMeta = async function ({
     }
 
     // Determine if this is a movie or series based on structure
-    const type = links.some(
-      (link) =>
-        link.episodesLink?.includes("Season") ||
-        link.episodesLink?.includes("S0")
-    )
-      ? "series"
-      : directLinks.length > 1
-      ? "series"
-      : "movie";
+    const pathname = new URL(url).pathname;
+    const type =
+      pathname.startsWith("/tvs/") ||
+      pathname.startsWith("/kdrama/") ||
+      pathname.startsWith("/asiandrama/") ||
+      links.some((item) => item.episodesLink)
+        ? "series"
+        : "movie";
 
     return {
       title: title,
       synopsis: `Content from 111477.xyz directory`,
       image: `https://placehold.jp/23/000000/ffffff/300x450.png?text=${encodeURIComponent(
-        title
+        title,
       )}&css=%7B%22background%22%3A%22%20-webkit-gradient(linear%2C%20left%20bottom%2C%20left%20top%2C%20from(%233f3b3b)%2C%20to(%23000000))%22%2C%22text-transform%22%3A%22%20capitalize%22%7D`,
       imdbId: "",
       type: type,

@@ -17,7 +17,7 @@ export const getEpisodes = async function ({
     // Parse episode files from directory
     $("table tbody tr").each((i, element) => {
       const $row = $(element);
-      const linkElement = $row.find("td:first-child a");
+      const linkElement = $row.find("a[href]").first();
       const fileName = linkElement.text().trim();
       const fileLink = linkElement.attr("href");
 
@@ -34,7 +34,7 @@ export const getEpisodes = async function ({
           fileName.includes(".avi") ||
           fileName.includes(".mov")
         ) {
-          const fullLink = fileLink;
+          const fullLink = new URL(fileLink, url).href;
 
           // Try to extract episode information from filename
           let episodeTitle = fileName;
