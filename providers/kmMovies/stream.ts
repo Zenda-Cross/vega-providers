@@ -202,13 +202,15 @@ async function resolveBuzzheavier(
   if (!downloadPath) return null;
 
   const downloadUrl = new URL(downloadPath, origin).href;
-  console.log("Buzzheavier download path:", downloadUrl);
-
-  const rawUrl = await captureRedirect(downloadUrl, axios, {
-    ...requestHeaders,
-    Referer: link,
-  });
-  return rawUrl ? { server: "BUZZHEAVIER", link: rawUrl, type: "mkv" } : null;
+  return {
+    server: "BUZZHEAVIER",
+    link: downloadUrl,
+    type: "mkv",
+    headers: {
+      Referer: link,
+      "User-Agent": requestHeaders["User-Agent"],
+    },
+  };
 }
 
 async function resolveSkyDrop(
@@ -290,6 +292,7 @@ export async function getStream({
           if (stream && !seen.has(stream.link)) {
             seen.add(stream.link);
             streams.push(stream);
+            break;
           }
         } catch (error: any) {
           console.log(`${server} failed:`, error.message);
