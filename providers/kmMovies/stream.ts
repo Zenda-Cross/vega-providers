@@ -205,9 +205,27 @@ async function resolveBuzzheavier(
   if (!downloadPath) return null;
 
   const downloadUrl = new URL(downloadPath, origin).href;
+  const setCookie = pageResponse.headers?.["set-cookie"];
+  const cookie = (Array.isArray(setCookie) ? setCookie : [setCookie])
+    .filter(Boolean)
+    .map((value: string) => value.split(";", 1)[0])
+    .join("; ");
+  const downloadResponse = await axios.head(downloadUrl, {
+    headers: {
+      ...requestHeaders,
+      Referer: link,
+      "HX-Request": "true",
+      "HX-Current-URL": link,
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
+    validateStatus: (status: number) => status >= 200 && status < 300,
+  });
+  const redirectUrl = downloadResponse.headers?.["hx-redirect"];
+  if (!redirectUrl) return null;
+
   return {
     server: "BUZZHEAVIER",
-    link: downloadUrl,
+    link: new URL(redirectUrl, origin).href,
     type: "mkv",
     headers: {
       Referer: link,
