@@ -68,12 +68,12 @@ function extractLinkList($: any, pageUrl: string): Link[] {
 
   $(".type-content[data-type]").each((_: number, container: any) => {
     const group = $(container).attr("data-type") || "";
+    if (group.startsWith("zip-")) return;
+
     const isEpisodeGroup = group.startsWith("episodes-");
     const groupTitle = group.startsWith("combined-")
       ? "Combined"
-      : group.startsWith("zip-")
-        ? "Zip"
-        : "Episode Wise";
+      : "Episode Wise";
 
     $(container)
       .find("a.dl-btn[href]")
@@ -115,6 +115,11 @@ function extractLinkList($: any, pageUrl: string): Link[] {
   if (links.length > 0) return links;
 
   $("a.dl-btn[href]").each((_: number, anchor: any) => {
+    const group = $(anchor)
+      .closest(".type-content[data-type]")
+      .attr("data-type");
+    if (group?.startsWith("zip-")) return;
+
     const href = $(anchor).attr("href")?.trim();
     const label = $(anchor).text().replace(/\s+/g, " ").trim();
     if (!href || !label) return;
