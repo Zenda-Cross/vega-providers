@@ -62,11 +62,7 @@ export const getMeta = async ({
     if (!imdbId) {
       const heading = infoContainer?.find("h3");
       imdbId =
-        //@ts-ignore
-        heading
-          ?.next("p")
-          ?.find("a")?.[0]
-          ?.attribs?.href?.match(/tt\d+/g)?.[0] ||
+        heading?.next("p")?.find("a")?.attr("href")?.match(/tt\d+/g)?.[0] ||
         infoContainer.text().match(/tt\d+/g)?.[0] ||
         "";
     }
@@ -140,7 +136,7 @@ export const getMeta = async ({
       }
     }
 
-    const list = hr?.nextUntil("hr");
+    const list = hr?.nextAll();
     const links: Link[] = [];
     list.each((index, element: any) => {
       element = $(element);
@@ -165,9 +161,7 @@ export const getMeta = async ({
       // episode links
       const vcloudLinks = element
         ?.next()
-        .find(
-          ".btn-outline[style='background:linear-gradient(135deg,#ed0b0b,#f2d152); color: white;'],.btn-outline[style='background:linear-gradient(135deg,#ed0b0b,#f2d152); color: #fdf8f2;'],.btn-outline[style='background:linear-gradient(135deg,#ed0b0b,#f2d152);color: white']",
-        )
+        .find(".btn-outline[style*='#ed0b0b']")
         ?.parent()
         ?.attr("href");
       const episodesLink =
@@ -183,9 +177,7 @@ export const getMeta = async ({
             : "") ||
         element
           ?.next()
-          .find(
-            ".btn-outline[style='background:linear-gradient(135deg,#0ebac3,#09d261); color: white;']",
-          )
+          .find(".btn-outline[style*='#0ebac3']")
           ?.parent()
           ?.attr("href");
       if (movieLinks || episodesLink) {
@@ -199,7 +191,7 @@ export const getMeta = async ({
         });
       }
     });
-    // console.log(links);
+
     return {
       title,
       synopsis,
@@ -213,13 +205,6 @@ export const getMeta = async ({
     console.log("getInfo error");
     console.error(error);
     // ToastAndroid.show('No response', ToastAndroid.SHORT);
-    return {
-      title: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "",
-      linkList: [],
-    };
+    throw error;
   }
 };
