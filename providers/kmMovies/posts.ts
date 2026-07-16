@@ -92,12 +92,14 @@ async function fetchPosts({
 
     // --- Build URL for category filter or search query
     if (query && query.trim()) {
-      url = `${baseUrl}/?s=${encodeURIComponent(query)}${page > 1 ? `&paged=${page}` : ""
-        }`;
+      url = `${baseUrl}/?s=${encodeURIComponent(query)}${
+        page > 1 ? `&paged=${page}` : ""
+      }`;
     } else if (filter) {
       url = filter.startsWith("/")
-        ? `${baseUrl}${filter.replace(/\/$/, "")}${page > 1 ? `/page/${page}` : ""
-        }`
+        ? `${baseUrl}${filter.replace(/\/$/, "")}${
+            page > 1 ? `/page/${page}` : ""
+          }`
         : `${baseUrl}/${filter}${page > 1 ? `/page/${page}` : ""}`;
     } else {
       url = `${baseUrl}${page > 1 ? `/page/${page}` : ""}`;
@@ -135,7 +137,7 @@ async function fetchPosts({
       if (seen.has(link)) return;
 
       let title =
-        card.find("h2").first().text().trim() ||
+        card.find(".movie-title").first().text().trim() ||
         card.find("a[title]").first().attr("title")?.trim() ||
         card.text().trim();
       title = title
@@ -160,7 +162,7 @@ async function fetchPosts({
   } catch (err) {
     console.error(
       "kmMovies fetchPosts error:",
-      err instanceof Error ? err.message : String(err)
+      err instanceof Error ? err.message : String(err),
     );
     return [];
   }
