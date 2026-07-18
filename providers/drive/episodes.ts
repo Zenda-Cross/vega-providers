@@ -60,11 +60,33 @@ export const getEpisodes = async function ({
             else if (href.includes("pixeldrain")) serverName = "Pixeldrain";
             else if (href.includes("fastdl")) serverName = "FastDL";
 
-            if (!episodeLinks.find((e) => e.link === href)) {
+            const episodeTitle = currentTitle || "Play";
+            const hubCloudTitle = `${episodeTitle} - HubCloud`;
+
+            if (
+              serverName !== "HubCloud" &&
+              episodeLinks.some((episode) => episode.title === hubCloudTitle)
+            ) {
+              return;
+            }
+
+            if (serverName === "HubCloud") {
+              const alternateIndex = episodeLinks.findIndex(
+                (episode) =>
+                  episode.title.startsWith(`${episodeTitle} - `) &&
+                  episode.title !== hubCloudTitle,
+              );
+              if (alternateIndex !== -1) {
+                episodeLinks.splice(alternateIndex, 1);
+              }
+            }
+
+            if (!episodeLinks.find((episode) => episode.link === href)) {
               episodeLinks.push({
-                title: currentTitle
-                  ? `${currentTitle} - ${serverName}`
-                  : serverName,
+                title:
+                  episodeTitle === "Play"
+                    ? serverName
+                    : `${episodeTitle} - ${serverName}`,
                 link: href,
               });
             }
@@ -83,9 +105,21 @@ export const getEpisodes = async function ({
       }
     }
 
-    console.log("episodeLinks:", episodeLinks);
-    return episodeLinks.length > 0
-      ? episodeLinks
+    const preferredEpisodeLinks = episodeLinks.filter((episode) => {
+      const episodePrefix = episode.title.replace(/ - [^-]+$/, "");
+      return (
+        episode.title.endsWith(" - HubCloud") ||
+        !episodeLinks.some(
+          (candidate) =>
+            candidate.title === `${episodePrefix} - HubCloud` &&
+            candidate.link !== episode.link,
+        )
+      );
+    });
+
+    console.log("episodeLinks:", preferredEpisodeLinks);
+    return preferredEpisodeLinks.length > 0
+      ? preferredEpisodeLinks
       : [{ title: "Play", link: url }];
   } catch (err) {
     console.error(err);

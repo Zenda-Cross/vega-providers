@@ -118,6 +118,8 @@ async function posts(
     $(".blog-items,.post-list,#archive-container,.movies-grid")
       ?.children("article,.entry-list-item,a")
       ?.each((index, element) => {
+        const href =
+          $(element)?.find("a")?.attr("href") || $(element)?.attr("href") || "";
         const post = {
           title: (
             $(element)
@@ -133,10 +135,9 @@ async function posts(
             ""
           ).trim(),
 
-          link:
-            $(element)?.find("a")?.attr("href") ||
-            $(element)?.attr("href") ||
-            "",
+          link: href.startsWith(baseUrl)
+            ? href.slice(baseUrl.length) || "/"
+            : href,
           image:
             $(element).find("a").find("img").attr("data-lazy-src") ||
             $(element).find("a").find("img").attr("data-src") ||

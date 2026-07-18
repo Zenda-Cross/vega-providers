@@ -12,8 +12,11 @@ export const getMeta = async function ({
   };
 }): Promise<Info> {
   try {
-    const { axios, cheerio } = providerContext;
-    const url = link;
+    const { axios, cheerio, getBaseUrl } = providerContext;
+    const currentBaseUrl = await getBaseUrl("drive");
+    const url = link.startsWith("http")
+      ? link
+      : new URL(link, `${currentBaseUrl}/`).href;
     const res = await axios.get(url);
     const data = res.data;
     const $ = cheerio.load(data);
@@ -86,6 +89,7 @@ export const getMeta = async function ({
       imdbId,
       type,
       linkList: links,
+      webUrl: url,
     };
   } catch (err) {
     console.error(err);

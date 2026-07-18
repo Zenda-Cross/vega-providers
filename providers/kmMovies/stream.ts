@@ -1,4 +1,6 @@
 import { ProviderContext, Stream } from "../types";
+import { gofileExtractor } from "../extractors/gofile";
+import { hubcloudExtractor } from "../extractors/hubcloud";
 
 const headers = {
   "User-Agent":
@@ -9,15 +11,99 @@ const headers = {
   "Cache-Control": "no-cache",
 };
 
+const browserHeaders = {
+  ...headers,
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+  "Accept-Language": "en-US,en;q=0.9,en-IN;q=0.8",
+  DNT: "1",
+  Priority: "u=0, i",
+  "Sec-CH-UA":
+    '"Not;A=Brand";v="8", "Chromium";v="150", "Microsoft Edge";v="150"',
+  "Sec-CH-UA-Mobile": "?0",
+  "Sec-CH-UA-Platform": '"Windows"',
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+};
+
+type ServerName = "ZIP-ZAP" | "BUZZHEAVIER" | "SKYDROP" | "GOFILE" | "HUBCLOUD";
+
+const SERVER_PATTERNS: Record<
+  ServerName,
+  (name: string, href: string) => boolean
+> = {
+  "ZIP-ZAP": (name, href) =>
+    name.includes("ZIP-ZAP") || href.includes("kmphotos.cv/download"),
+  BUZZHEAVIER: (name, href) =>
+    name.includes("BUZZHEAVIER") ||
+    name.includes("BUZZHIEVER") ||
+    href.includes("bzzhr.co"),
+  SKYDROP: (name, href) =>
+    name.includes("SKYDROP") || href.includes("skydrop.sbs/"),
+  GOFILE: (name, href) =>
+    name.includes("GOFILE") || href.includes("gofile.io/"),
+  HUBCLOUD: (name, href) =>
+    name.includes("HUBCLOUD") || href.includes("hubcloud."),
+};
+
+async function getMagicLinksPage(
+  url: string,
+  requestHeaders: Record<string, string>,
+) {
+  const initialResponse = await fetch(url, {
+    headers: requestHeaders,
+    credentials: "include",
+    cache: "no-store",
+    redirect: "manual",
+  });
+  const location = initialResponse.headers.get("location");
+  const setCookie = initialResponse.headers.get("set-cookie");
+
+  if (!location || !setCookie) {
+    if (!initialResponse.ok) {
+      throw new Error(`Magic Links returned HTTP ${initialResponse.status}`);
+    }
+    return { data: await initialResponse.text() };
+  }
+
+  const cookie = setCookie.split(";", 1)[0];
+  const destination = new URL(location, url).href;
+  const response = await fetch(destination, {
+    headers: {
+      ...requestHeaders,
+      Cookie: cookie,
+      Referer: url,
+    },
+    credentials: "include",
+    cache: "no-store",
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Magic Links returned HTTP ${response.status}`);
+  }
+
+  return { data: await response.text() };
+}
+
 async function getWithWAF(
   url: string,
   axios: any,
   openWebView: any,
-  headers: any,
 ): Promise<any> {
   const baseUrl = url.split("/").slice(0, 3).join("/");
+  const requestHeaders = { ...headers, Referer: baseUrl };
   try {
-    return await axios.get(url, { headers: { ...headers, Referer: baseUrl } });
+    if (new URL(url).hostname.includes("magiclinks")) {
+      return await getMagicLinksPage(url, requestHeaders);
+    }
+    return await axios.get(url, {
+      headers: requestHeaders,
+      responseType: "text",
+    });
   } catch (error: any) {
     if (error.response?.status === 403 && openWebView) {
       console.log(`WAF detected (403) for ${url}, using solver...`);
@@ -28,13 +114,174 @@ async function getWithWAF(
         waitForCookie: "cf_clearance",
       });
       return await axios.get(url, {
-        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
+        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookies },
+        responseType: "text",
       });
     }
     throw error;
   }
 }
 
+function extractDownloadLinks($: any): { server: ServerName; link: string }[] {
+  const links: { server: ServerName; link: string }[] = [];
+  const seen = new Set<string>();
+
+  $("a[href]").each((_: number, element: any) => {
+    const href = $(element).attr("href")?.trim();
+    if (!href || seen.has(href)) return;
+    const name = $(element).text().replace(/\s+/g, " ").trim().toUpperCase();
+
+    for (const [server, matches] of Object.entries(SERVER_PATTERNS)) {
+      if (matches(name, href)) {
+        seen.add(href);
+        links.push({ server: server as ServerName, link: href });
+        return;
+      }
+    }
+  });
+
+  return links;
+}
+
+async function captureRedirect(
+  url: string,
+  axios: any,
+  requestHeaders: any,
+): Promise<string> {
+  const response = await axios.get(url, {
+    headers: requestHeaders,
+    maxRedirects: 0,
+    validateStatus: (status: number) => status >= 200 && status < 400,
+  });
+  return response.headers?.location
+    ? new URL(response.headers.location, url).href
+    : "";
+}
+
+async function resolveZipZap(
+  link: string,
+  axios: any,
+  cheerio: any,
+  commonHeaders: Record<string, string>,
+): Promise<Stream | null> {
+  const downloadUrl = new URL(link);
+  const requestHeaders = {
+    ...headers,
+    ...commonHeaders,
+    Referer: downloadUrl.origin,
+  };
+
+  const pageResponse = await axios.get(downloadUrl.href, {
+    headers: requestHeaders,
+  });
+  const $ = cheerio.load(pageResponse.data);
+  const r2Href = $("a[href*='dl=r2']").first().attr("href");
+  if (!r2Href) return null;
+
+  const r2Url = new URL(r2Href, downloadUrl);
+  const rawUrl = await captureRedirect(r2Url.href, axios, {
+    ...requestHeaders,
+    Referer: downloadUrl.href,
+  });
+  return rawUrl ? { server: "ZIP-ZAP", link: rawUrl, type: "mkv" } : null;
+}
+
+async function resolveBuzzheavier(
+  link: string,
+  axios: any,
+  cheerio: any,
+  commonHeaders: Record<string, string>,
+): Promise<Stream | null> {
+  const origin = new URL(link).origin;
+  const requestHeaders = {
+    ...browserHeaders,
+    ...commonHeaders,
+    Referer: origin,
+  };
+
+  const pageResponse = await axios.get(link, { headers: requestHeaders });
+  const $ = cheerio.load(pageResponse.data);
+  const downloadPath = $("a.download-btn").attr("hx-get");
+  if (!downloadPath) return null;
+
+  const downloadUrl = new URL(downloadPath, origin).href;
+  const setCookie = pageResponse.headers?.["set-cookie"];
+  const cookie = (Array.isArray(setCookie) ? setCookie : [setCookie])
+    .filter(Boolean)
+    .map((value: string) => value.split(";", 1)[0])
+    .join("; ");
+  const downloadResponse = await axios.head(downloadUrl, {
+    headers: {
+      ...requestHeaders,
+      Referer: link,
+      "HX-Request": "true",
+      "HX-Current-URL": link,
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
+    validateStatus: (status: number) => status >= 200 && status < 300,
+  });
+  const redirectUrl = downloadResponse.headers?.["hx-redirect"];
+  if (!redirectUrl) return null;
+
+  return {
+    server: "BUZZHEAVIER",
+    link: new URL(redirectUrl, origin).href,
+    type: "mkv",
+    headers: {
+      Referer: link,
+      "User-Agent": requestHeaders["User-Agent"],
+    },
+  };
+}
+
+async function resolveSkyDrop(
+  link: string,
+  axios: any,
+): Promise<Stream | null> {
+  const skyDropUrl = new URL(link);
+  const id = skyDropUrl.searchParams.get("id");
+  if (!id) return null;
+
+  const response = await axios.get(`${skyDropUrl.origin}/api.php`, {
+    params: { id },
+    headers,
+  });
+  if (!response.data?.success || !response.data.link) return null;
+  return { server: "SkyDrop", link: response.data.link, type: "mkv" };
+}
+
+async function resolveGofile(link: string, axios: any): Promise<Stream | null> {
+  const gofileUrl = new URL(link);
+  const id = gofileUrl.pathname.split("/").filter(Boolean).pop();
+  if (!id) return null;
+
+  const result = await gofileExtractor(id, axios);
+  if (!result.link || !result.token) return null;
+
+  return {
+    server: "Gofile",
+    link: result.link,
+    type: "mkv",
+    headers: {
+      Referer: "https://gofile.io/",
+      Cookie: `accountToken=${result.token}`,
+    },
+  };
+}
+
+async function resolveHubcloud(
+  link: string,
+  signal: AbortSignal,
+  axios: any,
+  cheerio: any,
+  commonHeaders: Record<string, string>,
+): Promise<Stream | null> {
+  const streams = await hubcloudExtractor(link, signal, axios, cheerio, {
+    ...headers,
+    ...commonHeaders,
+  });
+  return streams.find((stream: Stream) => stream?.link) || null;
+}
 
 export async function getStream({
   link,
@@ -47,41 +294,53 @@ export async function getStream({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }) {
-  const { axios, cheerio, openWebView } = providerContext;
+  const { axios, cheerio, openWebView, commonHeaders } = providerContext;
 
   try {
-    const streamLinks: Stream[] = [];
-
-    // Fetch the page HTML
-    const res = await getWithWAF(link, axios, openWebView, headers);
+    const res = await getWithWAF(link, axios, openWebView);
     const $ = cheerio.load(res.data);
+    const downloadLinks = extractDownloadLinks($);
 
-    const ALLOWED_SERVERS = ["ONE CLICK", "ZIP-ZAP", "ULTRA FAST", "SKYDROP"];
-    // --- Scrape all <a class="download-button"> links
-    $("a.download-button").each((_, el) => {
-      const btn = $(el);
-      const href = btn.attr("href")?.trim();
-      const serverName = btn.text().trim() || "Unknown Server";
+    const resolvers: Record<
+      ServerName,
+      (link: string) => Promise<Stream | null>
+    > = {
+      "ZIP-ZAP": (l) => resolveZipZap(l, axios, cheerio, commonHeaders || {}),
+      BUZZHEAVIER: (l) =>
+        resolveBuzzheavier(l, axios, cheerio, commonHeaders || {}),
+      SKYDROP: (l) => resolveSkyDrop(l, axios),
+      GOFILE: (l) => resolveGofile(l, axios),
+      HUBCLOUD: (l) =>
+        resolveHubcloud(l, signal, axios, cheerio, commonHeaders || {}),
+    };
 
-      // Check for partial matches in server names
-      const isAllowed = ALLOWED_SERVERS.some(
-        (allowed) =>
-          serverName.toUpperCase().includes(allowed) ||
-          allowed.includes(serverName.toUpperCase())
-      );
+    const streams: Stream[] = [];
+    const seen = new Set<string>();
 
-      if (href && isAllowed) {
-        streamLinks.push({
-          server: serverName,
-          link: href,
-          type: "mkv", // Boss, mostly KMMOVIES MKV hota hai
-        });
+    for (const server of [
+      "ZIP-ZAP",
+      "BUZZHEAVIER",
+      "SKYDROP",
+      "GOFILE",
+      "HUBCLOUD",
+    ] as ServerName[]) {
+      for (const { link } of downloadLinks.filter((d) => d.server === server)) {
+        try {
+          const stream = await resolvers[server](link);
+          if (stream && !seen.has(stream.link)) {
+            seen.add(stream.link);
+            streams.push(stream);
+            break;
+          }
+        } catch (error: any) {
+          console.log(`${server} failed:`, error.message);
+        }
       }
-    });
+    }
 
-    return streamLinks;
+    return streams;
   } catch (error: any) {
-    console.log("getStream error: ", error.message);
+    console.log("getStream error:", error.message);
     return [];
   }
 }

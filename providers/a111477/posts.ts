@@ -77,7 +77,7 @@ export const getSearchPosts = async function ({
 
     // Check if all query words are found in title words
     const allWordsMatch = queryWords.every((queryWord) =>
-      titleWords.some((titleWord) => titleWord.includes(queryWord))
+      titleWords.some((titleWord) => titleWord.includes(queryWord)),
     );
 
     if (allWordsMatch) {
@@ -90,7 +90,7 @@ export const getSearchPosts = async function ({
       if (queryWord.length >= 3) {
         // Check if any title word starts with the query
         const startsWithMatch = titleWords.some((titleWord) =>
-          titleWord.startsWith(queryWord)
+          titleWord.startsWith(queryWord),
         );
 
         if (startsWithMatch) {
@@ -138,7 +138,7 @@ async function posts({
     // Parse the directory listing
     $("table tbody tr").each((i, element) => {
       const $row = $(element);
-      const linkElement = $row.find("td:first-child a");
+      const linkElement = $row.find("a[href]").first();
       const title = linkElement.text().trim();
       const link = linkElement.attr("href");
 
@@ -151,7 +151,7 @@ async function posts({
         title.endsWith("/")
       ) {
         const cleanTitle = title.replace(/\/$/, ""); // Remove trailing slash
-        const fullLink = url + link;
+        const fullLink = new URL(link, url).href;
 
         // Generate a placeholder image based on title
         const imageTitle =
@@ -159,7 +159,7 @@ async function posts({
             ? cleanTitle.slice(0, 30).replace(/\./g, " ")
             : cleanTitle.replace(/\./g, " ");
         const image = `https://placehold.jp/23/000000/ffffff/200x400.png?text=${encodeURIComponent(
-          imageTitle
+          imageTitle,
         )}&css=%7B%22background%22%3A%22%20-webkit-gradient(linear%2C%20left%20bottom%2C%20left%20top%2C%20from(%233f3b3b)%2C%20to(%23000000))%22%2C%22text-transform%22%3A%22%20capitalize%22%7D`;
 
         catalog.push({
@@ -193,7 +193,7 @@ function levenshteinDistance(str1: string, str2: string): number {
       matrix[j][i] = Math.min(
         matrix[j][i - 1] + 1, // deletion
         matrix[j - 1][i] + 1, // insertion
-        matrix[j - 1][i - 1] + indicator // substitution
+        matrix[j - 1][i - 1] + indicator, // substitution
       );
     }
   }

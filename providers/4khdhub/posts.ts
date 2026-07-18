@@ -16,7 +16,7 @@ export const getPosts = async function ({
   const baseUrl = await getBaseUrl("4khdhub");
   const url = `${baseUrl + filter}/page/${page}`;
   console.log("4khdhubGetPosts url", url);
-  return posts({ url, signal, cheerio });
+  return posts({ baseUrl, url, signal, cheerio });
 };
 
 export const getSearchPosts = async function ({
@@ -38,14 +38,16 @@ export const getSearchPosts = async function ({
       ? `${baseUrl}/?s=${searchQuery}`
       : `${baseUrl}/page/${page}?s=${searchQuery}`;
   console.log("4khdhubGetSearchPosts url", url);
-  return posts({ url, signal, cheerio });
+  return posts({ baseUrl, url, signal, cheerio });
 };
 
 async function posts({
+  baseUrl,
   url,
   signal,
   cheerio,
 }: {
+  baseUrl: string;
   url: string;
   signal: AbortSignal;
   cheerio: ProviderContext["cheerio"];
@@ -72,7 +74,9 @@ async function posts({
         if (title && link && image) {
           catalog.push({
             title: title,
-            link: link,
+            link: link.startsWith(baseUrl)
+              ? link.slice(baseUrl.length) || "/"
+              : link,
             image: image,
           });
         }

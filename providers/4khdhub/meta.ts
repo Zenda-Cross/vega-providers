@@ -10,7 +10,9 @@ export const getMeta = async function ({
   try {
     const { axios, cheerio, getBaseUrl } = providerContext;
     const baseUrl = await getBaseUrl("4khdhub");
-    const url = `${baseUrl}${link}`;
+    const url = link.startsWith("http")
+      ? link
+      : new URL(link, `${baseUrl}/`).href;
     const res = await axios.get(url);
     const data = res.data;
     const $ = cheerio.load(data);
@@ -77,6 +79,7 @@ export const getMeta = async function ({
       imdbId,
       type,
       linkList: links,
+      webUrl: url,
     };
   } catch (err) {
     console.error(err);

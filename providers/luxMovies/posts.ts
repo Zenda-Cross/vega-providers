@@ -78,11 +78,12 @@ export const getSearchPosts = async ({
     if (data?.hits) {
       data.hits.forEach((hit: any) => {
         const doc = hit.document;
+        const permalink = doc.permalink || "";
         const post = {
           title: doc.post_title.replace("Download", "").trim(),
-          link: doc.permalink.startsWith("http")
-            ? doc.permalink
-            : `${baseUrl}${doc.permalink}`,
+          link: permalink.startsWith(baseUrl)
+            ? permalink.slice(baseUrl.length) || "/"
+            : permalink,
           image: doc.post_thumbnail,
         };
         posts.push(post);
@@ -116,6 +117,8 @@ async function posts(
     $(".blog-items,.post-list,#archive-container,.movies-grid")
       ?.children("article,.entry-list-item,a")
       ?.each((index, element) => {
+        const href =
+          $(element)?.find("a")?.attr("href") || $(element)?.attr("href") || "";
         const post = {
           title: (
             $(element)
@@ -131,10 +134,9 @@ async function posts(
             ""
           ).trim(),
 
-          link:
-            $(element)?.find("a")?.attr("href") ||
-            $(element)?.attr("href") ||
-            "",
+          link: href.startsWith(baseUrl)
+            ? href.slice(baseUrl.length) || "/"
+            : href,
           image:
             $(element).find("a").find("img").attr("data-lazy-src") ||
             $(element).find("a").find("img").attr("data-src") ||
