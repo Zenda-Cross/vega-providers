@@ -7,7 +7,7 @@ const hubcloudDecode = function (value: string) {
 
 const extractUrlFromScript = (html: string): string => {
   const doubleAtobMatch = html.match(
-    /var\s+url\s*=\s*atob\(atob\(['"]([^'"]+)['"]\)\)/,
+    /atob\(atob\(['"]([^'"]+)['"]\)\)/,
   );
   if (doubleAtobMatch?.[1]) {
     return atob(atob(doubleAtobMatch[1]));

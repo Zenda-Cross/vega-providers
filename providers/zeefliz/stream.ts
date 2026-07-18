@@ -41,7 +41,10 @@ export async function getStream({
       const dotlinkRes = await axios(`${link}`, { headers });
       const dotlinkText = dotlinkRes.data;
       // console.log("dotlinkText", dotlinkText);
-      const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
+      let vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
+      if (!vlink[1]) {
+        vlink = dotlinkText.match(/<a\s+href="([^"]*zee-dl\.shop[^"]*)"/i) || [];
+      }
       console.log("vLink", vlink[1]);
       link = vlink[1];
 
