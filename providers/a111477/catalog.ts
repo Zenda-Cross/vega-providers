@@ -15,10 +15,6 @@ export const catalog = [
     title: "Asian Drama",
     filter: "/asiandrama/",
   },
-  {
-    title: "Misc",
-    filter: "/misc/",
-  },
 ];
 
 export const genres = [];
