@@ -1,4 +1,5 @@
 import { Info, Link, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getMeta = async function ({
   link,
@@ -8,7 +9,7 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { getBaseUrl, axios } = providerContext;
+    const { axios } = providerContext;
     const baseUrl = await getBaseUrl("consumet");
     const url = `${baseUrl}/anime/zoro/info?id=` + link;
     const res = await axios.get(url);

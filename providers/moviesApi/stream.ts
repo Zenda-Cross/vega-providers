@@ -1,4 +1,5 @@
 import { Stream, ProviderContext, TextTracks } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const mpGetStream = async function ({
   link: id,
@@ -10,7 +11,7 @@ export const mpGetStream = async function ({
   providerContext: ProviderContext;
 }): Promise<Stream[]> {
   try {
-    const { getBaseUrl, cheerio } = providerContext;
+    const { cheerio } = providerContext;
     const streams: Stream[] = [];
     const { season, episode, tmdbId } = JSON.parse(id);
     const baseUrl = await getBaseUrl("moviesapi");
@@ -59,7 +60,7 @@ export const mpGetStream = async function ({
         {
           method: "POST",
           body: contents,
-        }
+        },
       );
       const finalData = await res2.json();
       const subtitle: TextTracks = finalData?.subtitles?.map((sub: any) => ({

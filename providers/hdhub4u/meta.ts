@@ -1,4 +1,5 @@
 import { Info, Link, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 const hdbHeaders = {
   Cookie: "xla=s4t",
@@ -14,7 +15,7 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { axios, cheerio, getBaseUrl } = providerContext;
+    const { axios, cheerio } = providerContext;
     const baseUrl = await getBaseUrl("hdhub");
     const url = new URL(link, `${baseUrl}/`).href;
     const res = await axios.get(url, { headers: hdbHeaders });

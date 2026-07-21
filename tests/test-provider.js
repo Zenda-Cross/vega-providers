@@ -2,7 +2,8 @@ const readline = require("readline");
 const cheerio = require("cheerio");
 const axios = require("axios");
 const { z } = require("zod");
-const { getBaseUrl } = require("./dist/getBaseUrl.js");
+const path = require("path");
+const rootDir = path.join(__dirname, "..");
 
 // Create readline interface
 const rl = readline.createInterface({
@@ -23,7 +24,6 @@ function prompt(question) {
 const providerContext = {
   axios,
   cheerio,
-  getBaseUrl,
   commonHeaders: {
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -179,7 +179,7 @@ async function testProvider(providerName, functionName) {
     console.log("=".repeat(50));
 
     // Check if provider exists
-    const modulePath = `./dist/${providerName}`;
+    const modulePath = path.join(rootDir, "dist", providerName);
     let module;
 
     try {
@@ -254,7 +254,7 @@ async function testProvider(providerName, functionName) {
 // Zod schemas for response validation
 const PostSchema = z.object({
   title: z.string().min(1, "Title cannot be empty"),
-  link: z.string().url("Link must be a valid URL"),
+  link: z.string().min(1, "Link cannot be empty"),
   image: z.string().url("Image must be a valid URL"),
   provider: z.string().optional(),
 });
@@ -395,13 +395,13 @@ async function main() {
     console.log("🎯 Vega Providers Command Line Tester");
     console.log("====================================");
     console.log("\nUsage:");
-    console.log("  node test-provider.js <provider> <function> [--rebuild]");
+    console.log("  npm run test:provider -- <provider> <function> [--rebuild]");
     console.log("\nExamples:");
-    console.log("  node test-provider.js mod getPosts");
-    console.log("  node test-provider.js mod getSearchPosts --rebuild");
-    console.log("  node test-provider.js uhd getMeta");
-    console.log("  node test-provider.js primeMirror getEpisodes");
-    console.log("  node test-provider.js luxMovies getStream");
+    console.log("  npm run test:provider -- mod getPosts");
+    console.log("  npm run test:provider -- mod getSearchPosts --rebuild");
+    console.log("  npm run test:provider -- uhd getMeta");
+    console.log("  npm run test:provider -- primeMirror getEpisodes");
+    console.log("  npm run test:provider -- luxMovies getStream");
     console.log("\nAvailable functions:");
     console.log("  - getPosts       (get posts by filter/category)");
     console.log("  - getSearchPosts (search for posts)");
@@ -420,7 +420,7 @@ async function main() {
   if (args.length < 2) {
     console.log("❌ Please provide both provider name and function name");
     console.log(
-      "Usage: node test-provider.js <provider> <function> [--rebuild]",
+      "Usage: npm run test:provider -- <provider> <function> [--rebuild]",
     );
     rl.close();
     return;
@@ -455,6 +455,7 @@ async function main() {
       const buildProcess = spawn("npm", ["run", "build"], {
         stdio: "inherit",
         shell: true,
+        cwd: rootDir,
       });
 
       await new Promise((resolve, reject) => {

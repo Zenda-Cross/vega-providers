@@ -1,4 +1,4 @@
-name: Test Providers and Report to Discord
+name: Test Providers
 
 on:
   schedule:
@@ -25,7 +25,5 @@ jobs:
       - name: Build Providers
         run: npm run build
 
-      - name: Run Integration Tests and Report
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: node run-tests-and-report.js
+      - name: Run Integration Tests
+        run: npm test

@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 function extractSubjects(items: any[]): any[] {
   const subjects: any[] = [];
@@ -38,7 +39,6 @@ export const getPosts = async function ({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   const posts: Post[] = [];
-  const { getBaseUrl } = providerContext;
   if (page > 1) {
     return posts;
   }
@@ -75,7 +75,7 @@ export const getSearchPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { getBaseUrl, axios, cheerio } = providerContext;
+  const { axios, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("movieBox");
   const url = `${baseUrl}/wefeed-mobile-bff/subject-api/search/v2`;
   if (page > 1) {

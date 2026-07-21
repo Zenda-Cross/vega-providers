@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 async function getWithWAF(
   url: string,
@@ -39,8 +40,7 @@ export const getPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { getBaseUrl, cheerio, axios, openWebView, commonHeaders } =
-    providerContext;
+  const { cheerio, axios, openWebView, commonHeaders } = providerContext;
   const baseUrl = await getBaseUrl("kat");
   const url = `${baseUrl + filter}/page/${page}/`;
   return posts({
@@ -66,8 +66,7 @@ export const getSearchPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { getBaseUrl, cheerio, axios, openWebView, commonHeaders } =
-    providerContext;
+  const { cheerio, axios, openWebView, commonHeaders } = providerContext;
   const baseUrl = await getBaseUrl("kat");
   const url = `${baseUrl}/page/${page}/?s=${searchQuery}`;
   return posts({

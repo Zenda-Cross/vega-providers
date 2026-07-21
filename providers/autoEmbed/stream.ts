@@ -1,4 +1,5 @@
 import { Stream, ProviderContext, TextTracks } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getStream = async ({
   link: id,
@@ -32,7 +33,7 @@ export const getStream = async ({
       season,
       effectiveType,
       streams,
-      providerContext
+      providerContext,
     );
 
     await getRiveStream(
@@ -41,7 +42,7 @@ export const getStream = async ({
       season,
       effectiveType,
       streams,
-      providerContext
+      providerContext,
     );
     return streams;
   } catch (err) {
@@ -57,7 +58,7 @@ export async function getWebstreamerStream(
   season: string,
   type: string,
   Streams: Stream[],
-  providerContext: ProviderContext
+  providerContext: ProviderContext,
 ) {
   if (!imdbId || imdbId === "undefined") return;
   const url = `https://webstreamr.hayd.uk/{"multi":"on","al":"on","de":"on","es":"on","fr":"on","hi":"on","it":"on","mx":"on","mediaFlowProxyUrl":"","mediaFlowProxyPassword":""}/stream/${type}/${imdbId}${
@@ -97,7 +98,7 @@ export async function getRiveStream(
   season: string,
   type: string,
   Streams: Stream[],
-  providerContext: ProviderContext
+  providerContext: ProviderContext,
 ) {
   if (!tmdId || tmdId === "undefined") {
     console.warn("autoEmbed/rive: missing tmdbId in link payload");
@@ -117,7 +118,7 @@ export async function getRiveStream(
     "putafilme",
     "ophim",
   ];
-  const baseUrl = await providerContext.getBaseUrl("rive");
+  const baseUrl = await getBaseUrl("rive");
   const cors = process.env.CORS_PRXY ? process.env.CORS_PRXY + "?url=" : "";
   console.log("CORS: " + cors);
   const route =
@@ -162,7 +163,7 @@ export async function getRiveStream(
       } catch (e) {
         console.log(e);
       }
-    })
+    }),
   );
 }
 
@@ -268,10 +269,10 @@ function generateSecretKey(id: number | string) {
       for (let n = 0; n < e.length; n++) {
         const r = e.charCodeAt(n);
         const i =
-          (((t = (r + (t << 6) + (t << 16) - t) >>> 0) << n % 5) |
+          (((t = (r + (t << 6) + (t << 16) - t) >>> 0) << (n % 5)) |
             (t >>> (32 - (n % 5)))) >>>
           0;
-        t = (t ^ (i ^ (((r << n % 7) | (r >>> (8 - (n % 7)))) >>> 0))) >>> 0;
+        t = (t ^ (i ^ (((r << (n % 7)) | (r >>> (8 - (n % 7)))) >>> 0))) >>> 0;
         t = (t + ((t >>> 11) ^ (t << 3))) >>> 0;
       }
       t ^= t >>> 15;
@@ -287,7 +288,7 @@ function generateSecretKey(id: number | string) {
       let n = (3735928559 ^ t.length) >>> 0;
       for (let idx = 0; idx < t.length; idx++) {
         let r = t.charCodeAt(idx);
-        r ^= ((131 * idx + 89) ^ (r << idx % 5)) & 255;
+        r ^= ((131 * idx + 89) ^ (r << (idx % 5))) & 255;
         n = (((n << 7) | (n >>> 25)) >>> 0) ^ r;
         const i = ((n & 65535) * 60205) >>> 0;
         const o = (((n >>> 16) * 60205) << 16) >>> 0;

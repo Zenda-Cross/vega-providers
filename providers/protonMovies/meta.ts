@@ -1,4 +1,5 @@
 import { EpisodeLink, Info, Link, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getMeta = async function ({
   link,
@@ -8,7 +9,7 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { axios, cheerio, getBaseUrl } = providerContext;
+    const { axios, cheerio } = providerContext;
     const baseUrl = await getBaseUrl("protonMovies");
 
     console.log("all", link);
@@ -51,7 +52,7 @@ export const getMeta = async function ({
     const $ = cheerio.load(html);
 
     const title = $(
-      ".trending-text.fw-bold.texture-text.text-uppercase.my-0.fadeInLeft.animated.d-inline-block"
+      ".trending-text.fw-bold.texture-text.text-uppercase.my-0.fadeInLeft.animated.d-inline-block",
     ).text();
     const image = $("#thumbnail").attr("src");
     const type = link.includes("series") ? "series" : "movie";

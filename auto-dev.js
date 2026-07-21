@@ -39,7 +39,7 @@ class AutoDev {
 
     const missing = requiredPackages.filter(
       (pkg) =>
-        !packageJson.dependencies?.[pkg] && !packageJson.devDependencies?.[pkg]
+        !packageJson.dependencies?.[pkg] && !packageJson.devDependencies?.[pkg],
     );
 
     if (missing.length > 0) {
@@ -73,7 +73,7 @@ class AutoDev {
   async initialBuild() {
     log.info("Running initial build...");
     try {
-      await this.runCommand("node", ["build-simple.js"]);
+      await this.runCommand("npm", ["run", "build:dev"]);
       log.success("Initial build completed");
     } catch (error) {
       log.error("Initial build failed:", error.message);
@@ -197,7 +197,7 @@ ${colors.yellow}Press Ctrl+C to stop${colors.reset}
 
       log.success("Auto-development environment is running!");
       log.info(
-        "Make changes to your providers and watch them rebuild automatically"
+        "Make changes to your providers and watch them rebuild automatically",
       );
     } catch (error) {
       log.error("Failed to start auto-dev environment:", error.message);

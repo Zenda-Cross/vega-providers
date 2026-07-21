@@ -151,7 +151,7 @@ async function buildProvider(providerName) {
 }
 
 async function buildUtilityFiles() {
-  const utilityFiles = ["getBaseUrl", "headers", "providerContext"];
+  const utilityFiles = ["headers", "providerContext"];
 
   for (const utilityName of utilityFiles) {
     const utilityPath = path.join(providersDir, `${utilityName}.ts`);

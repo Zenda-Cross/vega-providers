@@ -1,4 +1,5 @@
 import { Stream, ProviderContext, TextTracks } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getStream = async function ({
   link: id,
@@ -8,7 +9,7 @@ export const getStream = async function ({
   providerContext: ProviderContext;
 }): Promise<Stream[]> {
   try {
-    const { axios, getBaseUrl } = providerContext;
+    const { axios } = providerContext;
     const streamLinks: Stream[] = [];
     const subtitles: TextTracks = [];
     const baseUrl = await getBaseUrl("kissKh");

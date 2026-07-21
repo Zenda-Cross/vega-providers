@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getPosts = async function ({
   filter,
@@ -12,7 +13,7 @@ export const getPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { getBaseUrl, axios, cheerio } = providerContext;
+  const { axios, cheerio } = providerContext;
 
   const baseUrl = await getBaseUrl("primewire");
   const url = `${baseUrl + filter}&page=${page}`;
@@ -31,7 +32,7 @@ export const getSearchPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { getBaseUrl, axios, cheerio, Aes } = providerContext;
+  const { axios, cheerio, Aes } = providerContext;
   const getSHA256ofJSON = async function (input: any) {
     return await Aes.sha1(input);
   };

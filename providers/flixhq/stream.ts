@@ -1,4 +1,5 @@
 import { ProviderContext, Stream } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getStream = async function ({
   link: id,
@@ -8,7 +9,6 @@ export const getStream = async function ({
   providerContext: ProviderContext;
 }): Promise<Stream[]> {
   try {
-    const { getBaseUrl } = providerContext;
     const episodeId = id.split("*")[0];
     const mediaId = id.split("*")[1];
     const baseUrl = await getBaseUrl("consumet");

@@ -1,4 +1,5 @@
 import { EpisodeLink, Info, Link, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getMeta = async function ({
   link,
@@ -8,7 +9,7 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { getBaseUrl, axios } = providerContext;
+    const { axios } = providerContext;
     const res = await axios.get(link);
     const data = res.data;
     const meta = {
@@ -22,7 +23,7 @@ export const getMeta = async function ({
     let slug = "";
     try {
       const res2 = await axios.get(
-        baseUrl + "/core/api/search?q=" + meta.imdbId
+        baseUrl + "/core/api/search?q=" + meta.imdbId,
       );
       const data2 = res2.data;
       slug = data2?.data?.items[0]?.fullSlug;

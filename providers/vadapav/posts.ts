@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getPosts = async function ({
   filter,
@@ -13,7 +14,7 @@ export const getPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { getBaseUrl, axios, cheerio } = providerContext;
+  const { axios, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("vadapav");
   if (page > 1) {
     return [];
@@ -35,7 +36,7 @@ export const getSearchPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { getBaseUrl, axios, cheerio } = providerContext;
+  const { axios, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("vadapav");
   if (page > 1) {
     return [];
@@ -71,7 +72,7 @@ async function posts({
             ? title?.slice(0, 30)?.replace(/\./g, " ")
             : title?.replace(/\./g, " ");
         const image = `https://placehold.jp/23/000000/ffffff/200x400.png?text=${encodeURIComponent(
-          imageTitle
+          imageTitle,
         )}&css=%7B%22background%22%3A%22%20-webkit-gradient(linear%2C%20left%20bottom%2C%20left%20top%2C%20from(%233f3b3b)%2C%20to(%23000000))%22%2C%22text-transform%22%3A%22%20capitalize%22%7D`;
         if (title && link) {
           catalog.push({
@@ -80,7 +81,7 @@ async function posts({
             image: image,
           });
         }
-      }
+      },
     );
     return catalog;
   } catch (err) {

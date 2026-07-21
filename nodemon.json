@@ -2,7 +2,7 @@
   "watch": ["providers"],
   "ext": "ts",
   "ignore": ["node_modules", "dist", "*.test.ts"],
-  "exec": "node build-simple.js",
+  "exec": "npm run build:dev",
   "env": {
     "NODE_ENV": "development"
   },

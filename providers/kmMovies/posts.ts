@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 const defaultHeaders = {
   "User-Agent":
@@ -86,7 +87,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = await providerContext.getBaseUrl("kmmovies");
+    const baseUrl = await getBaseUrl("kmmovies");
     console.log("KM Movies baseUrl:", baseUrl);
     let url: string;
 

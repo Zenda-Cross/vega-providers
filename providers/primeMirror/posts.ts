@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getPosts = async function ({
   filter,
@@ -14,7 +15,7 @@ export const getPosts = async function ({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const { getBaseUrl, cheerio } = providerContext;
+    const { cheerio } = providerContext;
     const baseUrl = await getBaseUrl("nfMirror");
     const catalog: Post[] = [];
     if (page > 1) {
@@ -79,7 +80,6 @@ export const getSearchPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { getBaseUrl } = providerContext;
   try {
     if (page > 1) {
       return [];

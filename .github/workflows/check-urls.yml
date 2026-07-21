@@ -1,0 +1,89 @@
+name: Check Provider URLs
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-urls:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check provider URLs
+        shell: bash
+        run: |
+          set -o pipefail
+          node .github/scripts/url-checker.js 2>&1 | tee checker_output.log
+
+          if grep -q "### UPDATED_PROVIDERS_START ###" checker_output.log; then
+            sed -n '/### UPDATED_PROVIDERS_START ###/,/### UPDATED_PROVIDERS_END ###/p' checker_output.log \
+              | grep -v "###" > updated_providers.txt
+          fi
+
+      - name: Commit changed URLs
+        id: commit
+        shell: bash
+        run: |
+          if [[ -z "$(git status --porcelain urls.json)" ]]; then
+            echo "No URL changes detected"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add urls.json
+          git commit -m "Update provider URLs [skip ci]"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Send Discord notification
+        if: steps.commit.outputs.changed == 'true' && hashFiles('updated_providers.txt') != ''
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        shell: bash
+        run: |
+          if [[ -z "$DISCORD_WEBHOOK" ]]; then
+            echo "DISCORD_WEBHOOK is not configured; skipping notification"
+            exit 0
+          fi
+
+          PROVIDER_COUNT=$(wc -l < updated_providers.txt)
+          jq -n --arg count "$PROVIDER_COUNT" \
+            --rawfile providers updated_providers.txt '
+              {
+                embeds: [{
+                  title: "Provider URLs Updated (" + $count + ")",
+                  color: 3066993,
+                  fields: ($providers
+                    | split("\n")
+                    | map(select(length > 0))
+                    | map(split("|") | {
+                        name: .[0],
+                        value: "**Old:** <" + .[1] + ">\n**New:** <" + .[2] + ">",
+                        inline: false
+                      }))
+                }]
+              }
+            ' > discord-message.json
+
+          curl --fail-with-body --silent --show-error \
+            -H "Content-Type: application/json" \
+            -d @discord-message.json \
+            "$DISCORD_WEBHOOK"

@@ -1,4 +1,5 @@
 import { Info, Link, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 const kmmHeaders = {
   "User-Agent":
@@ -157,7 +158,7 @@ export const getMeta = async function ({
 }): Promise<Info> {
   try {
     const { axios, cheerio, openWebView } = providerContext;
-    const baseUrl = await providerContext.getBaseUrl("kmmovies");
+    const baseUrl = await getBaseUrl("kmmovies");
     const pageUrl = resolvePostUrl(link, baseUrl);
     const res = await getWithWAF(pageUrl, axios, openWebView, kmmHeaders);
     const html = String(res.data || "");

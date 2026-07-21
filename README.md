@@ -24,7 +24,6 @@ providers/
 
 <img src="https://github.com/user-attachments/assets/40e5da3d-326d-4f5c-b266-a4167da2a269" width="200"/>
 
-
 - **Purpose:** Defines the categories or filters available for your provider.
 - **How it's used:**
   - The `title` property will be shown as the heading on the home page (e.g., "Popular Movies").
@@ -79,8 +78,17 @@ providers/
 
 - `axios`: For HTTP requests
 - `cheerio`: For HTML parsing
-- `getBaseUrl`: Helper to get the provider's base URL (base url are generall stored here https://github.com/himanshu8443/providers/blob/main/modflix.json)
 - `commonHeaders`: Standard HTTP headers
+
+Providers that need a configurable base URL should import `getBaseUrl` directly. The build bundles the helper into each provider module that uses it:
+
+```ts
+import { getBaseUrl } from "../getBaseUrl";
+
+const baseUrl = await getBaseUrl("providerKey");
+```
+
+Provider base URLs are stored in https://github.com/Zenda-Cross/vega-providers/blob/main/urls.json.
 
 This ensures all providers use the same tools and patterns, making code easier to maintain and extend.
 
@@ -227,7 +235,6 @@ The `linkList` property in the object returned by `getMeta` is used to describe 
 
 <img src="https://github.com/user-attachments/assets/f5dc31fc-0701-4d97-8056-01a58ecdefc0" width="200"/>
 
-
 - Each entry in `linkList` can represent a season or anything you want; it will be shown in the dropdown.
 - If your provider requires an extra request to fetch episodes for a season, set the `episodesLink` property. When the user selects that season, the app will call `getEpisodes` with this value.
 - If your provider does not require an extra request (i.e., you already have all episode links), you can return them directly in the `directLinks` array. Each `directLinks` entry should have a `link`, `title`, and `type` (e.g., "movie" or "series").
@@ -261,15 +268,15 @@ This gives you flexibility to support both providers that need extra requests fo
 # How to Test Your Provider
 
 ## Test with CLI
-1. Run `npm run test -- provider_name` (example: `npm run test -- showbox`)
+
+1. Run `npm test -- provider_name` (example: `npm test -- showbox`)
    - This will do full testing by picking random posts and episodes and testing end-to-end.
-2. Run `npm run test:provider provider_name function_name` (example: `npm run test:provider showbox getPosts`)
+2. Run `npm run test:provider -- provider_name function_name` (example: `npm run test:provider -- showbox getPosts`)
    - This is for testing a single function, such as getPosts, getSearchPosts, getStream, etc. After entering manually, enter the input.
 
 ## Test in App
 
 1. **Start the Dev Server**
-
    - Run the following command in your terminal:
      ```sh
      npm run auto
@@ -277,7 +284,6 @@ This gives you flexibility to support both providers that need extra requests fo
    - This will start the development server and log a "Mobile test url" (e.g., `http://<your-local-ip>:3001`).
 
 2. **Configure the Vega App for Local Testing**
-
    - Open your Vega app project.
    - Go to `src/lib/services/ExtensionManager.ts`.
    - Set the following variables in class ExtensionManager:
@@ -288,7 +294,6 @@ This gives you flexibility to support both providers that need extra requests fo
    - This tells the app to use your local providers for testing.
 
 3. **Network Requirement**
-
    - Make sure both your development machine (running the dev server) and your mobile device (running the Vega app) are on the same network.
 
 4. **Test in the App**

@@ -1,4 +1,5 @@
 import { EpisodeLink, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getEpisodes = async function ({
   url,
@@ -7,7 +8,7 @@ export const getEpisodes = async function ({
   url: string;
   providerContext: ProviderContext;
 }): Promise<EpisodeLink[]> {
-  const { axios, cheerio, getBaseUrl } = providerContext;
+  const { axios, cheerio } = providerContext;
   try {
     const res = await axios.get(url);
     const baseUrl = await getBaseUrl("moviezwap");
@@ -32,7 +33,7 @@ export const getEpisodes = async function ({
             link: baseUrl + downloadPage,
           });
         }
-      }
+      },
     );
 
     return episodeLinks;

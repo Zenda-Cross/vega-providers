@@ -1,4 +1,5 @@
 import { Info, Link, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 // Headers
 const headers = {
@@ -29,7 +30,7 @@ export const getMeta = async function ({
   link: string;
   providerContext: ProviderContext;
 }): Promise<Info> {
-  const { cheerio, getBaseUrl } = providerContext;
+  const { cheerio } = providerContext;
   const baseUrl = await getBaseUrl("joya9tv");
   const url = new URL(link, `${baseUrl}/`).href;
 

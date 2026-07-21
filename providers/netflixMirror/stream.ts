@@ -1,4 +1,5 @@
 import { ProviderContext, Stream } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getStream = async ({
   link: id,
@@ -7,7 +8,6 @@ export const getStream = async ({
   link: string;
   providerContext: ProviderContext;
 }): Promise<Stream[]> => {
-  const { getBaseUrl } = providerContext;
   try {
     let providerValue = "netflixMirror";
     const baseUrl = await getBaseUrl("nfMirror");

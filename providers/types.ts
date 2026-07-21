@@ -165,7 +165,6 @@ export interface OpenWebViewResult {
 export type ProviderContext = {
   axios: AxiosStatic;
   Aes: any; // AES encryption utility, if used
-  getBaseUrl: (providerValue: string) => Promise<string>;
   commonHeaders: Record<string, string>;
   cheerio: typeof cheerio;
   openWebView: (

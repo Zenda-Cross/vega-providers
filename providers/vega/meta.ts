@@ -1,4 +1,5 @@
 import { Info, Link, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 const headers = {
   Accept:
@@ -29,7 +30,7 @@ export const getMeta = async ({
   providerContext: ProviderContext;
 }): Promise<Info> => {
   try {
-    const { axios, cheerio, getBaseUrl } = providerContext;
+    const { axios, cheerio } = providerContext;
     const currentBaseUrl = await getBaseUrl("Vega");
     const url = new URL(link, `${currentBaseUrl}/`).href;
     console.log("url", url);

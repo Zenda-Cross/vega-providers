@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 const headers = {
   "Accept-Encoding": "gzip",
@@ -21,7 +22,7 @@ export const getPosts = async function ({
   signal: AbortSignal;
 }): Promise<Post[]> {
   try {
-    const { axios, getBaseUrl } = providerContext;
+    const { axios } = providerContext;
     const baseUrl = await getBaseUrl("dooflix");
     const catalog: Post[] = [];
     const url = `${baseUrl + filter + `?page=${page}`}`;
@@ -99,7 +100,7 @@ export const getSearchPosts = async function ({
     if (page > 1) {
       return [];
     }
-    const { axios, getBaseUrl } = providerContext;
+    const { axios } = providerContext;
     const catalog: Post[] = [];
     const baseUrl = await getBaseUrl("dooflix");
     const url = `${baseUrl}/rest-api//v130/search?q=${searchQuery}&type=movietvserieslive&range_to=0&range_from=0&tv_category_id=0&genre_id=0&country_id=0`;

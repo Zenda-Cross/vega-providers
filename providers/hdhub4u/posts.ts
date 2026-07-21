@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 const hdbHeaders = {
   Cookie: "xla=s4t",
@@ -19,7 +20,6 @@ export const getPosts = async function ({
   providerContext: ProviderContext;
   signal: AbortSignal;
 }): Promise<Post[]> {
-  const { getBaseUrl } = providerContext;
   const baseUrl = await getBaseUrl("hdhub");
   const url = `${baseUrl + filter}/page/${page}/`;
   return posts({ baseUrl, url, signal, providerContext });
@@ -37,7 +37,6 @@ export const getSearchPosts = async function ({
   providerContext: ProviderContext;
   signal: AbortSignal;
 }): Promise<Post[]> {
-  const { getBaseUrl } = providerContext;
   const baseUrl = await getBaseUrl("hdhub");
   try {
     const today = new Date().toISOString().slice(0, 10);

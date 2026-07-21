@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 async function getWithWAF(
   url: string,
@@ -78,7 +79,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = await providerContext.getBaseUrl("1cinevood");
+    const baseUrl = await getBaseUrl("1cinevood");
     let url: string;
 
     // --- Build URL for category filter or search query

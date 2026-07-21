@@ -1,4 +1,5 @@
 import { Info, Link, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 async function getWithWAF(
   url: string,
@@ -35,8 +36,7 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { axios, cheerio, openWebView, commonHeaders, getBaseUrl } =
-      providerContext;
+    const { axios, cheerio, openWebView, commonHeaders } = providerContext;
     const baseUrl = await getBaseUrl("kat");
     const url = new URL(link, `${baseUrl}/`).href;
     const res = await getWithWAF(url, axios, openWebView, commonHeaders);

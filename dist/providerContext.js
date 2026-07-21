@@ -41484,25 +41484,6 @@ var {
   mergeConfig: mergeConfig2
 } = axios_default;
 
-// providers/getBaseUrl.ts
-var expireTime = 60 * 60 * 1e3;
-var getBaseUrl = /* @__PURE__ */ __name((providerValue) => __async(null, null, function* () {
-  try {
-    let baseUrl = "";
-    const cacheKey = "CacheBaseUrl" + providerValue;
-    const timeKey = "baseUrlTime" + providerValue;
-    const baseUrlRes = yield fetch(
-      "https://himanshu8443.github.io/providers/modflix.json"
-    );
-    const baseUrlData = yield baseUrlRes.json();
-    baseUrl = baseUrlData[providerValue].url;
-    return baseUrl;
-  } catch (error) {
-    console.error(`Error fetching baseUrl: ${providerValue}`, error);
-    return "";
-  }
-}), "getBaseUrl");
-
 // providers/headers.ts
 var headers = {
   "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
@@ -57297,7 +57278,6 @@ __name(fromURL, "fromURL");
 // providers/providerContext.ts
 var providerContext = {
   axios: axios_default,
-  getBaseUrl,
   Aes: null,
   commonHeaders: headers,
   cheerio: esm_exports4

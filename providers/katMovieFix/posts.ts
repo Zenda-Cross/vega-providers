@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 const defaultHeaders = {
   Referer: "https://www.google.com",
@@ -62,7 +63,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = await providerContext.getBaseUrl("katmoviefix");
+    const baseUrl = await getBaseUrl("katmoviefix");
     console.log("Base URL:", baseUrl);
     let url: string;
 
@@ -138,7 +139,7 @@ async function fetchPosts({
   } catch (err) {
     console.error(
       "HDMovie2 fetchPosts error:",
-      err instanceof Error ? err.message : String(err)
+      err instanceof Error ? err.message : String(err),
     );
     return [];
   }

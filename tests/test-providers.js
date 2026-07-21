@@ -2,16 +2,14 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const fs = require("fs");
 const path = require("path");
+const rootDir = path.join(__dirname, "..");
 
 // Load utilities
 let providerContext;
 try {
-  const { getBaseUrl } = require("./dist/getBaseUrl.js");
-
   providerContext = {
     axios,
     cheerio,
-    getBaseUrl,
     commonHeaders: {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -57,7 +55,12 @@ class ProviderTester {
    */
   loadModule(providerName, moduleName) {
     try {
-      const modulePath = `./dist/${providerName}/${moduleName}.js`;
+      const modulePath = path.join(
+        rootDir,
+        "dist",
+        providerName,
+        `${moduleName}.js`,
+      );
       // Clear cache to get fresh module
       delete require.cache[require.resolve(modulePath)];
       return require(modulePath);
@@ -71,7 +74,7 @@ class ProviderTester {
    */
   loadManifest() {
     try {
-      const manifestPath = path.join(__dirname, "manifest.json");
+      const manifestPath = path.join(rootDir, "manifest.json");
       if (!fs.existsSync(manifestPath)) {
         console.log("⚠️  manifest.json not found");
         return [];
@@ -88,7 +91,7 @@ class ProviderTester {
    * Get available providers from dist folder (excluding disabled ones)
    */
   getAvailableProviders() {
-    const distPath = path.join(__dirname, "dist");
+    const distPath = path.join(rootDir, "dist");
     if (!fs.existsSync(distPath)) {
       console.log("❌ dist folder not found. Run 'npm run build' first.");
       return [];
@@ -628,7 +631,7 @@ async function main() {
 🎯 Vega Providers Integration Tester
 =====================================
 
-Usage: node test-providers.js [provider] [options]
+Usage: npm test -- [provider] [options]
 
 Arguments:
   provider          Name of specific provider to test (optional)
@@ -647,10 +650,10 @@ Test Flow:
   5. If directLinks → call getStream
 
 Examples:
-  node test-providers.js                    # Test all providers
-  node test-providers.js vega               # Test only vega provider
-  node test-providers.js mod --posts=3      # Test mod with 3 random posts
-  node test-providers.js --posts=1 --links=1 # Quick test all providers
+  npm test                                  # Test all providers
+  npm test -- vega                          # Test only vega provider
+  npm test -- mod --posts=3                 # Test mod with 3 random posts
+  npm test -- --posts=1 --links=1           # Quick test all providers
     `);
     return;
   }

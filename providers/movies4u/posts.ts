@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 const defaultHeaders = {
   accept:
@@ -71,7 +72,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = await providerContext.getBaseUrl("movies4u");
+    const baseUrl = await getBaseUrl("movies4u");
     let url: string;
 
     // --- Build URL for category filter or search query

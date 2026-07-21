@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 const defaultHeaders = {
   Referer: "https://www.google.com",
@@ -62,7 +63,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = await providerContext.getBaseUrl("joya9tv");
+    const baseUrl = await getBaseUrl("joya9tv");
     let url: string;
 
     if (

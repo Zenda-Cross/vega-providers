@@ -8,7 +8,7 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { axios, cheerio, getBaseUrl } = providerContext;
+    const { axios, cheerio } = providerContext;
     const links: Link[] = [];
     const proxyUrl = `https://worker.zendax.me/api/moviebox?url=${encodeURIComponent(link)}`;
     const response = await fetch(proxyUrl);

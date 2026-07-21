@@ -1,4 +1,5 @@
 import { Info, Link } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getMeta = async function ({
   link,
@@ -8,11 +9,10 @@ export const getMeta = async function ({
   providerContext: {
     axios: any;
     cheerio: any;
-    getBaseUrl: (provider: string) => Promise<string>;
   };
 }): Promise<Info> {
   try {
-    const { axios, cheerio, getBaseUrl } = providerContext;
+    const { axios, cheerio } = providerContext;
     const currentBaseUrl = await getBaseUrl("drive");
     const url = new URL(link, `${currentBaseUrl}/`).href;
     const res = await axios.get(url);

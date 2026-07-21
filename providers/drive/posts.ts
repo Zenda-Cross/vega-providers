@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getPosts = async function ({
   filter,
@@ -12,7 +13,6 @@ export const getPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { getBaseUrl } = providerContext;
   const baseUrl = await getBaseUrl("drive");
   const url = `${baseUrl + filter}page/${page}/`;
   return posts({ baseUrl, url, signal, providerContext });
@@ -30,7 +30,6 @@ export const getSearchPosts = async function ({
   providerContext: ProviderContext;
   signal: AbortSignal;
 }): Promise<Post[]> {
-  const { getBaseUrl } = providerContext;
   const baseUrl = await getBaseUrl("drive");
   const url = buildSearchUrl(baseUrl, searchQuery, page);
   return searchPosts({

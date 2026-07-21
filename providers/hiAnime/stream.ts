@@ -1,4 +1,5 @@
 import { Stream, ProviderContext, TextTracks } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 export const getStream = async function ({
   link: id,
@@ -8,7 +9,7 @@ export const getStream = async function ({
   providerContext: ProviderContext;
 }): Promise<Stream[]> {
   try {
-    const { getBaseUrl, axios } = providerContext;
+    const { axios } = providerContext;
     const baseUrl = await getBaseUrl("consumet");
     const servers = ["vidcloud", "vidstreaming"];
     const url = `${baseUrl}/anime/zoro/watch?episodeId=${id}&server=`;
@@ -46,7 +47,7 @@ export const getStream = async function ({
         } catch (e) {
           console.log(e);
         }
-      })
+      }),
     );
     return streamLinks;
   } catch (err) {

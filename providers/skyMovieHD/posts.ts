@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 const defaultHeaders = {
   Referer: "https://www.google.com",
@@ -62,7 +63,7 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const baseUrl = await providerContext.getBaseUrl("skymovieshd");
+    const baseUrl = await getBaseUrl("skymovieshd");
     let url: string;
 
     if (
@@ -102,7 +103,7 @@ async function fetchPosts({
       let link =
         card
           .find(
-            "header.entry-header h2.entry-title a, header.entry-header h1.entry-title a"
+            "header.entry-header h2.entry-title a, header.entry-header h1.entry-title a",
           )
           .attr("href") || "";
       if (!link) return;
@@ -112,7 +113,7 @@ async function fetchPosts({
       // Title: remove "Download"
       let title = card
         .find(
-          "header.entry-header h2.entry-title a, header.entry-header h1.entry-title a"
+          "header.entry-header h2.entry-title a, header.entry-header h1.entry-title a",
         )
         .text()
         .replace(/^Download\s*/i, "")
@@ -134,7 +135,7 @@ async function fetchPosts({
   } catch (err) {
     console.error(
       "fetchPosts error:",
-      err instanceof Error ? err.message : String(err)
+      err instanceof Error ? err.message : String(err),
     );
     return [];
   }

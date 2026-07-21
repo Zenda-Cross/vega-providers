@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getBaseUrl } from "../getBaseUrl";
 
 const headers = {
   Accept:
@@ -34,7 +35,7 @@ export const getPosts = async ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> => {
-  const { getBaseUrl, axios, cheerio } = providerContext;
+  const { axios, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("lux");
 
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
@@ -56,7 +57,7 @@ export const getSearchPosts = async ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> => {
-  const { getBaseUrl, axios, cheerio } = providerContext;
+  const { axios, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("lux");
 
   console.log("vegaGetPosts baseUrl:", providerValue, baseUrl);
