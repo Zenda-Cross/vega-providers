@@ -44,7 +44,7 @@ async function fetchProviderUrls(): Promise<ProviderUrls> {
       }
 
       const data = (await response.json()) as ProviderUrls;
-      console.log("Fetched provider URL configuration", data);
+      console.log("Fetched provider URL configuration");
       cache.data = data;
       cache.expiresAt = Date.now() + cacheTtl;
       return data;

@@ -75,24 +75,23 @@ export const getSearchPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const { axios, cheerio } = providerContext;
-  const baseUrl = await getBaseUrl("movieBox");
-  const url = `${baseUrl}/wefeed-mobile-bff/subject-api/search/v2`;
+  const url = `/wefeed-mobile-bff/subject-api/search/v2`;
   if (page > 1) {
     return [];
   }
 
-  // this is just a proxy please host your own if you want to use this code:- https://github.com/himanshu8443/Cf-Workers/blob/main/src/dob-worker/index.js
-  const response = await fetch("https://dob-worker.8man.workers.dev", {
-    signal: signal,
+  const proxyUrl = `https://worker.zendax.me/api/moviebox?url=${encodeURIComponent(url)}&method=POST`;
+  const response = await fetch(proxyUrl, {
+    signal,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      url: url,
-      method: "POST",
-      body: { page: 1, perPage: 20, keyword: searchQuery, tabId: "Movie" },
+      page: 1,
+      perPage: 20,
+      keyword: searchQuery,
+      tabId: "Movie",
     }),
   });
 
@@ -101,7 +100,7 @@ export const getSearchPosts = async function ({
   const posts: Post[] = list.map((item: any) => ({
     image: item?.cover?.url,
     title: item?.title,
-    link: `${baseUrl}/wefeed-mobile-bff/subject-api/get?subjectId=${item?.subjectId}`,
+    link: `/wefeed-mobile-bff/subject-api/get?subjectId=${item?.subjectId}`,
   }));
   return posts;
 };
