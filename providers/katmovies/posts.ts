@@ -110,9 +110,10 @@ async function posts({
         const link = $(element).find("a").attr("href");
         const image = $(element).find("img").attr("src");
         if (title && link && image) {
+          const postUrl = new URL(link, `${baseUrl}/`);
           catalog.push({
             title: title.replace("Download", "").trim(),
-            link: link,
+            link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
             image: image,
           });
         }

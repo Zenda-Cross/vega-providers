@@ -1,6 +1,5 @@
 import { Info, Link, ProviderContext } from "../types";
 
-
 async function getWithWAF(
   url: string,
   axios: any,
@@ -36,9 +35,11 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { axios, cheerio, openWebView, commonHeaders } = providerContext;
+    const { axios, cheerio, openWebView, commonHeaders, getBaseUrl } =
+      providerContext;
     console.log("Fetching metadata from UHD...", link, providerContext);
-    const url = link;
+    const baseUrl = await getBaseUrl("UhdMovies");
+    const url = new URL(link, `${baseUrl}/`).href;
     const res = await getWithWAF(url, axios, openWebView, commonHeaders);
     const html = await res.data;
     const $ = cheerio.load(html);
@@ -115,6 +116,7 @@ export const getMeta = async function ({
       synopsis: title,
       type: "",
       linkList: episodes,
+      webUrl: url,
     };
   } catch (error) {
     console.error(error);

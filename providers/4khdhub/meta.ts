@@ -10,9 +10,7 @@ export const getMeta = async function ({
   try {
     const { axios, cheerio, getBaseUrl } = providerContext;
     const baseUrl = await getBaseUrl("4khdhub");
-    const url = link.startsWith("http")
-      ? link
-      : new URL(link, `${baseUrl}/`).href;
+    const url = new URL(link, `${baseUrl}/`).href;
     const res = await axios.get(url);
     const data = res.data;
     const $ = cheerio.load(data);

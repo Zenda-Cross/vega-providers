@@ -1,6 +1,5 @@
 import { Post, ProviderContext } from "../types";
 
-
 export const getPosts = async ({
   filter,
   page,
@@ -74,7 +73,7 @@ async function posts(
   baseURL: string,
   url: string,
   signal: AbortSignal,
-  providerContext: ProviderContext
+  providerContext: ProviderContext,
 ): Promise<Post[]> {
   try {
     const { axios, cheerio, openWebView, commonHeaders } = providerContext;
@@ -91,9 +90,10 @@ async function posts(
         const image = $(element).find("a").find("img").attr("src");
 
         if (title && link && image) {
+          const postUrl = new URL(link, `${baseURL}/`);
           uhdCatalog.push({
             title: title.replace("Download", "").trim(),
-            link: link,
+            link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
             image: image,
           });
         }

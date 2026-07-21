@@ -1,7 +1,5 @@
 import { Info, Link, ProviderContext } from "../types";
 
-
-
 async function getWithWAF(
   url: string,
   axios: any,
@@ -36,9 +34,10 @@ export const getMeta = async function ({
   link: string;
   providerContext: ProviderContext;
 }): Promise<Info> {
-  const { axios, cheerio, commonHeaders, openWebView } = providerContext;
-  const url = link;
-  const baseUrl = url.split("/").slice(0, 3).join("/");
+  const { axios, cheerio, commonHeaders, openWebView, getBaseUrl } =
+    providerContext;
+  const baseUrl = await getBaseUrl("1cinevood");
+  const url = new URL(link, `${baseUrl}/`).href;
 
   const emptyResult: Info = {
     title: "",
@@ -149,8 +148,9 @@ export const getMeta = async function ({
 
           links.push({
             // Final title for the link entry (e.g., S01 | 1080p | 11.78 GB)
-            title: `${seasonEpisode}${qualityMatch}${fileSizeMatch ? " | " + fileSizeMatch : ""
-              }`
+            title: `${seasonEpisode}${qualityMatch}${
+              fileSizeMatch ? " | " + fileSizeMatch : ""
+            }`
               .trim()
               .replace(/\|$/, "")
               .trim(),
@@ -165,6 +165,7 @@ export const getMeta = async function ({
     });
 
     result.linkList = links;
+    result.webUrl = url;
     return result;
   } catch (err) {
     console.log("getMeta error:", err);

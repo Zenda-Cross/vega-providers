@@ -14,9 +14,7 @@ export const getMeta = async function ({
   try {
     const { axios, cheerio, getBaseUrl } = providerContext;
     const currentBaseUrl = await getBaseUrl("drive");
-    const url = link.startsWith("http")
-      ? link
-      : new URL(link, `${currentBaseUrl}/`).href;
+    const url = new URL(link, `${currentBaseUrl}/`).href;
     const res = await axios.get(url);
     const data = res.data;
     const $ = cheerio.load(data);

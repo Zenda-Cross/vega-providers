@@ -48,7 +48,7 @@ export const getSearchPosts = async function ({
 async function posts({
   url,
   signal,
-  // baseUrl,
+  baseUrl,
   axios,
   cheerio,
   headers,
@@ -76,9 +76,10 @@ async function posts({
         const image = $(element).find("img").attr("src");
         console.log(title, link, image);
         if (title && link && image) {
+          const postUrl = new URL(link, `${baseUrl}/`);
           catalog.push({
             title: title,
-            link: link,
+            link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
             image: image,
           });
         }

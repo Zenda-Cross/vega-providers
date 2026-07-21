@@ -167,11 +167,9 @@ function normalizeUrl(baseUrl: string, value: string): string {
 
 function toRelativePath(baseUrl: string, value: string): string {
   const absoluteUrl = normalizeUrl(baseUrl, value);
-  const normalizedBaseUrl = trimTrailingSlash(baseUrl);
+  const postUrl = new URL(absoluteUrl);
 
-  return absoluteUrl.startsWith(normalizedBaseUrl)
-    ? absoluteUrl.slice(normalizedBaseUrl.length) || "/"
-    : absoluteUrl;
+  return `${postUrl.pathname}${postUrl.search}${postUrl.hash}`;
 }
 
 function trimTrailingSlash(value: string): string {

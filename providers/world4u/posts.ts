@@ -16,7 +16,7 @@ export const getPosts = async function ({
   const { getBaseUrl, axios, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("w4u");
   const url = `${baseUrl + filter}/page/${page}/`;
-  return posts({ url, signal, axios, cheerio });
+  return posts({ baseUrl, url, signal, axios, cheerio });
 };
 
 export const getSearchPosts = async function ({
@@ -35,15 +35,17 @@ export const getSearchPosts = async function ({
   const { getBaseUrl, axios, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("w4u");
   const url = `${baseUrl}/page/${page}/?s=${searchQuery}`;
-  return posts({ url, signal, axios, cheerio });
+  return posts({ baseUrl, url, signal, axios, cheerio });
 };
 
 async function posts({
+  baseUrl,
   url,
   signal,
   axios,
   cheerio,
 }: {
+  baseUrl: string;
   url: string;
   signal: AbortSignal;
   axios: ProviderContext["axios"];
@@ -63,9 +65,10 @@ async function posts({
           $(element).find(".post-thumb").find("img").attr("data-src") ||
           $(element).find(".post-thumb").find("img").attr("src");
         if (title && link && image) {
+          const postUrl = new URL(link, `${baseUrl}/`);
           catalog.push({
             title: title.replace("Download", "").trim(),
-            link: link,
+            link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
             image: image,
           });
         }

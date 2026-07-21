@@ -79,11 +79,10 @@ export const getSearchPosts = async ({
       data.hits.forEach((hit: any) => {
         const doc = hit.document;
         const permalink = doc.permalink || "";
+        const postUrl = new URL(permalink, `${baseUrl}/`);
         const post = {
           title: doc.post_title.replace("Download", "").trim(),
-          link: permalink.startsWith(baseUrl)
-            ? permalink.slice(baseUrl.length) || "/"
-            : permalink,
+          link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
           image: doc.post_thumbnail,
         };
         posts.push(post);
@@ -119,6 +118,7 @@ async function posts(
       ?.each((index, element) => {
         const href =
           $(element)?.find("a")?.attr("href") || $(element)?.attr("href") || "";
+        const postUrl = new URL(href, `${baseUrl}/`);
         const post = {
           title: (
             $(element)
@@ -134,9 +134,7 @@ async function posts(
             ""
           ).trim(),
 
-          link: href.startsWith(baseUrl)
-            ? href.slice(baseUrl.length) || "/"
-            : href,
+          link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
           image:
             $(element).find("a").find("img").attr("data-lazy-src") ||
             $(element).find("a").find("img").attr("data-src") ||

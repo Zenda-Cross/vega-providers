@@ -1,7 +1,5 @@
 import { Post, ProviderContext } from "../types";
 
-
-
 async function getWithWAF(
   url: string,
   axios: any,
@@ -85,12 +83,14 @@ async function fetchPosts({
 
     // --- Build URL for category filter or search query
     if (query && query.trim()) {
-      url = `${baseUrl}/?s=${encodeURIComponent(query)}${page > 1 ? `&paged=${page}` : ""
-        }`;
+      url = `${baseUrl}/?s=${encodeURIComponent(query)}${
+        page > 1 ? `&paged=${page}` : ""
+      }`;
     } else if (filter) {
       url = filter.startsWith("/")
-        ? `${baseUrl}${filter.replace(/\/$/, "")}${page > 1 ? `/page/${page}` : ""
-        }`
+        ? `${baseUrl}${filter.replace(/\/$/, "")}${
+            page > 1 ? `/page/${page}` : ""
+          }`
         : `${baseUrl}/${filter}${page > 1 ? `/page/${page}` : ""}`;
     } else {
       url = `${baseUrl}${page > 1 ? `/page/${page}` : ""}`;
@@ -122,7 +122,8 @@ async function fetchPosts({
       const card = $(el);
       let link = card.find("a[href]").first().attr("href") || "";
       if (!link) return;
-      link = resolveUrl(link);
+      const postUrl = new URL(link, url);
+      link = `${postUrl.pathname}${postUrl.search}${postUrl.hash}`;
       if (seen.has(link)) return;
 
       let title =
@@ -151,7 +152,7 @@ async function fetchPosts({
   } catch (err) {
     console.error(
       "HDMovie2 fetchPosts error:",
-      err instanceof Error ? err.message : String(err)
+      err instanceof Error ? err.message : String(err),
     );
     return [];
   }

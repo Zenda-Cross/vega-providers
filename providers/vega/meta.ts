@@ -31,9 +31,7 @@ export const getMeta = async ({
   try {
     const { axios, cheerio, getBaseUrl } = providerContext;
     const currentBaseUrl = await getBaseUrl("Vega");
-    const url = link.startsWith("http")
-      ? link
-      : new URL(link, `${currentBaseUrl}/`).href;
+    const url = new URL(link, `${currentBaseUrl}/`).href;
     console.log("url", url);
     const baseUrl = url.split("/").slice(0, 3).join("/");
     const response = await axios.get(url, {

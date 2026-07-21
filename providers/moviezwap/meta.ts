@@ -10,7 +10,7 @@ export const getMeta = async function ({
   try {
     const { axios, cheerio, getBaseUrl } = providerContext;
     const baseUrl = await getBaseUrl("moviezwap");
-    const url = link.startsWith("http") ? link : `${baseUrl}${link}`;
+    const url = new URL(link, `${baseUrl}/`).href;
     const res = await axios.get(url);
     const data = res.data;
     const $ = cheerio.load(data);
@@ -66,7 +66,7 @@ export const getMeta = async function ({
             directLinks: [{ title: "Movie", link: baseUrl + downloadPage }],
           });
         }
-      }
+      },
     );
 
     $("img[src*='/images/play.png']").each((i, el) => {
@@ -89,6 +89,7 @@ export const getMeta = async function ({
       tags,
       type,
       linkList: links,
+      webUrl: url,
       //info: infoRows.join("\n"),
     };
   } catch (err) {

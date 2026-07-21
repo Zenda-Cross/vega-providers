@@ -171,7 +171,8 @@ async function fetchPosts({
       console.log("Processing card:", card.text().trim().slice(0, 50)); // Debug log
       let link = card.find("a[href]").first().attr("href") || "";
       if (!link) return;
-      link = resolveUrl(link);
+      const postUrl = new URL(link, url);
+      link = `${postUrl.pathname}${postUrl.search}${postUrl.hash}`;
       if (seen.has(link)) return;
 
       let title =

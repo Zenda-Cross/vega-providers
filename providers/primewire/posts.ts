@@ -39,7 +39,7 @@ export const getSearchPosts = async function ({
   const hash = await getSHA256ofJSON(searchQuery + "JyjId97F9PVqUPuMO0");
   const url = `${baseUrl}/filter?s=${searchQuery}&page=${page}&ds=${hash.slice(
     0,
-    10
+    10,
   )}`;
   return posts({ baseUrl, url, signal, axios, cheerio });
 };
@@ -67,9 +67,10 @@ async function posts({
       const link = $(element).find("a").attr("href");
       const image = $(element).find("img").attr("src") || "";
       if (title && link) {
+        const postUrl = new URL(link, `${baseUrl}/`);
         catalog.push({
           title: title,
-          link: baseUrl + link,
+          link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
           image: image,
         });
       }

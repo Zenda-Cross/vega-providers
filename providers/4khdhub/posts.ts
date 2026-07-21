@@ -72,11 +72,10 @@ async function posts({
         //   image
         // );
         if (title && link && image) {
+          const postUrl = new URL(link, `${baseUrl}/`);
           catalog.push({
             title: title,
-            link: link.startsWith(baseUrl)
-              ? link.slice(baseUrl.length) || "/"
-              : link,
+            link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
             image: image,
           });
         }

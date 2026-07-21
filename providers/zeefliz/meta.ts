@@ -27,9 +27,9 @@ export const getMeta = async function ({
   link: string;
   providerContext: ProviderContext;
 }): Promise<Info> {
-  const { axios, cheerio } = providerContext;
-  const url = link;
-  const baseUrl = url.split("/").slice(0, 3).join("/");
+  const { axios, cheerio, getBaseUrl } = providerContext;
+  const baseUrl = await getBaseUrl("zeefliz");
+  const url = new URL(link, `${baseUrl}/`).href;
 
   const emptyResult: Info = {
     title: "",
@@ -188,6 +188,7 @@ export const getMeta = async function ({
     }
 
     result.linkList = links;
+    result.webUrl = url;
     return result;
   } catch (err) {
     console.error("getMeta error:", err instanceof Error ? err.message : err);
