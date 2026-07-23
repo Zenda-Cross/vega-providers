@@ -28,7 +28,7 @@ export const getMeta = async function ({
     dubs?.forEach((dub: any) => {
       const link: Link = {
         title: dub?.lanName,
-        episodesLink: `/wefeed-mobile-bff/subject-api/resource?subjectId=${dub?.subjectId}&page=1&perPage=200&all=0&startPosition=1&endPosition=1&pagerMode=0&resolution=1080&se=1&epFrom=1`,
+        episodesLink: `/wefeed-mobile-bff/subject-api/resource?subjectId=${dub?.subjectId}&page=1&perPage=20&all=0&startPosition=1&endPosition=1&pagerMode=0&resolution=1080&se=1&epFrom=1`,
       };
       links.push(link);
     });
