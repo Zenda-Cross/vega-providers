@@ -51,6 +51,10 @@
     "name": "nfMirror",
     "url": "https://net22.cc"
   },
+  "movieBoxWeb": {
+    "name": "MovieBox Web",
+    "url": "https://themoviebox.org"
+  },
   "primewire": {
     "name": "primewire",
     "url": "https://primewire.pw"

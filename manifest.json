@@ -104,9 +104,17 @@
     "disabled": false
   },
   {
-    "display_name": "MovieBox",
+    "display_name": "MovieBox App",
     "value": "movieBox",
     "version": "2.5",
+    "icon": "",
+    "type": "global",
+    "disabled": false
+  },
+  {
+    "display_name": "MovieBox Web",
+    "value": "movieBoxWeb",
+    "version": "1.0",
     "icon": "",
     "type": "global",
     "disabled": false
