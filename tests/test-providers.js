@@ -1,27 +1,7 @@
-const axios = require("axios");
-const cheerio = require("cheerio");
 const fs = require("fs");
 const path = require("path");
+const { providerContext } = require("./provider-test-context");
 const rootDir = path.join(__dirname, "..");
-
-// Load utilities
-let providerContext;
-try {
-  providerContext = {
-    axios,
-    cheerio,
-    commonHeaders: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    },
-    Aes: {},
-  };
-} catch (error) {
-  console.log(
-    "⚠️  Could not load provider context. Run 'npm run build' first.",
-  );
-  providerContext = null;
-}
 
 /**
  * Helper to pick random items from array
