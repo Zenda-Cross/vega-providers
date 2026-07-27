@@ -1,5 +1,5 @@
 import { ProviderContext, Stream } from "../types";
-
+import { throwProviderError } from "../providerErrors";
 
 export const getStream = async ({
   link: url,
@@ -168,8 +168,7 @@ export const getStream = async ({
     console.log("ServerLinks", ServerLinks);
     return ServerLinks;
   } catch (err) {
-    console.log("getStream error", err);
-    return [];
+    throwProviderError("UHDMovies", "stream", err);
   }
 };
 
@@ -178,7 +177,7 @@ const isDriveLink = async (ddl: string) => {
     const driveLeach = await fetch(ddl);
     const driveLeachData = await driveLeach.text();
     const pathMatch = driveLeachData.match(
-      /window\.location\.replace\("([^"]+)"\)/
+      /window\.location\.replace\("([^"]+)"\)/,
     );
     const path = pathMatch?.[1];
     const mainUrl = ddl.split("/")[2];

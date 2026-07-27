@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 export const getPosts = async function ({
   filter,
@@ -16,7 +17,14 @@ export const getPosts = async function ({
   const { axios, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("Moviesmod");
   const url = `${baseUrl + filter}/page/${page}/`;
-  return posts({ baseUrl, url, signal, axios, cheerio });
+  return posts({
+    baseUrl,
+    url,
+    signal,
+    axios,
+    cheerio,
+    operation: "posts",
+  });
 };
 
 export const getSearchPosts = async function ({
@@ -34,7 +42,14 @@ export const getSearchPosts = async function ({
   const { axios, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("Moviesmod");
   const url = `${baseUrl}/search/${searchQuery}/page/${page}/`;
-  return posts({ baseUrl, url, signal, axios, cheerio });
+  return posts({
+    baseUrl,
+    url,
+    signal,
+    axios,
+    cheerio,
+    operation: "search posts",
+  });
 };
 
 async function posts({
@@ -43,12 +58,14 @@ async function posts({
   signal,
   axios,
   cheerio,
+  operation,
 }: {
   baseUrl: string;
   url: string;
   signal: AbortSignal;
   axios: ProviderContext["axios"];
   cheerio: ProviderContext["cheerio"];
+  operation: string;
 }): Promise<Post[]> {
   try {
     const res = await axios.get(url, { signal });
@@ -72,7 +89,6 @@ async function posts({
       });
     return catalog;
   } catch (err) {
-    console.error("modGetPosts error ", err);
-    return [];
+    throwProviderError("MoviesMod", operation, err);
   }
 }

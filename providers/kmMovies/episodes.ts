@@ -1,4 +1,5 @@
 import { EpisodeLink, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 const headers = {
   "User-Agent":
@@ -36,7 +37,6 @@ export const getEpisodes = async function ({
 
     return episodes;
   } catch (err) {
-    console.error("kmMovies getEpisodes error:", err);
-    return [];
+    throwProviderError("KMMovies", "episodes", err);
   }
 };

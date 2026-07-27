@@ -1,5 +1,6 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 // Headers
 const headers = {
@@ -31,15 +32,6 @@ export const getMeta = async function ({
   const { axios, cheerio } = providerContext;
   const baseUrl = await getBaseUrl("zeefliz");
   const url = new URL(link, `${baseUrl}/`).href;
-
-  const emptyResult: Info = {
-    title: "",
-    synopsis: "",
-    image: "",
-    imdbId: "",
-    type: "movie",
-    linkList: [],
-  };
 
   try {
     const response = await axios.get(url, {
@@ -192,7 +184,6 @@ export const getMeta = async function ({
     result.webUrl = url;
     return result;
   } catch (err) {
-    console.error("getMeta error:", err instanceof Error ? err.message : err);
-    return emptyResult;
+    throwProviderError("ZeeFliz", "metadata", err);
   }
 };

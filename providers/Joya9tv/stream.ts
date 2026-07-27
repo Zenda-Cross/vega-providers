@@ -1,5 +1,6 @@
 import { ProviderContext, Stream } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
+import { throwProviderError } from "../providerErrors";
 
 const headers = {
   accept:
@@ -37,6 +38,11 @@ export async function getStream({
     if (!link.includes("cloud")) {
       // vlink
       const dotlinkRes = await fetch(`${link}`, { headers });
+      if (!dotlinkRes.ok) {
+        throw new Error(
+          `HTTP ${dotlinkRes.status} ${dotlinkRes.statusText} | URL ${link}`,
+        );
+      }
       const dotlinkText = await dotlinkRes.text();
       // console.log('dotlinkText', dotlinkText);
       const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
@@ -105,10 +111,6 @@ export async function getStream({
 
     return await hubcloudExtractor(link, signal, axios, cheerio, commonHeaders);
   } catch (error: any) {
-    console.log("getStream error: ", error);
-    if (error.message.includes("Aborted")) {
-    } else {
-    }
-    return [];
+    throwProviderError("Joya9TV", "stream", error);
   }
 }

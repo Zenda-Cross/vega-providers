@@ -1,4 +1,5 @@
 import { Info, Link, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 export const getMeta = async function ({
   link: data,
 }: {
@@ -74,14 +75,6 @@ export const getMeta = async function ({
       tags,
     };
   } catch (err) {
-    return {
-      title: "",
-      image: "",
-      imdbId: "",
-      synopsis: "",
-      type: "movie",
-      linkList: [],
-      tags: [],
-    };
+    throwProviderError("Ringz", "metadata", err);
   }
 };

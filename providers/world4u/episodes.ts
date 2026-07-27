@@ -1,4 +1,5 @@
 import { EpisodeLink, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getEpisodes = async function ({
   url,
@@ -14,7 +15,7 @@ export const getEpisodes = async function ({
     let $ = cheerio.load(html);
     const episodeLinks: EpisodeLink[] = [];
     $(
-      'strong:contains("Episode"),strong:contains("1080"),strong:contains("720"),strong:contains("480")'
+      'strong:contains("Episode"),strong:contains("1080"),strong:contains("720"),strong:contains("480")',
     ).map((i, element) => {
       const title = $(element).text();
       const link = $(element)
@@ -32,11 +33,6 @@ export const getEpisodes = async function ({
     });
     return episodeLinks;
   } catch (err) {
-    return [
-      {
-        title: "Server 1",
-        link: url,
-      },
-    ];
+    throwProviderError("World4u", "episodes", err);
   }
 };

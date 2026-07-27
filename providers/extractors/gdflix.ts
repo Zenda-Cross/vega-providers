@@ -1,3 +1,5 @@
+import { throwProviderError } from "../providerErrors";
+
 export async function gdflixExtractor(
   link: string,
   signal: AbortSignal,
@@ -193,7 +195,6 @@ export async function gdflixExtractor(
     }
     return streamLinks;
   } catch (error) {
-    console.log("gdflix error: ", error);
-    return [];
+    throwProviderError("GDFlix", `extract ${link}`, error);
   }
 }

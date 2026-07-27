@@ -1,5 +1,6 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 export const getMeta = async function ({
   link,
@@ -94,14 +95,6 @@ export const getMeta = async function ({
       //info: infoRows.join("\n"),
     };
   } catch (err) {
-    console.error(err);
-    return {
-      title: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "movie",
-      linkList: [],
-    };
+    throwProviderError("MoviezWap", "metadata", err);
   }
 };

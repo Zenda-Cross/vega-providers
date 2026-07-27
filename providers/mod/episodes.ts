@@ -1,4 +1,5 @@
 import { EpisodeLink, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getEpisodes = async function ({
   url,
@@ -46,7 +47,6 @@ export const getEpisodes = async function ({
     });
     return episodeLinks;
   } catch (err) {
-    console.error(err);
-    return [];
+    throwProviderError("MoviesMod", "episodes", err);
   }
 };

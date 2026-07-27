@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 export const getPosts = async function ({
   filter,
@@ -54,6 +55,9 @@ async function posts({
     console.log("Fetching URL:", url);
     const { cheerio } = providerContext;
     const res = await fetch(url, { signal });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText} | URL ${url}`);
+    }
     const data = await res.text();
     const $ = cheerio.load(data);
     const catalog: Post[] = [];
@@ -71,8 +75,7 @@ async function posts({
     });
     return catalog;
   } catch (err) {
-    console.error("drive error ", err);
-    return [];
+    throwProviderError("Drive", "posts", err);
   }
 }
 
@@ -90,7 +93,7 @@ async function searchPosts({
     const res = await fetch(url, { signal });
 
     if (!res.ok) {
-      throw new Error(`drive search failed with status ${res.status}`);
+      throw new Error(`HTTP ${res.status} ${res.statusText} | URL ${url}`);
     }
 
     const data = (await res.json()) as {
@@ -128,8 +131,7 @@ async function searchPosts({
         .filter((post): post is Post => post !== null) ?? []
     );
   } catch (err) {
-    console.error("drive search error ", err);
-    return [];
+    throwProviderError("Drive", "search posts", err);
   }
 }
 

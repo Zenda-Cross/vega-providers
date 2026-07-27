@@ -1,5 +1,6 @@
 import { getBaseUrl } from "../getBaseUrl";
 import { Info, Link, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 import {
   absoluteUrl,
   detailPath,
@@ -43,8 +44,11 @@ export const getMeta = async function ({
     const baseUrl = await getBaseUrl(providerValue);
     const pageUrl = absoluteUrl(baseUrl, `/moviesDetail/${detailPath(link)}`);
     const response = await fetch(pageUrl);
-    if (!response.ok)
-      throw new Error(`MovieBox Web returned ${response.status}`);
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status} ${response.statusText} | URL ${pageUrl}`,
+      );
+    }
 
     const detail = parseNuxtDetail(
       await response.text(),
@@ -104,14 +108,6 @@ export const getMeta = async function ({
       webUrl: pageUrl,
     };
   } catch (error) {
-    console.error("MovieBox Web metadata error", error);
-    return {
-      title: "",
-      image: "",
-      synopsis: "",
-      imdbId: "",
-      type: "movie",
-      linkList: [],
-    };
+    throwProviderError("MovieBox Web", "metadata", error);
   }
 };

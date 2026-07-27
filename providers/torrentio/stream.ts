@@ -1,4 +1,5 @@
 import { Stream, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 const languageCodes = [
   ["MULTI", "MULTI"],
@@ -149,7 +150,6 @@ export const getStream = async ({
 
     return streams;
   } catch (err) {
-    console.error("Torrentio getStream error:", err);
-    return [];
+    throwProviderError("Torrentio", "stream", err);
   }
 };

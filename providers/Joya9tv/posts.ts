@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 const defaultHeaders = {
   Referer: "https://www.google.com",
@@ -87,6 +88,9 @@ async function fetchPosts({
 
     const { cheerio } = providerContext;
     const res = await fetch(url, { headers: defaultHeaders, signal });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText} | URL ${url}`);
+    }
     const data = await res.text();
     const $ = cheerio.load(data || "");
 
@@ -142,10 +146,10 @@ async function fetchPosts({
 
     return catalog.slice(0, 100);
   } catch (err) {
-    console.error(
-      "fetchPosts error:",
-      err instanceof Error ? err.message : String(err),
+    throwProviderError(
+      "Joya9TV",
+      query && query.trim() ? "search posts" : "posts",
+      err,
     );
-    return [];
   }
 }

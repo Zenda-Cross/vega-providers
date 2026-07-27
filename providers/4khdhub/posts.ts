@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 export const getPosts = async function ({
   filter,
@@ -17,7 +18,7 @@ export const getPosts = async function ({
   const baseUrl = await getBaseUrl("4khdhub");
   const url = `${baseUrl + filter}/page/${page}`;
   console.log("4khdhubGetPosts url", url);
-  return posts({ baseUrl, url, signal, cheerio });
+  return posts({ baseUrl, url, signal, cheerio, operation: "posts" });
 };
 
 export const getSearchPosts = async function ({
@@ -39,7 +40,7 @@ export const getSearchPosts = async function ({
       ? `${baseUrl}/?s=${searchQuery}`
       : `${baseUrl}/page/${page}?s=${searchQuery}`;
   console.log("4khdhubGetSearchPosts url", url);
-  return posts({ baseUrl, url, signal, cheerio });
+  return posts({ baseUrl, url, signal, cheerio, operation: "search posts" });
 };
 
 async function posts({
@@ -47,14 +48,19 @@ async function posts({
   url,
   signal,
   cheerio,
+  operation,
 }: {
   baseUrl: string;
   url: string;
   signal: AbortSignal;
   cheerio: ProviderContext["cheerio"];
+  operation: string;
 }): Promise<Post[]> {
   try {
     const res = await fetch(url, { signal });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText} | URL ${url}`);
+    }
     const data = await res.text();
     const $ = cheerio.load(data);
     const catalog: Post[] = [];
@@ -83,7 +89,6 @@ async function posts({
       });
     return catalog;
   } catch (err) {
-    console.error("4khdhubGetPosts error ", err);
-    return [];
+    throwProviderError("4KHDHub", operation, err);
   }
 }

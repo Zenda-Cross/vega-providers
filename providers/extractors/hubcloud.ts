@@ -1,3 +1,5 @@
+import { throwProviderError } from "../providerErrors";
+
 const hubcloudDecode = function (value: string) {
   if (value === undefined) {
     return "";
@@ -73,6 +75,11 @@ export async function hubcloudExtractor(
       signal,
       redirect: "follow",
     });
+    if (!vcloudRes.ok) {
+      throw new Error(
+        `HTTP ${vcloudRes.status} ${vcloudRes.statusText} | URL ${vcloudLink}`,
+      );
+    }
     const vcloudText = await vcloudRes.text();
     const $ = cheerio.load(vcloudText);
     // console.log("vcloudRes", $.text());
@@ -194,7 +201,6 @@ export async function hubcloudExtractor(
     console.log("streamLinks", streamLinks);
     return streamLinks;
   } catch (error: any) {
-    console.log("hubcloudExtractor error: ", error?.message || error);
-    return [];
+    throwProviderError("HubCloud", `extract ${link}`, error);
   }
 }

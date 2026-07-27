@@ -1,4 +1,5 @@
 import { Stream, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getStream = async function ({
   link: url,
@@ -38,25 +39,30 @@ export const getStream = async function ({
       const fastilinksData = fastilinksRes.data;
       const $$ = cheerio.load(fastilinksData);
       const fastilinksKey = $$(
-        'input[name="_csrf_token_645a83a41868941e4692aa31e7235f2"]'
+        'input[name="_csrf_token_645a83a41868941e4692aa31e7235f2"]',
       ).attr("value");
       console.log("fastilinksKey", fastilinksKey);
       const fastilinksFormData = new FormData();
       fastilinksFormData.append(
         "_csrf_token_645a83a41868941e4692aa31e7235f2",
-        fastilinksKey || ""
+        fastilinksKey || "",
       );
       console.log(
         "fastilinksFormData",
         fastilinksFormData,
         "fastilinksUrl",
-        url
+        url,
       );
       const fastilinksRes2 = await fetch(url, {
         method: "POST",
         headers: headers,
         body: fastilinksFormData,
       });
+      if (!fastilinksRes2.ok) {
+        throw new Error(
+          `HTTP ${fastilinksRes2.status} ${fastilinksRes2.statusText} | URL ${url}`,
+        );
+      }
       const fastilinksHtml = await fastilinksRes2.text();
       // console.log('fastilinksHtml', fastilinksHtml);
       const $$$ = cheerio.load(fastilinksHtml);
@@ -97,7 +103,7 @@ export const getStream = async function ({
           },
           body: null,
           method: "GET",
-        }
+        },
       );
       const photolinxData = await photolinxRes.text();
       const $$$ = cheerio.load(photolinxData);
@@ -169,7 +175,7 @@ export const getStream = async function ({
     } catch (err) {
       console.log(
         "error in world4uGetStream",
-        err instanceof Error ? err.message : err
+        err instanceof Error ? err.message : err,
       );
     }
 
@@ -248,7 +254,7 @@ export const getStream = async function ({
       const repairLink = $("#continue-btn").attr("href");
       console.log("repairLink", "https://www.mediafire.com" + repairLink);
       const repairRequireRepairRes = await fetch(
-        "https://www.mediafire.com" + repairLink
+        "https://www.mediafire.com" + repairLink,
       );
       const $$ = cheerio.load(await repairRequireRepairRes.text());
       const repairDownloadLink = $$(".input.popsok").attr("href");
@@ -264,7 +270,6 @@ export const getStream = async function ({
 
     return streamLinks;
   } catch (err) {
-    console.log(err instanceof Error ? err.message : err);
-    return [];
+    throwProviderError("World4u", "stream", err);
   }
 };

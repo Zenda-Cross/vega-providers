@@ -1,4 +1,5 @@
 import { EpisodeLink, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getEpisodes = async function ({
   url: id,
@@ -29,7 +30,7 @@ export const getEpisodes = async function ({
     });
     return episodeLinks;
   } catch (err) {
-    return [];
+    throwProviderError("ShowBox", "episodes", err);
   }
 };
 

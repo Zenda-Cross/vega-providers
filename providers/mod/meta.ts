@@ -1,5 +1,6 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 export const getMeta = async function ({
   link,
@@ -79,14 +80,6 @@ export const getMeta = async function ({
     // console.log('mod meta', links);
     return { ...meta, linkList: links, webUrl: url };
   } catch (err) {
-    console.error(err);
-    return {
-      title: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "movie",
-      linkList: [],
-    };
+    throwProviderError("MoviesMod", "metadata", err);
   }
 };

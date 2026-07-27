@@ -1,5 +1,6 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 // Headers
 const headers = {
@@ -34,19 +35,15 @@ export const getMeta = async function ({
   const baseUrl = await getBaseUrl("joya9tv");
   const url = new URL(link, `${baseUrl}/`).href;
 
-  const emptyResult: Info = {
-    title: "",
-    synopsis: "",
-    image: "",
-    imdbId: "",
-    type: "movie",
-    linkList: [],
-  };
-
   try {
     const response = await fetch(url, {
       headers: { ...headers, Referer: baseUrl },
     });
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status} ${response.statusText} | URL ${url}`,
+      );
+    }
 
     const data = await response.text();
     const $ = cheerio.load(data);
@@ -155,7 +152,6 @@ export const getMeta = async function ({
     result.webUrl = url;
     return result;
   } catch (err) {
-    console.log("getMeta error:", err);
-    return emptyResult;
+    throwProviderError("Joya9TV", "metadata", err);
   }
 };

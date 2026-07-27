@@ -1,5 +1,6 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 const hdbHeaders = {
   Cookie: "xla=s4t",
@@ -121,14 +122,6 @@ export const getMeta = async function ({
       webUrl: url,
     };
   } catch (err) {
-    console.error(err);
-    return {
-      title: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "movie",
-      linkList: [],
-    };
+    throwProviderError("HDHub4u", "metadata", err);
   }
 };

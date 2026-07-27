@@ -1,7 +1,6 @@
 import { ProviderContext, Stream } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
-
-
+import { throwProviderError } from "../providerErrors";
 
 export async function getStream({
   link,
@@ -22,7 +21,11 @@ export async function getStream({
         const urlObj = new URL(processLink);
         const id = processLink.split("/").filter(Boolean).pop();
         const apiUrl = `${urlObj.origin}/api/s/${id}/hubcloud`;
-        const res = await fetch(apiUrl, { headers: commonHeaders, redirect: "follow", signal });
+        const res = await fetch(apiUrl, {
+          headers: commonHeaders,
+          redirect: "follow",
+          signal,
+        });
         if (res.url && res.url.includes("hubcloud")) {
           processLink = res.url;
         }
@@ -41,10 +44,6 @@ export async function getStream({
 
     return hubcloudLink;
   } catch (error: any) {
-    console.log("getStream error: ", error);
-    if (error.message.includes("Aborted")) {
-    } else {
-    }
-    return [];
+    throwProviderError("1CineVood", "stream", error);
   }
 }

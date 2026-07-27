@@ -1,5 +1,5 @@
-
 import { EpisodeLink, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getEpisodes = async function ({
   url,
@@ -28,7 +28,7 @@ export const getEpisodes = async function ({
       const link = el
         .next("p")
         .find(
-          '.btn-outline[style="background:linear-gradient(135deg,#ed0b0b,#f2d152); color: white;"]'
+          '.btn-outline[style="background:linear-gradient(135deg,#ed0b0b,#f2d152); color: white;"]',
         )
         .parent()
         .attr("href");
@@ -39,8 +39,6 @@ export const getEpisodes = async function ({
     // console.log(episodes);
     return episodes;
   } catch (err) {
-    console.log("getEpisodeLinks error: ");
-    // console.error(err);
-    return [];
+    throwProviderError("ZeeFliz", "episodes", err);
   }
 };

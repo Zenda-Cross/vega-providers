@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 export const getPosts = async function ({
   filter,
@@ -16,7 +17,7 @@ export const getPosts = async function ({
   const { cheerio } = providerContext;
   const baseUrl = await getBaseUrl("moviezwap");
   const url = `${baseUrl}${filter}`;
-  return posts({ url, signal, cheerio });
+  return posts({ url, signal, cheerio, operation: "posts" });
 };
 
 export const getSearchPosts = async function ({
@@ -34,20 +35,25 @@ export const getSearchPosts = async function ({
   const { cheerio } = providerContext;
   const baseUrl = await getBaseUrl("moviezwap");
   const url = `${baseUrl}/search.php?q=${encodeURIComponent(searchQuery)}`;
-  return posts({ url, signal, cheerio });
+  return posts({ url, signal, cheerio, operation: "search posts" });
 };
 
 async function posts({
   url,
   signal,
   cheerio,
+  operation,
 }: {
   url: string;
   signal: AbortSignal;
   cheerio: ProviderContext["cheerio"];
+  operation: string;
 }): Promise<Post[]> {
   try {
     const res = await fetch(url, { signal });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText} | URL ${url}`);
+    }
     const data = await res.text();
     const $ = cheerio.load(data);
     const catalog: Post[] = [];
@@ -65,7 +71,6 @@ async function posts({
     });
     return catalog;
   } catch (err) {
-    console.error("moviezwapGetPosts error ", err);
-    return [];
+    throwProviderError("MoviezWap", operation, err);
   }
 }

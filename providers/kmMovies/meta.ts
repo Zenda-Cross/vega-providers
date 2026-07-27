@@ -1,5 +1,6 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 const kmmHeaders = {
   "User-Agent":
@@ -238,17 +239,6 @@ export const getMeta = async function ({
       webUrl: pageUrl,
     };
   } catch (err) {
-    console.error("KMMOVIES getMeta error:", err);
-    return {
-      title: "",
-      synopsis: "",
-      image: "https://via.placeholder.com/300x450",
-      imdbId: "",
-      type: "movie",
-      tags: [],
-      cast: [],
-      rating: "",
-      linkList: [],
-    };
+    throwProviderError("KMMovies", "metadata", err);
   }
 };

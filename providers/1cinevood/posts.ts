@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 async function getWithWAF(
   url: string,
@@ -151,10 +152,10 @@ async function fetchPosts({
 
     return catalog.slice(0, 100);
   } catch (err) {
-    console.error(
-      "HDMovie2 fetchPosts error:",
-      err instanceof Error ? err.message : String(err),
+    throwProviderError(
+      "1CineVood",
+      query && query.trim() ? "search posts" : "posts",
+      err,
     );
-    return [];
   }
 }

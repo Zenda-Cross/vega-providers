@@ -1,5 +1,6 @@
 import { EpisodeLink, ProviderContext } from "../types";
 import { decodeLink, encodeLink } from "./utils";
+import { throwProviderError } from "../providerErrors";
 
 export const getEpisodes = async function ({
   url,
@@ -40,7 +41,6 @@ export const getEpisodes = async function ({
     }
     return episodes;
   } catch (error) {
-    console.error("MovieBox Web episodes error", error);
-    return [];
+    throwProviderError("MovieBox Web", "episodes", error);
   }
 };

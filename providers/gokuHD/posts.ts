@@ -15,7 +15,11 @@ async function parsePosts(
   providerContext: ProviderContext,
 ): Promise<Post[]> {
   const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(`GokuHD returned ${response.status}`);
+  if (!response.ok) {
+    throw new Error(
+      `HTTP ${response.status} ${response.statusText} | URL ${url}`,
+    );
+  }
 
   const $ = providerContext.cheerio.load(await response.text());
   const posts: Post[] = [];
@@ -81,11 +85,16 @@ export const getSearchPosts = async function ({
     page: String(page),
     _embed: "1",
   });
-  const response = await fetch(
-    new URL(`/wp-json/wp/v2/posts?${params}`, `${baseUrl}/`).href,
-    { signal, headers: { Accept: "application/json" } },
-  );
-  if (!response.ok) return [];
+  const url = new URL(`/wp-json/wp/v2/posts?${params}`, `${baseUrl}/`).href;
+  const response = await fetch(url, {
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(
+      `HTTP ${response.status} ${response.statusText} | URL ${url}`,
+    );
+  }
 
   const posts = (await response.json()) as any[];
   return posts.map((post) => ({

@@ -1,4 +1,5 @@
 import { EpisodeLink, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 async function getWithWAF(
   url: string,
@@ -85,8 +86,7 @@ export const getEpisodes = async function ({
 
     return episodesLink;
   } catch (err) {
-    console.error(err);
-    return [];
+    throwProviderError("KatMovies", "episodes", err);
   }
 };
 

@@ -1,4 +1,5 @@
 import { EpisodeLink, Info, Link, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getMeta = async function ({
   link,
@@ -94,14 +95,6 @@ export const getMeta = async function ({
       linkList: links,
     };
   } catch (err) {
-    console.error("111477 meta error:", err);
-    return {
-      title: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "movie",
-      linkList: [],
-    };
+    throwProviderError("111477", "metadata", err);
   }
 };

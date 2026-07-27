@@ -1,4 +1,5 @@
 import { EpisodeLink, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 // यहाँ `getEpisodes` फ़ंक्शन मान रहा है कि यह उस पेज को स्क्रैप कर रहा है
 // जो 'Download Links' बटन से प्राप्त हुआ है (जैसे m4ulinks.com/number/42882)
@@ -134,8 +135,6 @@ export const getEpisodes = async function ({
     // console.log(episodes);
     return episodes;
   } catch (err) {
-    console.log("getEpisodeLinks error: ");
-    // console.error(err);
-    return [];
+    throwProviderError("Movies4u", "episodes", err);
   }
 };

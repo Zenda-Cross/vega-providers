@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 const defaultHeaders = {
   Referer: "https://www.google.com",
@@ -128,10 +129,10 @@ async function fetchPosts({
 
     return catalog.slice(0, 100);
   } catch (err) {
-    console.error(
-      "fetchPosts error:",
-      err instanceof Error ? err.message : String(err),
+    throwProviderError(
+      "ZeeFliz",
+      query && query.trim() ? "search posts" : "posts",
+      err,
     );
-    return [];
   }
 }

@@ -1,5 +1,6 @@
 import { ProviderContext } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
+import { throwProviderError } from "../providerErrors";
 
 export async function getStream({
   link,
@@ -69,8 +70,7 @@ export async function getStream({
       headers,
     );
   } catch (error: any) {
-    console.log("hd hub 4 getStream error: ", error);
-    return [];
+    throwProviderError("HDHub4u", "stream", error);
   }
 }
 

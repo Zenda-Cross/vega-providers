@@ -1,5 +1,6 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 export const getMeta = async function ({
   link,
@@ -71,14 +72,6 @@ export const getMeta = async function ({
       webUrl: url,
     };
   } catch (error) {
-    console.error(error);
-    return {
-      title: "",
-      image: "",
-      imdbId: "",
-      synopsis: "",
-      linkList: [],
-      type: "uhd",
-    };
+    throwProviderError("PrimeWire", "metadata", error);
   }
 };

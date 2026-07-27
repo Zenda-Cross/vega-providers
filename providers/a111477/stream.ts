@@ -1,4 +1,5 @@
 import { Stream, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getStream = async function ({
   link: url,
@@ -32,7 +33,6 @@ export const getStream = async function ({
 
     return stream;
   } catch (err) {
-    console.error("111477 stream error:", err);
-    return [];
+    throwProviderError("111477", "stream", err);
   }
 };

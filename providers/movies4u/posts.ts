@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 const defaultHeaders = {
   accept:
@@ -204,10 +205,10 @@ async function fetchPosts({
 
     return catalog.slice(0, 100);
   } catch (err) {
-    console.error(
-      "HDMovie2 fetchPosts error:",
-      err instanceof Error ? err.message : String(err),
+    throwProviderError(
+      "Movies4u",
+      query && query.trim() ? "search posts" : "posts",
+      err,
     );
-    return [];
   }
 }

@@ -1,3 +1,5 @@
+import { throwProviderError } from "../providerErrors";
+
 const GOFILE_API = "https://api.gofile.io";
 const GOFILE_LANGUAGE = "en-US";
 const GOFILE_WEBSITE_SECRET = "9844d94d963d30";
@@ -201,8 +203,7 @@ export async function gofileExtractor(
 
     return { link: file.link, token };
   } catch (error) {
-    console.error("gofileExtractor error", error);
-    return { link: "", token: "" };
+    throwProviderError("Gofile", `extract ${id}`, error);
   }
 }
 

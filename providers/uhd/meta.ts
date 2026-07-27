@@ -1,5 +1,6 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 async function getWithWAF(
   url: string,
@@ -119,14 +120,6 @@ export const getMeta = async function ({
       webUrl: url,
     };
   } catch (error) {
-    console.error(error);
-    return {
-      title: "",
-      image: "",
-      imdbId: "",
-      synopsis: "",
-      linkList: [],
-      type: "uhd",
-    };
+    throwProviderError("UHDMovies", "metadata", error);
   }
 };

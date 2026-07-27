@@ -1,4 +1,5 @@
 import { Stream, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getStream = async function ({
   link: id,
@@ -38,6 +39,6 @@ export const getStream = async function ({
     console.log(stream);
     return stream;
   } catch (err) {
-    return [];
+    throwProviderError("ShowBox", "stream", err);
   }
 };

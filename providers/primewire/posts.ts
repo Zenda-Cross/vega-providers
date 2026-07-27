@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 export const getPosts = async function ({
   filter,
@@ -17,7 +18,14 @@ export const getPosts = async function ({
 
   const baseUrl = await getBaseUrl("primewire");
   const url = `${baseUrl + filter}&page=${page}`;
-  return posts({ baseUrl, url, signal, axios, cheerio });
+  return posts({
+    baseUrl,
+    url,
+    signal,
+    axios,
+    cheerio,
+    operation: "posts",
+  });
 };
 
 export const getSearchPosts = async function ({
@@ -42,7 +50,14 @@ export const getSearchPosts = async function ({
     0,
     10,
   )}`;
-  return posts({ baseUrl, url, signal, axios, cheerio });
+  return posts({
+    baseUrl,
+    url,
+    signal,
+    axios,
+    cheerio,
+    operation: "search posts",
+  });
 };
 
 async function posts({
@@ -51,12 +66,14 @@ async function posts({
   signal,
   axios,
   cheerio,
+  operation,
 }: {
   baseUrl: string;
   url: string;
   signal: AbortSignal;
   axios: ProviderContext["axios"];
   cheerio: ProviderContext["cheerio"];
+  operation: string;
 }): Promise<Post[]> {
   try {
     const res = await axios.get(url, { signal });
@@ -78,7 +95,6 @@ async function posts({
     });
     return catalog;
   } catch (err) {
-    console.error("primewire error ", err);
-    return [];
+    throwProviderError("PrimeWire", operation, err);
   }
 }

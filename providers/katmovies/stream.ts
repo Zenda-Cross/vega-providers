@@ -1,6 +1,7 @@
 import { Stream, ProviderContext } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
 import { gdflixExtractor } from "../extractors/gdflix";
+import { throwProviderError } from "../providerErrors";
 
 async function getWithWAF(
   url: string,
@@ -159,7 +160,6 @@ export const getStream = async function ({
     );
     return stereams;
   } catch (error: any) {
-    console.log("katgetStream error: ", error);
-    return [];
+    throwProviderError("KatMovies", "stream", error);
   }
 };

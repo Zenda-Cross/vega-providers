@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 async function getWithWAF(
   url: string,
@@ -51,6 +52,7 @@ export const getPosts = async function ({
     axios,
     openWebView,
     commonHeaders,
+    operation: "posts",
   });
 };
 
@@ -77,6 +79,7 @@ export const getSearchPosts = async function ({
     axios,
     openWebView,
     commonHeaders,
+    operation: "search posts",
   });
 };
 
@@ -88,6 +91,7 @@ async function posts({
   axios,
   openWebView,
   commonHeaders,
+  operation,
 }: {
   url: string;
   baseUrl: string;
@@ -96,6 +100,7 @@ async function posts({
   axios: ProviderContext["axios"];
   openWebView: ProviderContext["openWebView"];
   commonHeaders: any;
+  operation: string;
 }): Promise<Post[]> {
   try {
     const res = await getWithWAF(url, axios, openWebView, commonHeaders);
@@ -119,7 +124,6 @@ async function posts({
       });
     return catalog;
   } catch (err) {
-    console.error("katmovies error ", err);
-    return [];
+    throwProviderError("KatMovies", operation, err);
   }
 }

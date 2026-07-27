@@ -1,6 +1,7 @@
 import { Stream, ProviderContext } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
 import { gdflixExtractor } from "../extractors/gdflix";
+import { throwProviderError } from "../providerErrors";
 
 export const getStream = async function ({
   link: url,
@@ -68,7 +69,6 @@ export const getStream = async function ({
       headers,
     );
   } catch (err: any) {
-    console.error("Movies Drive err", err?.message || err);
-    return [];
+    throwProviderError("Drive", "stream", err);
   }
 };

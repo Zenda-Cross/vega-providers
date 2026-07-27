@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 export const getPosts = async ({
   filter,
@@ -19,7 +20,7 @@ export const getPosts = async ({
     page === 1 ? `${baseUrl}/${filter}/` : `${baseUrl + filter}/page/${page}/`;
   console.log("url", url);
 
-  return posts(baseUrl, url, signal, providerContext);
+  return posts(baseUrl, url, signal, providerContext, "posts");
 };
 
 export const getSearchPosts = async ({
@@ -38,7 +39,7 @@ export const getSearchPosts = async ({
   const baseUrl = await getBaseUrl("UhdMovies");
   const url = `${baseUrl}/search/${searchQuery}/page/${page}/`;
 
-  return posts(baseUrl, url, signal, providerContext);
+  return posts(baseUrl, url, signal, providerContext, "search posts");
 };
 
 async function getWithWAF(
@@ -73,6 +74,7 @@ async function posts(
   url: string,
   signal: AbortSignal,
   providerContext: ProviderContext,
+  operation: string,
 ): Promise<Post[]> {
   try {
     const { axios, cheerio, openWebView, commonHeaders } = providerContext;
@@ -99,7 +101,6 @@ async function posts(
       });
     return uhdCatalog;
   } catch (err) {
-    console.error("uhd error ", err);
-    return [];
+    throwProviderError("UHDMovies", operation, err);
   }
 }

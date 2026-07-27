@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getPosts = async function ({
   filter,
@@ -125,7 +126,10 @@ async function posts({
 
     return catalog;
   } catch (err) {
-    console.error("animetsu error ", err);
-    return [];
+    throwProviderError(
+      "AnimeTsu",
+      filter === undefined ? "search posts" : "posts",
+      err,
+    );
   }
 }

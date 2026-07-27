@@ -1,5 +1,6 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 export const getMeta = async function ({
   link,
@@ -62,15 +63,6 @@ export const getMeta = async function ({
       webUrl: url,
     };
   } catch (err) {
-    console.error("Error fetching metadata:", err);
-    return {
-      title: "",
-      rating: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "",
-      linkList: [],
-    };
+    throwProviderError("ShowBox", "metadata", err);
   }
 };

@@ -1,4 +1,5 @@
 import { Stream, ProviderContext, TextTracks } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getStream = async function ({
   link: id,
@@ -179,7 +180,6 @@ export const getStream = async function ({
     console.log("Stream links:", streamLinks);
     return streamLinks;
   } catch (err) {
-    console.error("animetsu stream error:", err);
-    return [];
+    throwProviderError("AnimeTsu", "stream", err);
   }
 };

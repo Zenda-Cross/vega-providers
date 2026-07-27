@@ -1,6 +1,7 @@
 import { ProviderContext, Stream } from "../types";
 import { gofileExtractor } from "../extractors/gofile";
 import { hubcloudExtractor } from "../extractors/hubcloud";
+import { throwProviderError } from "../providerErrors";
 
 const headers = {
   "User-Agent":
@@ -64,7 +65,9 @@ async function getMagicLinksPage(
 
   if (!location || !setCookie) {
     if (!initialResponse.ok) {
-      throw new Error(`Magic Links returned HTTP ${initialResponse.status}`);
+      throw new Error(
+        `HTTP ${initialResponse.status} ${initialResponse.statusText} | URL ${url}`,
+      );
     }
     return { data: await initialResponse.text() };
   }
@@ -83,7 +86,9 @@ async function getMagicLinksPage(
   });
 
   if (!response.ok) {
-    throw new Error(`Magic Links returned HTTP ${response.status}`);
+    throw new Error(
+      `HTTP ${response.status} ${response.statusText} | URL ${destination}`,
+    );
   }
 
   return { data: await response.text() };
@@ -316,6 +321,7 @@ export async function getStream({
 
     const streams: Stream[] = [];
     const seen = new Set<string>();
+    const resolverFailures: string[] = [];
 
     for (const server of [
       "ZIP-ZAP",
@@ -334,13 +340,23 @@ export async function getStream({
           }
         } catch (error: any) {
           console.log(`${server} failed:`, error.message);
+          resolverFailures.push(`${server}: ${error.message || String(error)}`);
         }
       }
     }
 
+    if (
+      downloadLinks.length > 0 &&
+      streams.length === 0 &&
+      resolverFailures.length > 0
+    ) {
+      throw new Error(
+        `All stream resolvers failed: ${resolverFailures.join("; ")}`,
+      );
+    }
+
     return streams;
   } catch (error: any) {
-    console.log("getStream error:", error.message);
-    return [];
+    throwProviderError("KMMovies", "stream", error);
   }
 }

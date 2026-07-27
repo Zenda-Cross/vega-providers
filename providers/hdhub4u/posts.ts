@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 const hdbHeaders = {
   Cookie: "xla=s4t",
@@ -60,6 +61,11 @@ export const getSearchPosts = async function ({
       },
       signal,
     });
+    if (!res.ok) {
+      throw new Error(
+        `HTTP ${res.status} ${res.statusText} | URL ${searchUrl}`,
+      );
+    }
     const json: any = await res.json();
     const hits: any[] = Array.isArray(json?.hits) ? json.hits : [];
     const catalog: Post[] = [];
@@ -77,8 +83,7 @@ export const getSearchPosts = async function ({
     }
     return catalog;
   } catch (err) {
-    console.error("hdhubGetSearchPosts error ", err);
-    return [];
+    throwProviderError("HDHub4u", "search posts", err);
   }
 };
 
@@ -99,6 +104,9 @@ async function posts({
       headers: hdbHeaders,
       signal,
     });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText} | URL ${url}`);
+    }
     const data = await res.text();
     const $ = cheerio.load(data);
     const catalog: Post[] = [];
@@ -120,7 +128,6 @@ async function posts({
       });
     return catalog;
   } catch (err) {
-    console.error("hdhubGetPosts error ", err);
-    return [];
+    throwProviderError("HDHub4u", "posts", err);
   }
 }

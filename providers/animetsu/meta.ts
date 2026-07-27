@@ -1,4 +1,5 @@
 import { Info, Link, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getMeta = async function ({
   link,
@@ -122,14 +123,6 @@ export const getMeta = async function ({
       linkList: linkList,
     };
   } catch (err) {
-    console.error("animetsu meta error:", err);
-    return {
-      title: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "movie",
-      linkList: [],
-    };
+    throwProviderError("AnimeTsu", "metadata", err);
   }
 };

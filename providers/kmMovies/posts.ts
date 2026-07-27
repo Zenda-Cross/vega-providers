@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 const defaultHeaders = {
   "User-Agent":
@@ -162,10 +163,10 @@ async function fetchPosts({
 
     return catalog.slice(0, 100);
   } catch (err) {
-    console.error(
-      "kmMovies fetchPosts error:",
-      err instanceof Error ? err.message : String(err),
+    throwProviderError(
+      "KMMovies",
+      query && query.trim() ? "search posts" : "posts",
+      err,
     );
-    return [];
   }
 }

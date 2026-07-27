@@ -1,5 +1,6 @@
 import { getBaseUrl } from "../getBaseUrl";
 import { ProviderContext, Stream, TextTracks } from "../types";
+import { throwProviderError } from "../providerErrors";
 import { absoluteUrl, decodeLink, providerValue } from "./utils";
 
 type PlayStream = {
@@ -67,11 +68,18 @@ async function getCaptions(
     subjectId: playback.subjectId,
     detailPath: playback.detailPath,
   });
-  const response = await fetch(
-    absoluteUrl(baseUrl, `/wefeed-h5api-bff/subject/caption?${params}`),
-    { headers: { ...requestHeaders, Referer: referer } },
+  const url = absoluteUrl(
+    baseUrl,
+    `/wefeed-h5api-bff/subject/caption?${params}`,
   );
-  if (!response.ok) return [];
+  const response = await fetch(url, {
+    headers: { ...requestHeaders, Referer: referer },
+  });
+  if (!response.ok) {
+    throw new Error(
+      `HTTP ${response.status} ${response.statusText} | URL ${url}`,
+    );
+  }
 
   const data = await response.json();
   return mapCaptions(data?.data?.captions || []);
@@ -106,15 +114,28 @@ export const getStream = async function ({
       playParams.set("ep", String(playback.episode));
     }
 
-    const response = await fetch(
-      absoluteUrl(baseUrl, `/wefeed-h5api-bff/subject/play?${playParams}`),
-      { headers: { ...requestHeaders, Referer: referer } },
+    const playUrl = absoluteUrl(
+      baseUrl,
+      `/wefeed-h5api-bff/subject/play?${playParams}`,
     );
-    if (!response.ok) return [];
+    const response = await fetch(playUrl, {
+      headers: { ...requestHeaders, Referer: referer },
+    });
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status} ${response.statusText} | URL ${playUrl}`,
+      );
+    }
 
     const data = await response.json();
     const playData = data?.data;
-    if (data?.code !== 0 || !playData?.hasResource) return [];
+    if (data?.code !== 0) {
+      throw new Error(
+        data?.message || `MovieBox Web play API code ${data?.code}`,
+      );
+    }
+    if (playData?.hasResource === false) return [];
+    if (!playData) throw new Error("MovieBox Web play data was not found");
 
     const sources = [
       ...(playData.streams || []),
@@ -138,7 +159,6 @@ export const getStream = async function ({
       })),
     );
   } catch (error) {
-    console.error("MovieBox Web stream error", error);
-    return [];
+    throwProviderError("MovieBox Web", "stream", error);
   }
 };

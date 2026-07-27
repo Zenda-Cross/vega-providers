@@ -1,4 +1,5 @@
 import { Stream, ProviderContext, EpisodeLink } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 const headers = {
   Accept:
@@ -77,8 +78,7 @@ export const getStream = async function ({
         });
         return episodeLinks;
       } catch (err) {
-        console.error(err);
-        return [];
+        throw err;
       }
     };
     console.log("modGetStream", type, url);
@@ -106,12 +106,12 @@ export const getStream = async function ({
       const resumeBot = $drive(".btn.btn-light").attr("href") || "";
       const resumeBotRes = await axios.get(resumeBot, { headers });
       const resumeBotToken = resumeBotRes.data.match(
-        /formData\.append\('token', '([a-f0-9]+)'\)/
+        /formData\.append\('token', '([a-f0-9]+)'\)/,
       )[1];
       const resumeBotBody = new FormData();
       resumeBotBody.append("token", resumeBotToken);
       const resumeBotPath = resumeBotRes.data.match(
-        /fetch\('\/download\?id=([a-zA-Z0-9\/+]+)'/
+        /fetch\('\/download\?id=([a-zA-Z0-9\/+]+)'/,
       )[1];
       const resumeBotBaseUrl = resumeBot.split("/download")[0];
       // console.log(
@@ -129,7 +129,7 @@ export const getStream = async function ({
             Referer: resumeBot,
             Cookie: "PHPSESSID=7e9658ce7c805dab5bbcea9046f7f308",
           },
-        }
+        },
       );
       const resumeBotDownloadData = await resumeBotDownload.json();
       console.log("resumeBotDownloadData", resumeBotDownloadData.url);
@@ -266,8 +266,7 @@ export const getStream = async function ({
 
     return servers;
   } catch (err) {
-    console.log("getStream error", err);
-    return [];
+    throwProviderError("MoviesMod", "stream", err);
   }
 };
 
@@ -276,7 +275,7 @@ const isDriveLink = async (ddl: string) => {
     const driveLeach = await fetch(ddl);
     const driveLeachData = await driveLeach.text();
     const pathMatch = driveLeachData.match(
-      /window\.location\.replace\("([^"]+)"\)/
+      /window\.location\.replace\("([^"]+)"\)/,
     );
     const path = pathMatch?.[1];
     const mainUrl = ddl.split("/")[2];

@@ -1,5 +1,6 @@
 import { ProviderContext, Stream } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
+import { throwProviderError } from "../providerErrors";
 
 const headers = {
   Accept:
@@ -183,10 +184,6 @@ export async function getStream({
 
     return await hubcloudExtractor(link, signal, axios, cheerio, commonHeaders);
   } catch (error: any) {
-    console.log("getStream error: ", error);
-    if (error.message.includes("Aborted")) {
-    } else {
-    }
-    return [];
+    throwProviderError("Movies4u", "stream", error);
   }
 }

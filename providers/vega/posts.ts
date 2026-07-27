@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 const headers = {
   Accept:
@@ -92,8 +93,7 @@ export const getSearchPosts = async ({
     }
     return posts;
   } catch (error) {
-    console.error("vegaGetSearchPosts error:", error);
-    return [];
+    throwProviderError("Vega", "search posts", error);
   }
 };
 
@@ -113,6 +113,11 @@ async function posts(
       },
       signal,
     });
+    if (!urlRes.ok) {
+      throw new Error(
+        `HTTP ${urlRes.status} ${urlRes.statusText} | URL ${url}`,
+      );
+    }
     const $ = cheerio.load(await urlRes.text());
     const posts: Post[] = [];
     $(".blog-items,.post-list,#archive-container,.movies-grid")
@@ -155,7 +160,6 @@ async function posts(
     // console.log(posts);
     return posts;
   } catch (error) {
-    console.error("vegaGetPosts error:", error);
-    return [];
+    throwProviderError("Vega", "posts", error);
   }
 }

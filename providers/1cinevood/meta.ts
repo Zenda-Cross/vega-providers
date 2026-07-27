@@ -1,5 +1,6 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { throwProviderError } from "../providerErrors";
 
 async function getWithWAF(
   url: string,
@@ -38,15 +39,6 @@ export const getMeta = async function ({
   const { axios, cheerio, commonHeaders, openWebView } = providerContext;
   const baseUrl = await getBaseUrl("1cinevood");
   const url = new URL(link, `${baseUrl}/`).href;
-
-  const emptyResult: Info = {
-    title: "",
-    synopsis: "",
-    image: "",
-    imdbId: "",
-    type: "movie",
-    linkList: [],
-  };
 
   try {
     const response = await getWithWAF(url, axios, openWebView, commonHeaders);
@@ -168,7 +160,6 @@ export const getMeta = async function ({
     result.webUrl = url;
     return result;
   } catch (err) {
-    console.log("getMeta error:", err);
-    return emptyResult;
+    throwProviderError("1CineVood", "metadata", err);
   }
 };

@@ -1,4 +1,5 @@
 import { Stream, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getStream = async function ({
   link: url,
@@ -52,6 +53,11 @@ export const getStream = async function ({
         method: "GET",
         mode: "cors",
       });
+      if (!res3.ok) {
+        throw new Error(
+          `HTTP ${res3.status} ${res3.statusText} | URL ${location}`,
+        );
+      }
       const data3 = await res3.text();
 
       // let MDCore: any = {};
@@ -71,7 +77,7 @@ export const getStream = async function ({
         const base = Number(
           encodedString.split(",'|MDCore|")[0].split(",")[
             encodedString.split(",'|MDCore|")[0].split(",").length - 1
-          ]
+          ],
         );
         console.log("Base:", base);
 
@@ -91,7 +97,7 @@ export const getStream = async function ({
           c: any,
           k: any,
           e: any,
-          d: any
+          d: any,
         ) {
           e = function (c: any) {
             return c.toString(36);
@@ -149,7 +155,6 @@ export const getStream = async function ({
     }
     return streamLinks;
   } catch (err) {
-    console.error(err);
-    return [];
+    throwProviderError("PrimeWire", "stream", err);
   }
 };

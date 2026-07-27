@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 
 export const getPosts = async function ({
   filter,
@@ -57,8 +58,7 @@ export const getSearchPosts = async function ({
     });
     return catalog;
   } catch (err) {
-    console.error("ringz error ", err);
-    return [];
+    throwProviderError("Ringz", "search posts", err);
   }
 };
 
@@ -97,8 +97,7 @@ async function posts({
     });
     return catalog;
   } catch (err) {
-    console.error("ringz error ", err);
-    return [];
+    throwProviderError("Ringz", "posts", err);
   }
 }
 
@@ -110,58 +109,82 @@ export const headers = {
 
 const BASE_URL = "https://privatereporz.pages.dev";
 export async function getRingzMovies() {
+  const url = `${BASE_URL}/test.json`;
   try {
-    const response = await fetch(`${BASE_URL}/test.json`, {
+    const response = await fetch(url, {
       headers: {
         ...headers,
       },
     });
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status} ${response.statusText} | URL ${url}`,
+      );
+    }
     const data = await response.json();
     return data.AllMovieDataList;
   } catch (error) {
-    console.error(error);
+    throwProviderError("Ringz", "fetch movies", error);
   }
 }
 
 export async function getRingzShows() {
+  const url = `${BASE_URL}/srs.json`;
   try {
-    const response = await fetch(`${BASE_URL}/srs.json`, {
+    const response = await fetch(url, {
       headers: {
         ...headers,
       },
     });
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status} ${response.statusText} | URL ${url}`,
+      );
+    }
     const data = await response.json();
     return data.webSeriesDataList;
   } catch (error) {
-    console.error(error);
+    throwProviderError("Ringz", "fetch shows", error);
   }
 }
 
 export async function getRingzAnime() {
+  const url = `${BASE_URL}/anime.json`;
   try {
-    const response = await fetch(`${BASE_URL}/anime.json`, {
+    const response = await fetch(url, {
       headers: {
         ...headers,
       },
     });
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status} ${response.statusText} | URL ${url}`,
+      );
+    }
     const data = await response.json();
     return data.webSeriesDataList;
   } catch (error) {
-    console.error(error);
+    throwProviderError("Ringz", "fetch anime", error);
   }
 }
 
 export async function getRingzAdult() {
+  const url = `${BASE_URL}/desihub.json`;
   try {
-    const response = await fetch(`${BASE_URL}/desihub.json`, {
+    const response = await fetch(url, {
       headers: {
         ...headers,
       },
     });
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status} ${response.statusText} | URL ${url}`,
+      );
+    }
     const data = await response.json();
     return data.webSeriesDataList;
   } catch (error) {
-    console.error(error);
+    throwProviderError("Ringz", "fetch adult catalog", error);
   }
 }
 
