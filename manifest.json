@@ -2,7 +2,7 @@
   {
     "display_name": "VegaMovies",
     "value": "vega",
-    "version": "2.19",
+    "version": "2.20",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -18,7 +18,7 @@
   {
     "display_name": "MoviesDrive",
     "value": "drive",
-    "version": "2.9",
+    "version": "2.10",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -58,7 +58,7 @@
   {
     "display_name": "KatMoviesHd",
     "value": "katmovies",
-    "version": "1.17",
+    "version": "1.18",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -146,7 +146,7 @@
   {
     "display_name": "Movies4U",
     "value": "movies4u",
-    "version": "1.12",
+    "version": "1.13",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -154,7 +154,7 @@
   {
     "display_name": "KmMovies",
     "value": "kmMovies",
-    "version": "2.8",
+    "version": "2.9",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -202,7 +202,7 @@
   {
     "display_name": "HdHub4u",
     "value": "hdhub4u",
-    "version": "2.6",
+    "version": "2.7",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -322,7 +322,7 @@
   {
     "display_name": "RogMovies",
     "value": "luxMovies",
-    "version": "2.13",
+    "version": "2.14",
     "icon": "",
     "type": "india",
     "disabled": false
@@ -330,7 +330,7 @@
   {
     "display_name": "TopMovies",
     "value": "topmovies",
-    "version": "1.7",
+    "version": "1.8",
     "icon": "",
     "type": "india",
     "disabled": false
@@ -370,7 +370,7 @@
   {
     "display_name": "Torrentio",
     "value": "torrentio",
-    "version": "1.7",
+    "version": "1.8",
     "icon": "",
     "type": "global",
     "disabled": false

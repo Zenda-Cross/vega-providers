@@ -28,7 +28,7 @@ export type CinemetaMeta = {
   videos?: CinemetaVideo[];
 };
 
-type CinemetaCache = Record<string, Promise<CinemetaMeta>>;
+type CinemetaCache = Record<string, CinemetaMeta | Promise<CinemetaMeta>>;
 
 type CinemetaState = {
   __vegaCinemetaCache__?: CinemetaCache;
@@ -38,6 +38,12 @@ declare const providerGlobal: CinemetaState | undefined;
 
 const CINEMETA_BASE_URL = "https://v3-cinemeta.strem.io/meta";
 const CONTEXT_KEY = "cinemetaMeta";
+
+function isCinemetaPromise(
+  value: CinemetaMeta | Promise<CinemetaMeta>,
+): value is Promise<CinemetaMeta> {
+  return typeof (value as Promise<CinemetaMeta>).then === "function";
+}
 
 function getCache(): CinemetaCache {
   const state =
@@ -65,7 +71,15 @@ export function getCinemetaMeta(
 
   const cache = getCache();
   const cached = cache[imdbId];
-  if (cached) return cached;
+  if (cached) {
+    if (isCinemetaPromise(cached)) {
+      return cached;
+    }
+    if (cached.name && cached.imdb_id === imdbId) {
+      return Promise.resolve(cached);
+    }
+    delete cache[imdbId];
+  }
 
   const mediaType = type === "series" ? "series" : "movie";
   const url = `${CINEMETA_BASE_URL}/${mediaType}/${imdbId}.json`;
@@ -76,6 +90,7 @@ export function getCinemetaMeta(
       if (!meta?.name || meta.imdb_id !== imdbId) {
         throw new Error(`Cinemeta returned invalid metadata for ${imdbId}`);
       }
+      cache[imdbId] = meta;
       return meta;
     })
     .catch((error) => {
