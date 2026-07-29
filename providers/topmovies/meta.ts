@@ -1,6 +1,12 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
+import {
+  addCinemetaContext,
+  applyCinemetaMeta,
+  getCinemetaMeta,
+  getCinemetaSeason,
+} from "../getCinemetaMeta";
 
 export const getMeta = async function ({
   link,
@@ -16,7 +22,7 @@ export const getMeta = async function ({
     const res = await axios.get(url);
     const data = res.data;
     const $ = cheerio.load(data);
-    const meta = {
+    const meta: Info = {
       title: $(".imdbwp__title").text(),
       synopsis: $(".imdbwp__teaser").text(),
       image: $(".imdbwp__thumb").find("img").attr("src") || "",
@@ -24,6 +30,8 @@ export const getMeta = async function ({
       type: $(".thecontent").text().toLocaleLowerCase().includes("season")
         ? "series"
         : "movie",
+      linkList: [],
+      webUrl: url,
     };
     const links: Link[] = [];
 
@@ -58,8 +66,29 @@ export const getMeta = async function ({
         });
       }
     });
-    // console.log('mod meta', links);
-    return { ...meta, linkList: links, webUrl: url };
+    const imdbId = meta.imdbId;
+    meta.imdbId = "";
+    meta.linkList = links;
+    if (!imdbId) return meta;
+
+    const cinemeta = await getCinemetaMeta(imdbId, meta.type, providerContext);
+    if (meta.type === "series" && cinemeta.type === "series") {
+      meta.linkList = meta.linkList.map((item) => {
+        if (!item.episodesLink) return item;
+        const season =
+          getCinemetaSeason(item.title) || getCinemetaSeason(meta.title);
+        if (!season) return item;
+        return {
+          ...item,
+          episodesLink: addCinemetaContext(
+            new URL(item.episodesLink, url).href,
+            imdbId,
+            season,
+          ),
+        };
+      });
+    }
+    return applyCinemetaMeta(meta, cinemeta);
   } catch (err) {
     throwProviderError("TopMovies", "metadata", err);
   }

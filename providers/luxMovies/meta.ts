@@ -1,5 +1,11 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import {
+  addCinemetaContext,
+  applyCinemetaMeta,
+  getCinemetaMeta,
+  getCinemetaSeason,
+} from "../getCinemetaMeta";
 
 const headers = {
   Accept:
@@ -71,7 +77,13 @@ export const getMeta = async ({
     let type = "movie";
 
     const heading = infoContainer?.find("h3");
-    if (heading?.next("p")?.text()?.includes("Series Name")) {
+    const pageText = `${title} ${infoContainer.text()}`;
+    if (
+      heading?.next("p")?.text()?.includes("Series Name") ||
+      /\b(?:web\s+series|season\s*\d{1,2}|s\d{1,2}\s*e\d{1,3})\b/i.test(
+        pageText,
+      )
+    ) {
       type = "series";
     }
 
@@ -191,15 +203,34 @@ export const getMeta = async ({
       }
     });
 
-    return {
+    const websiteInfo: Info = {
       title,
       synopsis,
       image,
-      imdbId,
+      imdbId: "",
       type,
       linkList: links,
       webUrl: url,
     };
+    if (!imdbId) return websiteInfo;
+
+    const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
+    if (type === "series" && cinemeta.type === "series") {
+      websiteInfo.linkList = websiteInfo.linkList.map((item) => {
+        if (!item.episodesLink) return item;
+        const season = getCinemetaSeason(item.title);
+        if (!season) return item;
+        return {
+          ...item,
+          episodesLink: addCinemetaContext(
+            new URL(item.episodesLink, url).href,
+            imdbId,
+            season,
+          ),
+        };
+      });
+    }
+    return applyCinemetaMeta(websiteInfo, cinemeta);
   } catch (error) {
     console.log("getInfo error");
     console.error(error);

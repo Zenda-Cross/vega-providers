@@ -1,5 +1,10 @@
 import { EpisodeLink, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
+import {
+  enrichCinemetaEpisodes,
+  getCinemetaMeta,
+  readCinemetaContext,
+} from "../getCinemetaMeta";
 
 async function getWithWAF(
   url: string,
@@ -45,9 +50,30 @@ export const getEpisodes = async function ({
   const { axios, cheerio, openWebView, commonHeaders } = providerContext;
   const episodesLink: EpisodeLink[] = [];
   try {
-    if (url.includes("gdflix")) {
-      const baseUrl = url.split("/pack")?.[0];
-      const res = await getWithWAF(url, axios, openWebView, commonHeaders);
+    const context = readCinemetaContext(url);
+    const requestUrl = context.requestUrl;
+    const finish = async (): Promise<EpisodeLink[]> => {
+      if (!context.imdbId || !context.season) return episodesLink;
+      const cinemeta = await getCinemetaMeta(
+        context.imdbId,
+        "series",
+        providerContext,
+      );
+      return enrichCinemetaEpisodes(
+        episodesLink,
+        cinemeta.videos || [],
+        context.season,
+      );
+    };
+
+    if (requestUrl.includes("gdflix")) {
+      const baseUrl = requestUrl.split("/pack")?.[0];
+      const res = await getWithWAF(
+        requestUrl,
+        axios,
+        openWebView,
+        commonHeaders,
+      );
       const data = res.data;
       const $ = cheerio.load(data);
       const links = $(".list-group-item");
@@ -58,22 +84,28 @@ export const getEpisodes = async function ({
         });
       });
       if (episodesLink.length > 0) {
-        return episodesLink;
+        return finish();
       }
     }
-    if (url.includes("/pack")) {
-      const epIds = await extractKmhdEpisodes(url, providerContext);
+    if (requestUrl.includes("/pack")) {
+      const epIds = await extractKmhdEpisodes(requestUrl, providerContext);
       epIds?.forEach((id: string, index: number) => {
         episodesLink.push({
           title: `Episode ${index + 1}`,
-          link: url.split("/pack")[0] + "/file/" + id,
+          link: requestUrl.split("/pack")[0] + "/file/" + id,
         });
       });
     }
-    const res = await getWithWAF(url, axios, openWebView, commonHeaders, {
-      Cookie:
-        "_ga_GNR438JY8N=GS1.1.1722240350.5.0.1722240350.0.0.0; _ga=GA1.1.372196696.1722150754; unlocked=true",
-    });
+    const res = await getWithWAF(
+      requestUrl,
+      axios,
+      openWebView,
+      commonHeaders,
+      {
+        Cookie:
+          "_ga_GNR438JY8N=GS1.1.1722240350.5.0.1722240350.0.0.0; _ga=GA1.1.372196696.1722150754; unlocked=true",
+      },
+    );
     const episodeData = res.data;
     const $ = cheerio.load(episodeData);
     const links = $(".autohyperlink");
@@ -84,7 +116,7 @@ export const getEpisodes = async function ({
       });
     });
 
-    return episodesLink;
+    return finish();
   } catch (err) {
     throwProviderError("KatMovies", "episodes", err);
   }

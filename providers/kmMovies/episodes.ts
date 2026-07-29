@@ -1,5 +1,10 @@
 import { EpisodeLink, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
+import {
+  enrichCinemetaEpisodes,
+  getCinemetaMeta,
+  readCinemetaContext,
+} from "../getCinemetaMeta";
 
 const headers = {
   "User-Agent":
@@ -19,7 +24,8 @@ export const getEpisodes = async function ({
 }): Promise<EpisodeLink[]> {
   try {
     const { axios, cheerio } = providerContext;
-    const res = await axios.get(url, { headers });
+    const context = readCinemetaContext(url);
+    const res = await axios.get(context.requestUrl, { headers });
     const $ = cheerio.load(res.data);
     const episodes: EpisodeLink[] = [];
 
@@ -35,7 +41,18 @@ export const getEpisodes = async function ({
       }
     });
 
-    return episodes;
+    if (!context.imdbId || !context.season) return episodes;
+
+    const cinemeta = await getCinemetaMeta(
+      context.imdbId,
+      "series",
+      providerContext,
+    );
+    return enrichCinemetaEpisodes(
+      episodes,
+      cinemeta.videos || [],
+      context.season,
+    );
   } catch (err) {
     throwProviderError("KMMovies", "episodes", err);
   }

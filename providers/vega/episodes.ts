@@ -1,10 +1,7 @@
 import { EpisodeLink, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
-import {
-  enrichEpisodes,
-  getCinemetaMeta,
-  readEpisodeContext,
-} from "./cinemeta";
+import { getCinemetaMeta } from "../getCinemetaMeta";
+import { enrichEpisodes, readEpisodeContext } from "./cinemeta";
 
 export const getEpisodes = async function ({
   url,

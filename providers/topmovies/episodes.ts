@@ -1,5 +1,10 @@
 import { EpisodeLink, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
+import {
+  enrichCinemetaEpisodes,
+  getCinemetaMeta,
+  readCinemetaContext,
+} from "../getCinemetaMeta";
 
 export const getEpisodes = async function ({
   url,
@@ -10,17 +15,20 @@ export const getEpisodes = async function ({
 }): Promise<EpisodeLink[]> {
   const { axios, cheerio } = providerContext;
   try {
-    if (url.includes("url=")) {
-      url = atob(url.split("url=")[1]);
+    const context = readCinemetaContext(url);
+    let requestUrl = context.requestUrl;
+    const hasEncodedUrl = requestUrl.includes("url=");
+    if (hasEncodedUrl) {
+      requestUrl = atob(requestUrl.split("url=")[1]);
     }
-    const res = await axios.get(url);
+    const res = await axios.get(requestUrl);
     const html = res.data;
     let $ = cheerio.load(html);
-    if (url.includes("url=")) {
+    if (hasEncodedUrl) {
       const newUrl = $("meta[http-equiv='refresh']")
         .attr("content")
         ?.split("url=")[1];
-      const res2 = await axios.get(newUrl || url);
+      const res2 = await axios.get(newUrl || requestUrl);
       const html2 = res2.data;
       $ = cheerio.load(html2);
     }
@@ -45,7 +53,18 @@ export const getEpisodes = async function ({
         });
       }
     });
-    return episodeLinks;
+    if (!context.imdbId || !context.season) return episodeLinks;
+
+    const cinemeta = await getCinemetaMeta(
+      context.imdbId,
+      "series",
+      providerContext,
+    );
+    return enrichCinemetaEpisodes(
+      episodeLinks,
+      cinemeta.videos || [],
+      context.season,
+    );
   } catch (err) {
     throwProviderError("TopMovies", "episodes", err);
   }

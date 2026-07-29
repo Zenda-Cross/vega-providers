@@ -1,6 +1,12 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
+import {
+  addCinemetaContext,
+  applyCinemetaMeta,
+  getCinemetaMeta,
+  getCinemetaSeason,
+} from "../getCinemetaMeta";
 
 // Headers
 const headers = {
@@ -195,7 +201,34 @@ export const getMeta = async function ({
     });
     result.linkList = Array.from(uniqueLinks.values());
     result.webUrl = url;
-    return result;
+    const imdbId = result.imdbId;
+    result.imdbId = "";
+    if (!imdbId) return result;
+
+    const cinemeta = await getCinemetaMeta(
+      imdbId,
+      result.type,
+      providerContext,
+    );
+    if (result.type === "series" && cinemeta.type === "series") {
+      result.linkList = result.linkList.map((item) => {
+        if (!item.episodesLink) return item;
+        const season =
+          getCinemetaSeason(item.title) ||
+          getCinemetaSeason(infoParagraph) ||
+          getCinemetaSeason(rawTitle);
+        if (!season) return item;
+        return {
+          ...item,
+          episodesLink: addCinemetaContext(
+            new URL(item.episodesLink, url).href,
+            imdbId,
+            season,
+          ),
+        };
+      });
+    }
+    return applyCinemetaMeta(result, cinemeta);
   } catch (err) {
     throwProviderError("Movies4u", "metadata", err);
   }

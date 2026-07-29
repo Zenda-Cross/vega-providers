@@ -1,11 +1,7 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
-import {
-  addEpisodeContext,
-  CinemetaMeta,
-  getCinemetaMeta,
-  getSeasonNumber,
-} from "./cinemeta";
+import { CinemetaMeta, getCinemetaMeta } from "../getCinemetaMeta";
+import { addEpisodeContext, getSeasonNumber } from "./cinemeta";
 
 const headers = {
   Accept:

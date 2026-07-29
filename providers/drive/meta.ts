@@ -1,16 +1,19 @@
-import { Info, Link } from "../types";
+import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
+import {
+  addCinemetaContext,
+  applyCinemetaMeta,
+  getCinemetaMeta,
+  getCinemetaSeason,
+} from "../getCinemetaMeta";
 
 export const getMeta = async function ({
   link,
   providerContext,
 }: {
   link: string;
-  providerContext: {
-    axios: any;
-    cheerio: any;
-  };
+  providerContext: ProviderContext;
 }): Promise<Info> {
   try {
     const { axios, cheerio } = providerContext;
@@ -81,15 +84,34 @@ export const getMeta = async function ({
 
     // console.log('drive meta', title, synopsis, image, imdbId, type, links);
     console.log("drive meta", links, type);
-    return {
+    const websiteInfo: Info = {
       title,
       synopsis,
       image,
-      imdbId,
+      imdbId: "",
       type,
       linkList: links,
       webUrl: url,
     };
+    if (!imdbId) return websiteInfo;
+
+    const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
+    if (type === "series" && cinemeta.type === "series") {
+      websiteInfo.linkList = websiteInfo.linkList.map((item) => {
+        if (!item.episodesLink) return item;
+        const season = getCinemetaSeason(item.title);
+        if (!season) return item;
+        return {
+          ...item,
+          episodesLink: addCinemetaContext(
+            new URL(item.episodesLink, url).href,
+            imdbId,
+            season,
+          ),
+        };
+      });
+    }
+    return applyCinemetaMeta(websiteInfo, cinemeta);
   } catch (err) {
     throwProviderError("Drive", "metadata", err);
   }

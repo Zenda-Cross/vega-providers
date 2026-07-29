@@ -1,5 +1,10 @@
 import { EpisodeLink, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
+import {
+  enrichCinemetaEpisodes,
+  getCinemetaMeta,
+  readCinemetaContext,
+} from "../getCinemetaMeta";
 
 // यहाँ `getEpisodes` फ़ंक्शन मान रहा है कि यह उस पेज को स्क्रैप कर रहा है
 // जो 'Download Links' बटन से प्राप्त हुआ है (जैसे m4ulinks.com/number/42882)
@@ -14,8 +19,10 @@ export const getEpisodes = async function ({
   const { axios, cheerio, commonHeaders: headers } = providerContext;
   console.log("getEpisodeLinks", url);
   try {
+    const context = readCinemetaContext(url);
+    const requestUrl = context.requestUrl;
     // Note: Cookies को URL के आधार पर अपडेट करने की आवश्यकता हो सकती है
-    let res = await axios.get(url, {
+    let res = await axios.get(requestUrl, {
       headers: {
         ...headers,
         // Cloudflare/Bot protection के लिए Hardcoded cookie यहाँ आवश्यक हो सकता है
@@ -38,7 +45,7 @@ export const getEpisodes = async function ({
             String.fromCharCode(parseInt(hex, 16)),
           );
 
-        const baseUrl = url.split("/").slice(0, 3).join("/");
+        const baseUrl = requestUrl.split("/").slice(0, 3).join("/");
         const minJsRes = await axios.get(`${baseUrl}/min.js`, {
           headers,
         });
@@ -62,7 +69,7 @@ export const getEpisodes = async function ({
         const decrypted = solver(c3Hex, a2Hex, b1Hex);
         const newCookie = `Antiddos-systems-DH=${decrypted}`;
 
-        res = await axios.get(url, {
+        res = await axios.get(requestUrl, {
           headers: { ...headers, Cookie: newCookie },
         });
       }
@@ -95,7 +102,11 @@ export const getEpisodes = async function ({
         title.length < 150
       ) {
         // Clean up the title
-        const cleanedTitle = title.replace(/[-:]/g, "").trim();
+        const cleanedTitle = title
+          .replace(/\s+/g, " ")
+          .trim()
+          .replace(/^[-:\s]+|[-:\s]+$/g, "")
+          .replace(/^episodes?\s*:\s*/i, "Episode ");
 
         // Deduplicate
         if (!episodes.some((e) => e.link === link)) {
@@ -124,7 +135,11 @@ export const getEpisodes = async function ({
             `Episode ${i + 1}`;
           if (!episodes.some((e) => e.link === href)) {
             episodes.push({
-              title: title.replace(/[-:]/g, "").trim(),
+              title: title
+                .replace(/\s+/g, " ")
+                .trim()
+                .replace(/^[-:\s]+|[-:\s]+$/g, "")
+                .replace(/^episodes?\s*:\s*/i, "Episode "),
               link: href,
             });
           }
@@ -132,8 +147,18 @@ export const getEpisodes = async function ({
       });
     }
 
-    // console.log(episodes);
-    return episodes;
+    if (!context.imdbId || !context.season) return episodes;
+
+    const cinemeta = await getCinemetaMeta(
+      context.imdbId,
+      "series",
+      providerContext,
+    );
+    return enrichCinemetaEpisodes(
+      episodes,
+      cinemeta.videos || [],
+      context.season,
+    );
   } catch (err) {
     throwProviderError("Movies4u", "episodes", err);
   }

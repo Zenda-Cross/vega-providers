@@ -1,6 +1,13 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
+import {
+  addCinemetaContext,
+  applyCinemetaMeta,
+  enrichCinemetaEpisodes,
+  getCinemetaMeta,
+  getCinemetaSeason,
+} from "../getCinemetaMeta";
 
 async function getWithWAF(
   url: string,
@@ -138,16 +145,47 @@ export const getMeta = async function ({
         });
     }
 
-    // console.log('drive meta', title, synopsis, image, imdbId, type, links);
-    return {
+    const websiteInfo: Info = {
       title,
       synopsis,
       image,
-      imdbId,
+      imdbId: "",
       type,
       linkList: links,
       webUrl: url,
     };
+    if (!imdbId) return websiteInfo;
+
+    const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
+    if (type === "series" && cinemeta.type === "series") {
+      websiteInfo.linkList = websiteInfo.linkList.map((item) => {
+        const season =
+          getCinemetaSeason(item.title) || getCinemetaSeason(title);
+        if (!season) return item;
+        if (item.directLinks) {
+          return {
+            ...item,
+            directLinks: enrichCinemetaEpisodes(
+              item.directLinks,
+              cinemeta.videos || [],
+              season,
+            ),
+          };
+        }
+        if (item.episodesLink) {
+          return {
+            ...item,
+            episodesLink: addCinemetaContext(
+              new URL(item.episodesLink, url).href,
+              imdbId,
+              season,
+            ),
+          };
+        }
+        return item;
+      });
+    }
+    return applyCinemetaMeta(websiteInfo, cinemeta);
   } catch (err) {
     throwProviderError("KatMovies", "metadata", err);
   }

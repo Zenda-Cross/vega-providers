@@ -1,5 +1,10 @@
 import { EpisodeLink, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
+import {
+  enrichCinemetaEpisodes,
+  getCinemetaMeta,
+  readCinemetaContext,
+} from "../getCinemetaMeta";
 
 export const getEpisodes = async function ({
   url,
@@ -10,7 +15,8 @@ export const getEpisodes = async function ({
 }): Promise<EpisodeLink[]> {
   try {
     const { axios, cheerio } = providerContext;
-    const res = await axios.get(url);
+    const context = readCinemetaContext(url);
+    const res = await axios.get(context.requestUrl);
     const html = res.data;
     let $ = cheerio.load(html);
 
@@ -119,9 +125,22 @@ export const getEpisodes = async function ({
     });
 
     console.log("episodeLinks:", preferredEpisodeLinks);
-    return preferredEpisodeLinks.length > 0
-      ? preferredEpisodeLinks
-      : [{ title: "Play", link: url }];
+    const episodes =
+      preferredEpisodeLinks.length > 0
+        ? preferredEpisodeLinks
+        : [{ title: "Play", link: context.requestUrl }];
+    if (!context.imdbId || !context.season) return episodes;
+
+    const cinemeta = await getCinemetaMeta(
+      context.imdbId,
+      "series",
+      providerContext,
+    );
+    return enrichCinemetaEpisodes(
+      episodes,
+      cinemeta.videos || [],
+      context.season,
+    );
   } catch (err) {
     throwProviderError("Drive", "episodes", err);
   }
