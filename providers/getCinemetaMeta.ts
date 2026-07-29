@@ -28,8 +28,10 @@ export type CinemetaMeta = {
   videos?: CinemetaVideo[];
 };
 
+type CinemetaCache = Record<string, Promise<CinemetaMeta>>;
+
 type CinemetaState = {
-  __vegaCinemetaCache__?: Map<string, Promise<CinemetaMeta>>;
+  __vegaCinemetaCache__?: CinemetaCache;
 };
 
 declare const providerGlobal: CinemetaState | undefined;
@@ -37,13 +39,18 @@ declare const providerGlobal: CinemetaState | undefined;
 const CINEMETA_BASE_URL = "https://v3-cinemeta.strem.io/meta";
 const CONTEXT_KEY = "cinemetaMeta";
 
-function getCache(): Map<string, Promise<CinemetaMeta>> {
+function getCache(): CinemetaCache {
   const state =
     typeof providerGlobal !== "undefined" && providerGlobal
       ? providerGlobal
       : (globalThis as typeof globalThis & CinemetaState);
 
-  state.__vegaCinemetaCache__ ??= new Map();
+  if (
+    !state.__vegaCinemetaCache__ ||
+    typeof state.__vegaCinemetaCache__ !== "object"
+  ) {
+    state.__vegaCinemetaCache__ = Object.create(null) as CinemetaCache;
+  }
   return state.__vegaCinemetaCache__;
 }
 
@@ -57,7 +64,7 @@ export function getCinemetaMeta(
   }
 
   const cache = getCache();
-  const cached = cache.get(imdbId);
+  const cached = cache[imdbId];
   if (cached) return cached;
 
   const mediaType = type === "series" ? "series" : "movie";
@@ -72,11 +79,11 @@ export function getCinemetaMeta(
       return meta;
     })
     .catch((error) => {
-      cache.delete(imdbId);
+      delete cache[imdbId];
       throw error;
     });
 
-  cache.set(imdbId, request);
+  cache[imdbId] = request;
   return request;
 }
 
