@@ -93,7 +93,7 @@ export function readEpisodeContext(url: string): {
 
 function getEpisodeNumber(title: string, season: number): number | undefined {
   if (
-    /\b(?:e\d+|episode\s*\d+)\s*(?:[-–,&/]|\band\b)\s*(?:e|episode\s*)?\d+/i.test(
+    /\b(?:e\d+|episodes?\s*:?\s*\d+)\s*(?:[-–,&/]|\band\b)\s*(?:e|episodes?\s*:?\s*)?\d+/i.test(
       title,
     )
   ) {
@@ -108,7 +108,7 @@ function getEpisodeNumber(title: string, season: number): number | undefined {
 
   const matches = [
     ...title.matchAll(/\bs\d{1,2}\s*e(\d{1,3})\b/gi),
-    ...title.matchAll(/\bepisode\s*(\d{1,3})\b/gi),
+    ...title.matchAll(/\bepisodes?\s*:?\s*(\d{1,3})\b/gi),
     ...title.matchAll(/\be(\d{1,3})\b/gi),
   ].map((match) => Number(match[1]));
   const episodes = [...new Set(matches.filter((episode) => episode > 0))];
@@ -134,7 +134,9 @@ export function enrichEpisodes(
 
   const matched = episodes.map((episode) => {
     const episodeNumber = getEpisodeNumber(episode.title, season);
-    const video = episodeNumber ? videosByEpisode.get(episodeNumber) : undefined;
+    const video = episodeNumber
+      ? videosByEpisode.get(episodeNumber)
+      : undefined;
     const description = video?.description || video?.overview;
     return { episode, episodeNumber, video, description };
   });
@@ -142,9 +144,8 @@ export function enrichEpisodes(
   const allMatched =
     episodes.length > 0 &&
     !hasDuplicateVideo &&
-    matched.every(
-      ({ video, description }) =>
-        Boolean(video && description && video.thumbnail),
+    matched.every(({ video, description }) =>
+      Boolean(video && description && video.thumbnail),
     ) &&
     new Set(numbers).size === numbers.length;
   if (!allMatched) return episodes;

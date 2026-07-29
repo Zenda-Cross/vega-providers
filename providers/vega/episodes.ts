@@ -32,7 +32,12 @@ export const getEpisodes = async function ({
     const episodes: EpisodeLink[] = [];
     container.find("h4").each((index, element) => {
       const el = $(element);
-      const title = el.text().replace(/\s+/g, " ").trim();
+      const title = el
+        .text()
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/^[-:\s]+|[-:\s]+$/g, "")
+        .replace(/^episodes?\s*:\s*/i, "Episode ");
       const link = el
         .next("p")
         .find(
