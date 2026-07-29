@@ -1,5 +1,10 @@
 import { EpisodeLink, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
+import {
+  enrichEpisodes,
+  getCinemetaMeta,
+  readEpisodeContext,
+} from "./cinemeta";
 
 export const getEpisodes = async function ({
   url,
@@ -11,7 +16,8 @@ export const getEpisodes = async function ({
   const { axios, cheerio, commonHeaders: headers } = providerContext;
   console.log("getEpisodeLinks", url);
   try {
-    const res = await axios.get(url, {
+    const context = readEpisodeContext(url);
+    const res = await axios.get(context.requestUrl, {
       headers: {
         ...headers,
         cookie:
@@ -26,7 +32,7 @@ export const getEpisodes = async function ({
     const episodes: EpisodeLink[] = [];
     container.find("h4").each((index, element) => {
       const el = $(element);
-      const title = el.text().replace(/-/g, "").replace(/:/g, "");
+      const title = el.text().replace(/\s+/g, " ").trim();
       const link = el
         .next("p")
         .find(
@@ -38,8 +44,14 @@ export const getEpisodes = async function ({
         episodes.push({ title, link });
       }
     });
-    // console.log(episodes);
-    return episodes;
+    if (!context.imdbId || !context.season) return episodes;
+
+    const cinemeta = await getCinemetaMeta(
+      context.imdbId,
+      "series",
+      providerContext,
+    );
+    return enrichEpisodes(episodes, cinemeta.videos || [], context.season);
   } catch (err) {
     throwProviderError("Vega", "episodes", err);
   }

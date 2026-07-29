@@ -2,7 +2,7 @@
   {
     "display_name": "VegaMovies",
     "value": "vega",
-    "version": "2.15",
+    "version": "2.16",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -293,7 +293,7 @@
     "version": "1.10",
     "icon": "",
     "type": "english",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "TokyoInsider",

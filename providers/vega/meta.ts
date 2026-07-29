@@ -1,5 +1,11 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import {
+  addEpisodeContext,
+  CinemetaMeta,
+  getCinemetaMeta,
+  getSeasonNumber,
+} from "./cinemeta";
 
 const headers = {
   Accept:
@@ -21,6 +27,21 @@ const headers = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
 };
+
+function applyCinemeta(info: Info, meta: CinemetaMeta): Info {
+  return {
+    ...info,
+    title: meta.name || info.title,
+    image: meta.background || meta.poster || info.image,
+    logo: meta.logo || undefined,
+    synopsis: meta.description || info.synopsis,
+    imdbId: "",
+    type: meta.type || info.type,
+    tags: meta.genres || meta.genre || undefined,
+    cast: meta.cast || undefined,
+    rating: meta.imdbRating || undefined,
+  };
+}
 
 export const getMeta = async ({
   link,
@@ -71,7 +92,13 @@ export const getMeta = async ({
     let type = "movie";
 
     const heading = infoContainer?.find("h3");
-    if (heading?.next("p")?.text()?.includes("Series Name")) {
+    const pageText = `${title} ${infoContainer.text()}`;
+    if (
+      heading?.next("p")?.text()?.includes("Series Name") ||
+      /\b(?:web\s+series|season\s*\d{1,2}|s\d{1,2}\s*e\d{1,3})\b/i.test(
+        pageText,
+      )
+    ) {
       type = "series";
     }
 
@@ -190,16 +217,34 @@ export const getMeta = async ({
         });
       }
     });
-    // console.log(links);
-    return {
+    const websiteInfo: Info = {
       title,
       synopsis,
       image,
-      imdbId,
+      imdbId: "",
       type,
       linkList: links,
       webUrl: url,
     };
+    if (!imdbId) return websiteInfo;
+
+    const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
+    if (type === "series" && cinemeta.type === "series") {
+      websiteInfo.linkList = websiteInfo.linkList.map((item) => {
+        if (!item.episodesLink) return item;
+        const season = getSeasonNumber(item.title);
+        if (!season) return item;
+        return {
+          ...item,
+          episodesLink: addEpisodeContext(
+            new URL(item.episodesLink, url).href,
+            imdbId,
+            season,
+          ),
+        };
+      });
+    }
+    return applyCinemeta(websiteInfo, cinemeta);
   } catch (error) {
     console.log("getInfo error");
     console.error(error);

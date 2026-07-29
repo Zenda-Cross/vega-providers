@@ -208,7 +208,7 @@ async function getWithWAF(
         force: true,
       });
       return await axios.get(url, {
-        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
+        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookies },
       });
     }
     throw error;
