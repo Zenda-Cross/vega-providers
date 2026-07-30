@@ -31,6 +31,7 @@ async function getWithWAF(
         headers: {
           ...headers,
           Referer: baseUrl,
+          "User-Agent": wafResult.userAgent || headers["User-Agent"],
           Cookie: wafResult.cookies || wafResult.cookie,
         },
       });
