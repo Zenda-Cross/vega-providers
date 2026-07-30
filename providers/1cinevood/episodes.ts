@@ -1,4 +1,9 @@
 import { EpisodeLink, ProviderContext } from "../types";
+import {
+  enrichCinemetaEpisodes,
+  getCinemetaMeta,
+  readCinemetaContext,
+} from "../getCinemetaMeta";
 
 async function getWithWAF(
   url: string,
@@ -20,7 +25,11 @@ async function getWithWAF(
         force: true,
       });
       return await axios.get(url, {
-        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
+        headers: {
+          ...headers,
+          Referer: baseUrl,
+          Cookie: wafResult.cookies || wafResult.cookie,
+        },
       });
     }
     throw error;
@@ -49,13 +58,35 @@ export const getEpisodes = async function ({
   url: string;
   providerContext: ProviderContext;
 }): Promise<EpisodeLink[]> {
-  const { axios, cheerio, commonHeaders: headers, openWebView } = providerContext;
+  const {
+    axios,
+    cheerio,
+    commonHeaders: headers,
+    openWebView,
+  } = providerContext;
   console.log("getEpisodeLinks", url);
   try {
-    const baseUrl = url.split("/").slice(0, 3).join("/");
-    const id = url.split("/").filter(Boolean).pop() || "";
+    const context = readCinemetaContext(url);
+    const requestUrl = context.requestUrl;
+    const parsedUrl = new URL(requestUrl);
+    const baseUrl = parsedUrl.origin;
+    const id = parsedUrl.pathname.split("/").filter(Boolean).pop() || "";
     const apiUrl = `${baseUrl}/api/packs/${id}`;
     console.log("apiUrl:", apiUrl);
+
+    const enrich = async (episodes: EpisodeLink[]): Promise<EpisodeLink[]> => {
+      if (!context.imdbId || !context.season) return episodes;
+      const cinemeta = await getCinemetaMeta(
+        context.imdbId,
+        "series",
+        providerContext,
+      );
+      return enrichCinemetaEpisodes(
+        episodes,
+        cinemeta.videos || [],
+        context.season,
+      );
+    };
 
     let res;
     try {
@@ -66,17 +97,22 @@ export const getEpisodes = async function ({
         const alternativeUrl = `${baseUrl}/api/s/${id}/`;
         console.log("Trying alternative URL:", alternativeUrl);
 
-        const altRes = await getWithWAF(alternativeUrl, axios, openWebView, headers);
+        const altRes = await getWithWAF(
+          alternativeUrl,
+          axios,
+          openWebView,
+          headers,
+        );
 
         // Check if hubcloud is available
         if (altRes.data?.hasHubcloud) {
           const hubcloudUrl = `${baseUrl}/api/s/${id}/hubcloud`;
-          return [
+          return enrich([
             {
               title: formatEpisodeTitle(altRes.data.fileName || "Movie"),
               link: hubcloudUrl,
             },
-          ];
+          ]);
         }
 
         return [];
@@ -97,7 +133,7 @@ export const getEpisodes = async function ({
       }
     }
 
-    return episodes;
+    return enrich(episodes);
   } catch (err) {
     throw err;
   }

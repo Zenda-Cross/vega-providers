@@ -1,6 +1,12 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
+import {
+  addCinemetaContext,
+  applyCinemetaMeta,
+  getCinemetaMeta,
+  getCinemetaSeason,
+} from "../getCinemetaMeta";
 
 async function getWithWAF(
   url: string,
@@ -22,7 +28,11 @@ async function getWithWAF(
         force: true,
       });
       return await axios.get(url, {
-        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookie },
+        headers: {
+          ...headers,
+          Referer: baseUrl,
+          Cookie: wafResult.cookies || wafResult.cookie,
+        },
       });
     }
     throw error;
@@ -79,8 +89,8 @@ export const getMeta = async function ({
     const firstDownloadHeadingText = infoContainer.find("h6").first().text();
     // Improved check: look for Season/Episode patterns (S01, E01, Season 1)
     const isSeries =
-      firstDownloadHeadingText.includes("S01") ||
-      firstDownloadHeadingText.includes("E01") ||
+      /\bS\d{1,2}(?:E\d{1,3})?\b/i.test(firstDownloadHeadingText) ||
+      /\bE\d{1,3}\b/i.test(firstDownloadHeadingText) ||
       firstDownloadHeadingText.toLowerCase().includes("season");
     result.type = isSeries ? "series" : "movie";
 
@@ -107,9 +117,13 @@ export const getMeta = async function ({
     // --- LinkList extraction (Updated for flexible title and link structure) ---
     const links: Link[] = [];
 
-    // Select all <h6> tags that contain quality/file size info.
-    const qualityBlocks = infoContainer.find("h6").filter((_, el) => {
-      return !$(el).text().includes("Watch Online");
+    // Download sections currently use h5, while older pages used h6.
+    const qualityBlocks = infoContainer.find("h5,h6").filter((_, el) => {
+      const text = $(el).text();
+      return (
+        !text.includes("Watch Online") &&
+        /\b(?:\d{3,4}p|2160p|4k|S\d{1,2}|E\d{1,3})\b/i.test(text)
+      );
     });
 
     qualityBlocks.each((index, element) => {
@@ -123,8 +137,8 @@ export const getMeta = async function ({
       const fileSizeMatch =
         fullTitle.match(/\[([^\]]+)\](?=[^\[]*$)/)?.[1] || "";
 
-      // Get all immediate sibling elements until the next <h6> or <hr>.
-      const nextSiblings = el.nextUntil("h6, hr");
+      // Get all immediate sibling elements until the next download section.
+      const nextSiblings = el.nextUntil("h5, h6, hr");
 
       // Find all <a> elements that are descendants of the siblings OR are the siblings themselves
       nextSiblings
@@ -133,6 +147,14 @@ export const getMeta = async function ({
         .each((i, btn) => {
           const btnEl = $(btn);
           const link = btnEl.attr("href");
+          if (
+            !link ||
+            link === "#" ||
+            link.startsWith("javascript:") ||
+            !/(?:oxxfile|hubcloud)/i.test(link)
+          ) {
+            return;
+          }
 
           // Extract the season (S01) and Episode (E01) info
           const seMatch = fullTitle.match(/(S\d{2}E\d{2}|S\d{2}|E\d{2})/);
@@ -156,9 +178,46 @@ export const getMeta = async function ({
         });
     });
 
+    if (result.type === "movie" && links.length === 0) {
+      infoContainer
+        .find('a[href*="oxxfile"],a[href*="hubcloud"]')
+        .each((_, anchor) => {
+          const link = $(anchor).attr("href");
+          if (!link) return;
+          links.push({
+            title: $(anchor).text().trim() || "Movie",
+            directLinks: [{ link, title: "Movie", type: "movie" }],
+          });
+        });
+    }
+
     result.linkList = links;
     result.webUrl = url;
-    return result;
+    const imdbId = result.imdbId;
+    result.imdbId = "";
+    if (!imdbId) return result;
+
+    const cinemeta = await getCinemetaMeta(
+      imdbId,
+      result.type,
+      providerContext,
+    );
+    if (result.type === "series" && cinemeta.type === "series") {
+      result.linkList = result.linkList.map((item) => {
+        if (!item.episodesLink) return item;
+        const season = getCinemetaSeason(item.title);
+        if (!season) return item;
+        return {
+          ...item,
+          episodesLink: addCinemetaContext(
+            new URL(item.episodesLink, url).href,
+            imdbId,
+            season,
+          ),
+        };
+      });
+    }
+    return applyCinemetaMeta(result, cinemeta);
   } catch (err) {
     throwProviderError("1CineVood", "metadata", err);
   }
