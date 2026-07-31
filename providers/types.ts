@@ -39,6 +39,7 @@ export interface Info {
   logo?: string;
   synopsis: string;
   imdbId: string;
+  tmdbId?: string;
   type: string;
   tags?: string[];
   cast?: string[];
