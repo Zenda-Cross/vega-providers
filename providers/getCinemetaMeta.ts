@@ -110,6 +110,7 @@ export function applyCinemetaMeta(info: Info, meta: CinemetaMeta): Info {
     logo: meta.logo || undefined,
     synopsis: meta.description || info.synopsis,
     imdbId: "",
+    tmdbId: meta.moviedb_id?.toString() || undefined,
     type: meta.type || info.type,
     tags: meta.genres || meta.genre || undefined,
     cast: meta.cast || undefined,
