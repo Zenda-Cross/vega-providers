@@ -9,7 +9,7 @@ const hubcloudDecode = function (value: string) {
 
 const extractUrlFromScript = (html: string): string => {
   const doubleAtobMatch = html.match(
-    /var\s+url\s*=\s*atob\(atob\(['"]([^'"]+)['"]\)\)/,
+    /(?:var|let|const)\s+\w+\s*=\s*atob\(atob\(['"]([^'"]+)['"]\)\)/,
   );
   if (doubleAtobMatch?.[1]) {
     return atob(atob(doubleAtobMatch[1]));
@@ -107,7 +107,7 @@ export async function hubcloudExtractor(
 
             const token = link.split("/").pop()?.split("?")[0];
             const baseUrl = link.split("/").slice(0, -2).join("/");
-            link = `${baseUrl}/api/file/${token}`;
+            link = `${baseUrl}/api/file/${token}?download`;
           }
           streamLinks.push({ server: "Pixeldrain", link: link, type: "mkv" });
           break;

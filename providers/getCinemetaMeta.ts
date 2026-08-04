@@ -225,15 +225,13 @@ export function enrichCinemetaEpisodes<T extends EpisodeLink>(
   const allMatched =
     episodes.length > 0 &&
     !hasDuplicateVideo &&
-    matched.every(({ video, description }) =>
-      Boolean(video && description && video.thumbnail),
-    ) &&
+    matched.every(({ video }) => Boolean(video)) &&
     new Set(numbers).size === numbers.length;
   if (!allMatched) return episodes;
 
   return matched.map(({ episode, video, description }) => ({
     ...episode,
-    description,
-    image: video?.thumbnail,
+    description: description || episode.description,
+    image: video?.thumbnail || episode.image,
   }));
 }

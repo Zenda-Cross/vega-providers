@@ -1,5 +1,6 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
+import { applyCinemetaMeta, getCinemetaMeta } from "../getCinemetaMeta";
 import { throwProviderError } from "../providerErrors";
 
 // Headers
@@ -182,7 +183,16 @@ export const getMeta = async function ({
 
     result.linkList = links;
     result.webUrl = url;
-    return result;
+    const imdbId = result.imdbId;
+    result.imdbId = "";
+    if (!imdbId) return result;
+
+    const cinemeta = await getCinemetaMeta(
+      imdbId,
+      result.type,
+      providerContext,
+    );
+    return applyCinemetaMeta(result, cinemeta);
   } catch (err) {
     throwProviderError("ZeeFliz", "metadata", err);
   }

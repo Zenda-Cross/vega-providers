@@ -8,6 +8,8 @@ type DownloadPage = {
 
 type StreamQuality = NonNullable<Stream["quality"]>;
 
+const dotflixProxyAction = "4020c531ae02b8be9927fed961160ff20b3f81aafa";
+
 function getStreamQuality(label: string): StreamQuality | undefined {
   const resolution = Number(label.match(/\b(\d{3,4})p\b/i)?.[1]);
   if (!resolution) return undefined;
@@ -36,22 +38,70 @@ function addQuality(streams: Stream[], quality?: StreamQuality): Stream[] {
   }));
 }
 
-function getHubcloudUrl(data: string): string {
-  const driveUrl = data.match(
-    /https?:\/\/hubcloud\.[^\s"']+\/drive\/[a-z\d]+/i,
-  )?.[0];
-  if (driveUrl) return driveUrl;
+function getDotflixUrl(data: string): string {
+  return (
+    data.match(/https?:\/\/dotflix\.[^\s"'<>]+\/share\/[a-z\d]+/i)?.[0] || ""
+  );
+}
 
-  const driveId = data.match(/[?&]host=hubcloud&(?:amp;)?id=([a-z\d]+)/i)?.[1];
-  return driveId ? `https://hubcloud.cx/drive/${driveId}` : "";
+function getDotflixSharingCode(value: string): string {
+  try {
+    const url = new URL(value);
+    if (!/^(?:www\.)?dotflix\./i.test(url.hostname)) return "";
+    return url.pathname.match(/^\/share\/([a-z\d]+)/i)?.[1] || "";
+  } catch {
+    return "";
+  }
 }
 
 function isHubcloudUrl(value: string): boolean {
   try {
-    return /hubcloud\./i.test(new URL(value).hostname);
+    return /(?:^|\.)hubcloud\./i.test(new URL(value).hostname);
   } catch {
     return false;
   }
+}
+
+function getDotflixRouterState(sharingCode: string): string {
+  return encodeURIComponent(
+    JSON.stringify([
+      "",
+      {
+        children: [
+          "share",
+          {
+            children: [
+              ["code", sharingCode, "d"],
+              { children: ["__PAGE__", {}, null, null] },
+              null,
+              null,
+            ],
+          },
+          null,
+          null,
+        ],
+      },
+      null,
+      null,
+      true,
+    ]),
+  );
+}
+
+function getServerActionDownloadUrl(data: unknown): string {
+  if (typeof data !== "string") return "";
+  for (const line of data.split(/\r?\n/)) {
+    const value = line.slice(line.indexOf(":") + 1);
+    try {
+      const payload = JSON.parse(value);
+      if (payload?.success && typeof payload.downloadUrl === "string") {
+        return payload.downloadUrl;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return "";
 }
 
 async function followDownloadLink(
@@ -80,28 +130,88 @@ async function followDownloadLink(
     const responseUrl = response.url || currentUrl;
     return {
       data,
-      url: isHubcloudUrl(responseUrl)
+      url: getDotflixSharingCode(responseUrl)
         ? responseUrl
-        : getHubcloudUrl(data) || responseUrl,
+        : getDotflixUrl(data) || responseUrl,
     };
   }
 
   throw new Error("EonMovies download redirect chain exceeded the limit");
 }
 
-async function extractHubcloudStreams(
+async function extractDotflixStream(
   link: string,
   signal: AbortSignal,
   headers: Record<string, string>,
   providerContext: ProviderContext,
 ): Promise<Stream[]> {
-  return hubcloudExtractor(
-    link,
-    signal,
-    providerContext.axios,
-    providerContext.cheerio,
-    { ...headers },
-  );
+  const sharingCode = getDotflixSharingCode(link);
+  if (!sharingCode) return [];
+
+  const origin = new URL(link).origin;
+  const requestHeaders = { ...headers, Origin: origin, Referer: link };
+  const [directResult, proxyResult] = await Promise.allSettled([
+    providerContext.axios.post(
+      `${origin}/api/extract-download`,
+      { sharingCode },
+      {
+        signal,
+        headers: {
+          ...requestHeaders,
+          "Content-Type": "application/json",
+        },
+      },
+    ),
+    providerContext.axios.post(link, JSON.stringify([sharingCode]), {
+      signal,
+      headers: {
+        ...requestHeaders,
+        Accept: "text/x-component",
+        "Content-Type": "text/plain;charset=UTF-8",
+        "Next-Action": dotflixProxyAction,
+        "Next-Router-State-Tree": getDotflixRouterState(sharingCode),
+      },
+    }),
+  ]);
+
+  const streams: Stream[] = [];
+  if (directResult.status === "fulfilled") {
+    const data = directResult.value.data;
+    if (data?.success && typeof data.downloadUrl === "string") {
+      streams.push({ server: "Dotflix", link: data.downloadUrl, type: "mkv" });
+    }
+  }
+  if (proxyResult.status === "fulfilled") {
+    const proxyUrl = getServerActionDownloadUrl(proxyResult.value.data);
+    if (proxyUrl && !streams.some((stream) => stream.link === proxyUrl)) {
+      streams.push({ server: "Dotflix Proxy", link: proxyUrl, type: "mkv" });
+    }
+  }
+  if (!streams.length) {
+    throw new Error("Dotflix did not return a direct or proxy download URL");
+  }
+  return streams;
+}
+
+async function extractDownloadStreams(
+  link: string,
+  signal: AbortSignal,
+  headers: Record<string, string>,
+  providerContext: ProviderContext,
+): Promise<Stream[]> {
+  if (getDotflixSharingCode(link)) {
+    return extractDotflixStream(link, signal, headers, providerContext);
+  }
+  if (isHubcloudUrl(link)) {
+    return hubcloudExtractor(
+      link,
+      signal,
+      providerContext.axios,
+      providerContext.cheerio,
+      { ...headers },
+    );
+  }
+  return [];
 }
 
 export async function getStream({
@@ -116,8 +226,8 @@ export async function getStream({
 }): Promise<Stream[]> {
   const headers = { ...providerContext.commonHeaders };
   const page = await followDownloadLink(link, signal, headers);
-  if (isHubcloudUrl(page.url)) {
-    const streams = await extractHubcloudStreams(
+  if (getDotflixSharingCode(page.url) || isHubcloudUrl(page.url)) {
+    const streams = await extractDownloadStreams(
       page.url,
       signal,
       headers,
@@ -141,7 +251,9 @@ export async function getStream({
     })
     .get();
   if (!downloadLinks.length) {
-    throw new Error(`EonMovies did not redirect to HubCloud: ${page.url}`);
+    throw new Error(
+      `EonMovies did not redirect to Dotflix or HubCloud: ${page.url}`,
+    );
   }
 
   const streams: Stream[] = [];
@@ -152,9 +264,14 @@ export async function getStream({
       signal,
       headers,
     );
-    if (!isHubcloudUrl(downloadPage.url)) continue;
+    if (
+      !getDotflixSharingCode(downloadPage.url) &&
+      !isHubcloudUrl(downloadPage.url)
+    ) {
+      continue;
+    }
 
-    const extracted = await extractHubcloudStreams(
+    const extracted = await extractDownloadStreams(
       downloadPage.url,
       signal,
       headers,
