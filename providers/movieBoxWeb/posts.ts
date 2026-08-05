@@ -3,9 +3,30 @@ import { Post, ProviderContext } from "../types";
 import { absoluteUrl, parseNuxtData, providerValue } from "./utils";
 
 type SubjectPreview = {
+  detailPath?: string;
   title?: string;
   coverUrl?: string;
   hasResource?: boolean;
+};
+
+type SubjectListResponse = {
+  code?: number;
+  message?: string;
+  data?: {
+    subjectList?: Array<{
+      detailPath?: string;
+      title?: string;
+      cover?: { url?: string };
+      hasResource?: boolean;
+    }>;
+  };
+};
+
+const pageSize = 18;
+const requestHeaders = {
+  Accept: "application/json",
+  "x-client-info": JSON.stringify({ timezone: "Asia/Colombo" }),
+  "x-source": "",
 };
 
 function collectSubjectPreviews(value: unknown): Map<string, SubjectPreview> {
@@ -92,6 +113,57 @@ async function fetchPosts(
   return posts;
 }
 
+function mapSubjects(subjects: SubjectPreview[]): Post[] {
+  return subjects
+    .filter(
+      (subject) =>
+        Boolean(subject.detailPath && subject.title) &&
+        subject.hasResource !== false,
+    )
+    .map((subject) => ({
+      title: subject.title || "",
+      link: `/moviesDetail/${subject.detailPath}`,
+      image: subject.coverUrl || "",
+    }));
+}
+
+async function fetchCatalogPage(
+  filter: string,
+  page: number,
+  signal: AbortSignal,
+): Promise<Post[]> {
+  const baseUrl = await getBaseUrl(providerValue);
+  const params = new URLSearchParams({
+    page: String(Math.max(1, page)),
+    perPage: String(pageSize),
+  });
+  if (filter === "/newWeb/movie") {
+    params.set("tabId", "ONEROOM_MOVIE");
+  }
+
+  const response = await fetch(
+    absoluteUrl(
+      baseUrl,
+      `/wefeed-h5api-bff/subject/trending?${params.toString()}`,
+    ),
+    { headers: requestHeaders, signal },
+  );
+  if (!response.ok) throw new Error(`MovieBox Web returned ${response.status}`);
+
+  const payload = (await response.json()) as SubjectListResponse;
+  if (payload.code !== 0) {
+    throw new Error(payload.message || "MovieBox Web catalog request failed");
+  }
+  return mapSubjects(
+    (payload.data?.subjectList || []).map((subject) => ({
+      detailPath: subject.detailPath,
+      title: subject.title,
+      coverUrl: subject.cover?.url,
+      hasResource: subject.hasResource,
+    })),
+  );
+}
+
 export const getPosts = async function ({
   filter,
   page,
@@ -104,8 +176,12 @@ export const getPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
+  const path = filter || "/";
+  if (["/", "/newWeb/movie", "/newWeb/tv-series"].includes(path)) {
+    return fetchCatalogPage(path, page, signal);
+  }
   if (page > 1) return [];
-  return fetchPosts(filter || "/", signal, providerContext);
+  return fetchPosts(path, signal, providerContext);
 };
 
 export const getSearchPosts = async function ({
