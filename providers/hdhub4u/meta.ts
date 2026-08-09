@@ -14,6 +14,38 @@ const hdbHeaders = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
 };
+
+function getEpisodeLinks($: any): Link["directLinks"] {
+  const episodes: Link["directLinks"] = [];
+
+  $("strong").each((_, element) => {
+    const episodeTitle = $(element).text().trim();
+    if (!/^episode\s*\d+$/i.test(episodeTitle)) return;
+
+    const heading = $(element).closest("h1,h2,h3,h4,h5,h6");
+    let episodeLink = "";
+    for (const sibling of heading.nextAll().toArray()) {
+      const siblingHeading = $(sibling);
+      if (/^episode\s*\d+$/i.test(siblingHeading.text().trim())) break;
+
+      const drive = siblingHeading
+        .find('a[href*="hubdrive"],a:contains("Drive")')
+        .first()
+        .attr("href");
+      if (drive) {
+        episodeLink = drive;
+        break;
+      }
+    }
+
+    if (episodeLink) {
+      episodes.push({ title: episodeTitle.toUpperCase(), link: episodeLink });
+    }
+  });
+
+  return episodes;
+}
+
 export const getMeta = async function ({
   link,
   providerContext,
@@ -51,31 +83,9 @@ export const getMeta = async function ({
 
     // Links
     const links: Link[] = [];
-    const directLink: Link["directLinks"] = [];
+    const directLink = getEpisodeLinks($);
 
-    // direct link type
-    $('strong:contains("EPiSODE")').map((i, element) => {
-      const epTitle = $(element).parent().parent().text();
-      const episodesLink =
-        $(element)
-          .parent()
-          .parent()
-          .parent()
-          .next()
-          .next()
-          .find("a")
-          .attr("href") ||
-        $(element).parent().parent().parent().next().find("a").attr("href");
-
-      if (episodesLink && episodesLink) {
-        directLink.push({
-          title: epTitle,
-          link: episodesLink,
-        });
-      }
-    });
-
-    if (directLink.length === 0) {
+    if (directLink.length === 0 && type === "movie") {
       container.find('a:contains("EPiSODE")').map((i, element) => {
         const epTitle = $(element).text();
         const episodesLink = $(element).attr("href");

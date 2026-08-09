@@ -89,7 +89,7 @@ async function posts({
         catalog.push({
           title: title,
           link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
-          image: image,
+          image: baseUrl + image,
         });
       }
     });
