@@ -88,8 +88,6 @@ import { getBaseUrl } from "../getBaseUrl";
 const baseUrl = await getBaseUrl("providerKey");
 ```
 
-Provider base URLs are stored in https://github.com/Zenda-Cross/vega-providers/blob/main/urls.json.
-
 This ensures all providers use the same tools and patterns, making code easier to maintain and extend.
 
 ## Reference Types
