@@ -80,14 +80,6 @@ providers/
 - `cheerio`: For HTML parsing
 - `commonHeaders`: Standard HTTP headers
 
-Providers that need a configurable base URL should import `getBaseUrl` directly. The build bundles the helper into each provider module that uses it:
-
-```ts
-import { getBaseUrl } from "../getBaseUrl";
-
-const baseUrl = await getBaseUrl("providerKey");
-```
-
 This ensures all providers use the same tools and patterns, making code easier to maintain and extend.
 
 ## Reference Types
