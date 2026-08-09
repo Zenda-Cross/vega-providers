@@ -36,6 +36,7 @@ export interface Stream {
 export interface Info {
   title: string;
   image: string;
+  poster?: string;
   logo?: string;
   synopsis: string;
   imdbId: string;

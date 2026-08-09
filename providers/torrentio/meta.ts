@@ -85,7 +85,8 @@ export const getMeta = async function ({
       {
         title: meta.name || "",
         synopsis: meta.description || "",
-        image: meta.poster || meta.background || "",
+        image: meta.background || meta.poster || "",
+        poster: meta.poster || "",
         imdbId: "",
         type,
         linkList,

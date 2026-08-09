@@ -28,7 +28,8 @@ function applyCinemeta(info: Info, meta: CinemetaMeta): Info {
   return {
     ...info,
     title: meta.name || info.title,
-    image: meta.poster || meta.background || info.image,
+    image: meta.background || meta.poster || info.image,
+    poster: meta.poster || info.poster,
     logo: meta.logo || undefined,
     synopsis: meta.description || info.synopsis,
     imdbId: "",
