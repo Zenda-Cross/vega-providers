@@ -1,8 +1,8 @@
 [
   {
-    "display_name": "VegaMovies",
+    "display_name": "VMovies",
     "value": "vega",
-    "version": "2.25",
+    "version": "2.26",
     "icon": "",
     "type": "global",
     "disabled": false
