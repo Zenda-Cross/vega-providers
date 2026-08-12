@@ -101,7 +101,7 @@
     "version": "1.8",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "MovieBox App",
@@ -181,7 +181,7 @@
     "version": "1.2",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "NetflixMirror",
@@ -277,7 +277,7 @@
     "version": "1.4",
     "icon": "",
     "type": "english",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "HiAnime",
