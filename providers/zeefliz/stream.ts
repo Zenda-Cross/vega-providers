@@ -68,10 +68,17 @@ export async function getStream({
             `ZeeFliz: WAF detected (403) for ${link}, using solver...`,
           );
           const baseUrl = link.split("/").slice(0, 3).join("/");
+          const cleanHeaders = { ...headers, Referer: baseUrl };
+          delete cleanHeaders["User-Agent"];
+          delete cleanHeaders["sec-ch-ua"];
+          delete cleanHeaders["sec-ch-ua-mobile"];
+          delete cleanHeaders["sec-ch-ua-platform"];
+          delete cleanHeaders["Cookie"];
+
           const wafResult = await openWebView(baseUrl, {
             title: "Solve the captcha below and click done",
             description: "Required to bypass anti-bot protection.",
-            headers: { ...headers, Referer: baseUrl },
+            headers: cleanHeaders,
             waitForCookie: "cf_clearance",
             force: true,
           });

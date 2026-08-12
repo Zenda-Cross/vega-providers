@@ -72,10 +72,17 @@ export async function hubcloudExtractor(
           console.log(
             `hubcloudExtractor: WAF detected (403) for ${link}, using solver...`,
           );
+          const cleanHeaders = { ...headers, Referer: baseUrl };
+          delete cleanHeaders["User-Agent"];
+          delete cleanHeaders["sec-ch-ua"];
+          delete cleanHeaders["sec-ch-ua-mobile"];
+          delete cleanHeaders["sec-ch-ua-platform"];
+          delete cleanHeaders["Cookie"];
+
           const wafResult = await openWebView(baseUrl, {
             title: "Solve the captcha below and click done",
             description: "Required to bypass anti-bot protection.",
-            headers: { ...headers, Referer: baseUrl },
+            headers: cleanHeaders,
             waitForCookie: "cf_clearance",
             force: true,
           });
@@ -117,10 +124,17 @@ export async function hubcloudExtractor(
           `hubcloudExtractor: WAF detected (403) for ${vcloudLink}, using solver...`,
         );
         const vcloudBaseUrl = vcloudLink.split("/").slice(0, 3).join("/");
+        const cleanHeaders2 = { ...headers, Referer: vcloudBaseUrl };
+        delete cleanHeaders2["User-Agent"];
+        delete cleanHeaders2["sec-ch-ua"];
+        delete cleanHeaders2["sec-ch-ua-mobile"];
+        delete cleanHeaders2["sec-ch-ua-platform"];
+        delete cleanHeaders2["Cookie"];
+
         const wafResult = await openWebView(vcloudBaseUrl, {
           title: "Solve the captcha below and click done",
           description: "Required to bypass anti-bot protection.",
-          headers: { ...headers, Referer: vcloudBaseUrl },
+          headers: cleanHeaders2,
           waitForCookie: "cf_clearance",
           force: true,
         });
@@ -148,10 +162,17 @@ export async function hubcloudExtractor(
             `hubcloudExtractor: WAF detected (403) for ${vcloudLink}, using solver...`,
           );
           const vcloudBaseUrl = vcloudLink.split("/").slice(0, 3).join("/");
+          const cleanHeaders3 = { ...headers, Referer: vcloudBaseUrl };
+          delete cleanHeaders3["User-Agent"];
+          delete cleanHeaders3["sec-ch-ua"];
+          delete cleanHeaders3["sec-ch-ua-mobile"];
+          delete cleanHeaders3["sec-ch-ua-platform"];
+          delete cleanHeaders3["Cookie"];
+
           const wafResult = await openWebView(vcloudBaseUrl, {
             title: "Solve the captcha below and click done",
             description: "Required to bypass anti-bot protection.",
-            headers: { ...headers, Referer: vcloudBaseUrl },
+            headers: cleanHeaders3,
             waitForCookie: "cf_clearance",
             force: true,
           });
