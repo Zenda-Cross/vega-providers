@@ -1,5 +1,6 @@
 import { ProviderContext, Stream } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
+import { gdflixExtractor } from "../extractors/gdflix";
 import { throwProviderError } from "../providerErrors";
 
 const headers = {
@@ -33,18 +34,62 @@ export async function getStream({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }) {
-  const { axios, cheerio, commonHeaders } = providerContext;
+  const { axios, cheerio, commonHeaders, openWebView } = providerContext;
   try {
     const streamLinks: Stream[] = [];
     console.log("dotlink", link);
-    if (type === "movie") {
+
+    if (link.includes("gdflix")) {
+      return await gdflixExtractor(
+        link,
+        signal,
+        axios,
+        cheerio,
+        commonHeaders,
+        providerContext,
+      );
+    }
+
+    if (
+      type === "movie" ||
+      link.includes("nexdrive") ||
+      link.includes("dotlink") ||
+      link.includes("multicloud")
+    ) {
       // vlink
-      const dotlinkRes = await axios(`${link}`, { headers });
-      const dotlinkText = dotlinkRes.data;
-      // console.log("dotlinkText", dotlinkText);
+      let dotlinkText = "";
+      try {
+        const dotlinkRes = await axios(`${link}`, { headers, signal });
+        dotlinkText = dotlinkRes.data;
+      } catch (error: any) {
+        if (error.response?.status === 403 && openWebView) {
+          console.log(
+            `ZeeFliz: WAF detected (403) for ${link}, using solver...`,
+          );
+          const baseUrl = link.split("/").slice(0, 3).join("/");
+          const wafResult = await openWebView(baseUrl, {
+            title: "Solve the captcha below and click done",
+            description: "Required to bypass anti-bot protection.",
+            headers: { ...headers, Referer: baseUrl },
+            waitForCookie: "cf_clearance",
+            force: true,
+          });
+          if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
+          headers["Cookie"] =
+            (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
+            wafResult.cookies;
+          const retryRes = await axios(`${link}`, { headers, signal });
+          dotlinkText = retryRes.data;
+        } else {
+          throw error;
+        }
+      }
+
       const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
       console.log("vLink", vlink[1]);
-      link = vlink[1];
+      if (vlink[1]) {
+        link = vlink[1];
+      }
 
       // filepress link
       try {
@@ -106,7 +151,21 @@ export async function getStream({
       }
     }
 
-    return await hubcloudExtractor(link, signal, axios, cheerio, commonHeaders);
+    const hubStreams = await hubcloudExtractor(
+      link,
+      signal,
+      axios,
+      cheerio,
+      commonHeaders,
+      providerContext,
+    );
+
+    if (Array.isArray(hubStreams) && hubStreams.length > 0) {
+      streamLinks.push(...hubStreams);
+      return streamLinks;
+    }
+
+    return streamLinks;
   } catch (error: any) {
     throwProviderError("ZeeFliz", "stream", error);
   }

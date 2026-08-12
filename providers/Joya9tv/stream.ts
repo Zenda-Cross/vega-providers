@@ -1,5 +1,6 @@
 import { ProviderContext, Stream } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
+import { gdflixExtractor } from "../extractors/gdflix";
 import { throwProviderError } from "../providerErrors";
 
 const headers = {
@@ -34,58 +35,85 @@ export async function getStream({
   const { axios, cheerio, commonHeaders } = providerContext;
   try {
     const streamLinks: Stream[] = [];
-    console.log("dotlink", link);
-    if (!link.includes("cloud")) {
-      // vlink
-      const dotlinkRes = await fetch(`${link}`, { headers });
+    console.log("Joya9tv getStream link:", link);
+
+    if (link.includes("gdflix")) {
+      return await gdflixExtractor(
+        link,
+        signal,
+        axios,
+        cheerio,
+        commonHeaders,
+        providerContext,
+      );
+    }
+
+    let hubcloudLink = "";
+    let gdflixLink = "";
+    let filepressLink = "";
+
+    if (link.includes("hubcloud") || link.includes("hubcdn")) {
+      hubcloudLink = link;
+    } else {
+      const dotlinkRes = await fetch(`${link}`, { headers, signal });
       if (!dotlinkRes.ok) {
         throw new Error(
           `HTTP ${dotlinkRes.status} ${dotlinkRes.statusText} | URL ${link}`,
         );
       }
       const dotlinkText = await dotlinkRes.text();
-      // console.log('dotlinkText', dotlinkText);
-      const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
-      // console.log('vLink', vlink[1]);
-      link = vlink[1];
+      const $ = cheerio.load(dotlinkText);
+
+      $("a[href]").each((_, el) => {
+        const href = $(el).attr("href")?.trim() || "";
+        if (!href) return;
+
+        if (
+          !hubcloudLink &&
+          (href.includes("hubcloud") || href.includes("hubcdn"))
+        ) {
+          hubcloudLink = href;
+        } else if (!gdflixLink && href.includes("gdflix")) {
+          gdflixLink = href;
+        } else if (!filepressLink && href.includes("filepress")) {
+          filepressLink = href;
+        }
+      });
+
+      if (!hubcloudLink) {
+        const hubMatch =
+          dotlinkText.match(/<a\s+href="([^"]*hubcloud\.[^"]*)"/i) ||
+          dotlinkText.match(/<a\s+href="([^"]*hubcdn\.[^"]*)"/i);
+        if (hubMatch?.[1]) {
+          hubcloudLink = hubMatch[1];
+        }
+      }
+
+      if (!gdflixLink) {
+        const gdMatch = dotlinkText.match(/<a\s+href="([^"]*gdflix\.[^"]*)"/i);
+        if (gdMatch?.[1]) {
+          gdflixLink = gdMatch[1];
+        }
+      }
 
       // filepress link
       try {
-        const $ = cheerio.load(dotlinkText);
-        const filepressLink = $(
-          '.btn.btn-sm.btn-outline[style="background:linear-gradient(135deg,rgb(252,185,0) 0%,rgb(0,0,0)); color: #fdf8f2;"]',
-        )
-          .parent()
-          .attr("href");
-        // console.log('filepressLink', filepressLink);
-        const filepressID = filepressLink?.split("/").pop();
-        const filepressBaseUrl = filepressLink
-          ?.split("/")
-          .slice(0, -2)
-          .join("/");
-        // console.log('filepressID', filepressID);
-        // console.log('filepressBaseUrl', filepressBaseUrl);
-        const filepressTokenRes = await axios.post(
-          filepressBaseUrl + "/api/file/downlaod/",
-          {
-            id: filepressID,
-            method: "indexDownlaod",
-            captchaValue: null,
-          },
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Referer: filepressBaseUrl,
-            },
-          },
-        );
-        // console.log('filepressTokenRes', filepressTokenRes.data);
-        if (filepressTokenRes.data?.status) {
-          const filepressToken = filepressTokenRes.data?.data;
-          const filepressStreamLink = await axios.post(
-            filepressBaseUrl + "/api/file/downlaod2/",
+        const fpTarget =
+          filepressLink ||
+          $(
+            '.btn.btn-sm.btn-outline[style="background:linear-gradient(135deg,rgb(252,185,0) 0%,rgb(0,0,0)); color: #fdf8f2;"]',
+          )
+            .parent()
+            .attr("href");
+
+        if (fpTarget) {
+          const filepressID = fpTarget.split("/").pop();
+          const filepressBaseUrl = fpTarget.split("/").slice(0, -2).join("/");
+
+          const filepressTokenRes = await axios.post(
+            filepressBaseUrl + "/api/file/downlaod/",
             {
-              id: filepressToken,
+              id: filepressID,
               method: "indexDownlaod",
               captchaValue: null,
             },
@@ -96,20 +124,74 @@ export async function getStream({
               },
             },
           );
-          // console.log('filepressStreamLink', filepressStreamLink.data);
-          streamLinks.push({
-            server: "filepress",
-            link: filepressStreamLink.data?.data?.[0],
-            type: "mkv",
-          });
+
+          if (filepressTokenRes.data?.status) {
+            const filepressToken = filepressTokenRes.data?.data;
+            const filepressStreamLink = await axios.post(
+              filepressBaseUrl + "/api/file/downlaod2/",
+              {
+                id: filepressToken,
+                method: "indexDownlaod",
+                captchaValue: null,
+              },
+              {
+                headers: {
+                  "Content-Type": "application/json",
+                  Referer: filepressBaseUrl,
+                },
+              },
+            );
+
+            if (filepressStreamLink.data?.data?.[0]) {
+              streamLinks.push({
+                server: "filepress",
+                link: filepressStreamLink.data.data[0],
+                type: "mkv",
+              });
+            }
+          }
         }
       } catch (error) {
-        console.log("filepress error: ");
-        // console.error(error);
+        console.log("filepress error:", error);
       }
     }
 
-    return await hubcloudExtractor(link, signal, axios, cheerio, commonHeaders);
+    if (hubcloudLink) {
+      try {
+        const hubStreams = await hubcloudExtractor(
+          hubcloudLink,
+          signal,
+          axios,
+          cheerio,
+          commonHeaders,
+        );
+        if (Array.isArray(hubStreams) && hubStreams.length > 0) {
+          streamLinks.push(...hubStreams);
+        }
+      } catch (err) {
+        console.log("hubcloudExtractor error:", err);
+      }
+    }
+
+    if (gdflixLink) {
+      try {
+        const gdStreams = await gdflixExtractor(
+          gdflixLink,
+          signal,
+          axios,
+          cheerio,
+          commonHeaders,
+          providerContext,
+        );
+        if (Array.isArray(gdStreams) && gdStreams.length > 0) {
+          streamLinks.push(...gdStreams);
+        }
+      } catch (err) {
+        console.log("gdflixExtractor error:", err);
+      }
+    }
+
+    return streamLinks;
   } catch (error: any) {
     throwProviderError("Joya9TV", "stream", error);
   }

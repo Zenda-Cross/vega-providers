@@ -41,10 +41,16 @@ export const getEpisodes = function ({
             const anchor = $(a);
             const href = anchor.attr("href")?.trim();
 
-            // Only include links for hubcloud and gdflix as requested
+            // Include links for hubcloud, gdflix, filepress, dotlink, etc.
             if (
               href &&
-              (href.includes("hubcloud.one") || href.includes("gdflix.dev"))
+              (href.includes("hubcloud") ||
+                href.includes("gdflix") ||
+                href.includes("cloud") ||
+                href.includes("dotlink") ||
+                href.includes("vcloud") ||
+                href.includes("filepress") ||
+                href.includes("multicloud"))
             ) {
               // Clean up the title to be just "Episode X 480p"
               episodes.push({

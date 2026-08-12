@@ -50,15 +50,51 @@ export async function hubcloudExtractor(
   axios: any,
   cheerio: any,
   headers: Record<string, string>,
+  providerContext?: any,
 ) {
   try {
-    headers["Cookie"] =
-      "ext_name=ojplmecpdpgccookcobabopnaifgidhf; xla=s4t; cf_clearance=woQrFGXtLfmEMBEiGUsVHrUBMT8s3cmguIzmMjmvpkg-1770053679-1.2.1.1-xBrQdciOJsweUF6F2T_OtH6jmyanN_TduQ0yslc_XqjU6RcHSxI7.YOKv6ry7oYo64868HYoULnVyww536H2eVI3R2e4wKzsky6abjPdfQPxqpUaXjxfJ02o6jl3_Vkwr4uiaU7Wy596Vdst3y78HXvVmKdIohhtPvp.vZ9_L7wvWdce0GRixjh_6JiqWmWMws46hwEt3hboaS1e1e4EoWCvj5b0M_jVwvSxBOAW5emFzvT3QrnRh4nyYmKDERnY";
+    if (!headers["Cookie"]) {
+      headers["Cookie"] =
+        "ext_name=ojplmecpdpgccookcobabopnaifgidhf; xla=s4t; cf_clearance=woQrFGXtLfmEMBEiGUsVHrUBMT8s3cmguIzmMjmvpkg-1770053679-1.2.1.1-xBrQdciOJsweUF6F2T_OtH6jmyanN_TduQ0yslc_XqjU6RcHSxI7.YOKv6ry7oYo64868HYoULnVyww536H2eVI3R2e4wKzsky6abjPdfQPxqpUaXjxfJ02o6jl3_Vkwr4uiaU7Wy596Vdst3y78HXvVmKdIohhtPvp.vZ9_L7wvWdce0GRixjh_6JiqWmWMws46hwEt3hboaS1e1e4EoWCvj5b0M_jVwvSxBOAW5emFzvT3QrnRh4nyYmKDERnY";
+    }
     console.log("hubcloudExtractor", link);
     // console.log("headers", headers);
     const baseUrl = link.split("/").slice(0, 3).join("/");
     const streamLinks: any[] = [];
-    const vLinkRes = await axios(`${link}`, { headers, signal });
+    const openWebView = providerContext?.openWebView;
+
+    let vLinkRes: any;
+    try {
+      vLinkRes = await axios(`${link}`, { headers, signal });
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        if (openWebView) {
+          console.log(
+            `hubcloudExtractor: WAF detected (403) for ${link}, using solver...`,
+          );
+          const wafResult = await openWebView(baseUrl, {
+            title: "Solve the captcha below and click done",
+            description: "Required to bypass anti-bot protection.",
+            headers: { ...headers, Referer: baseUrl },
+            waitForCookie: "cf_clearance",
+            force: true,
+          });
+          if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
+          headers["Cookie"] =
+            (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
+            wafResult.cookies;
+          vLinkRes = await axios(`${link}`, { headers, signal });
+        } else {
+          console.log(
+            `hubcloudExtractor: 403 Forbidden for ${link}, but openWebView solver is not available!`,
+          );
+          throw error;
+        }
+      } else {
+        throw error;
+      }
+    }
+
     const vLinkText = vLinkRes.data;
     const $vLink = cheerio.load(vLinkText);
     let vcloudLink =
@@ -70,17 +106,74 @@ export async function hubcloudExtractor(
       vcloudLink = `${baseUrl}${vcloudLink}`;
       console.log("New vcloudLink", vcloudLink);
     }
-    const vcloudRes = await fetch(vcloudLink, {
-      headers,
-      signal,
-      redirect: "follow",
-    });
-    if (!vcloudRes.ok) {
-      throw new Error(
-        `HTTP ${vcloudRes.status} ${vcloudRes.statusText} | URL ${vcloudLink}`,
-      );
+
+    let vcloudText = "";
+    try {
+      const vcloudRes = await axios.get(vcloudLink, { headers, signal });
+      vcloudText = vcloudRes.data;
+    } catch (error: any) {
+      if (error.response?.status === 403 && openWebView) {
+        console.log(
+          `hubcloudExtractor: WAF detected (403) for ${vcloudLink}, using solver...`,
+        );
+        const vcloudBaseUrl = vcloudLink.split("/").slice(0, 3).join("/");
+        const wafResult = await openWebView(vcloudBaseUrl, {
+          title: "Solve the captcha below and click done",
+          description: "Required to bypass anti-bot protection.",
+          headers: { ...headers, Referer: vcloudBaseUrl },
+          waitForCookie: "cf_clearance",
+          force: true,
+        });
+        if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
+        headers["Cookie"] =
+          (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
+          wafResult.cookies;
+        const retryRes = await axios.get(vcloudLink, { headers, signal });
+        vcloudText = retryRes.data;
+      } else {
+        if (error.response?.status === 403 && !openWebView) {
+          console.log(
+            `hubcloudExtractor: 403 Forbidden for ${vcloudLink}, but openWebView solver is not available!`,
+          );
+        }
+        // Fallback to fetch
+        let fetchRes = await fetch(vcloudLink, {
+          headers,
+          signal,
+          redirect: "follow",
+        });
+
+        if (fetchRes.status === 403 && openWebView) {
+          console.log(
+            `hubcloudExtractor: WAF detected (403) for ${vcloudLink}, using solver...`,
+          );
+          const vcloudBaseUrl = vcloudLink.split("/").slice(0, 3).join("/");
+          const wafResult = await openWebView(vcloudBaseUrl, {
+            title: "Solve the captcha below and click done",
+            description: "Required to bypass anti-bot protection.",
+            headers: { ...headers, Referer: vcloudBaseUrl },
+            waitForCookie: "cf_clearance",
+            force: true,
+          });
+          if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
+          headers["Cookie"] =
+            (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
+            wafResult.cookies;
+          fetchRes = await fetch(vcloudLink, {
+            headers,
+            signal,
+            redirect: "follow",
+          });
+        }
+
+        if (!fetchRes.ok) {
+          throw new Error(
+            `HTTP ${fetchRes.status} ${fetchRes.statusText} | URL ${vcloudLink}`,
+          );
+        }
+        vcloudText = await fetchRes.text();
+      }
     }
-    const vcloudText = await vcloudRes.text();
     const $ = cheerio.load(vcloudText);
     // console.log("vcloudRes", $.text());
 
