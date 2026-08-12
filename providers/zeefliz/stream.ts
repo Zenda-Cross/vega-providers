@@ -159,7 +159,7 @@ export async function getStream({
         signal,
         axios,
         cheerio,
-        commonHeaders,
+        headers,
         providerContext,
       );
     } else {
@@ -168,7 +168,7 @@ export async function getStream({
         signal,
         axios,
         cheerio,
-        commonHeaders,
+        headers,
         providerContext,
       );
     }
