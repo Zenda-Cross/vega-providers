@@ -1,5 +1,6 @@
 import { ProviderContext, Stream } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
+import { zcloudExtractor } from "../extractors/zcloud";
 import { gdflixExtractor } from "../extractors/gdflix";
 import { throwProviderError } from "../providerErrors";
 
@@ -151,14 +152,26 @@ export async function getStream({
       }
     }
 
-    const hubStreams = await hubcloudExtractor(
-      link,
-      signal,
-      axios,
-      cheerio,
-      commonHeaders,
-      providerContext,
-    );
+    let hubStreams;
+    if (link.includes("zcloud")) {
+      hubStreams = await zcloudExtractor(
+        link,
+        signal,
+        axios,
+        cheerio,
+        commonHeaders,
+        providerContext,
+      );
+    } else {
+      hubStreams = await hubcloudExtractor(
+        link,
+        signal,
+        axios,
+        cheerio,
+        commonHeaders,
+        providerContext,
+      );
+    }
 
     if (Array.isArray(hubStreams) && hubStreams.length > 0) {
       streamLinks.push(...hubStreams);

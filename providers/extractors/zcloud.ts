@@ -1,0 +1,304 @@
+import { throwProviderError } from "../providerErrors";
+
+const hubcloudDecode = function (value: string) {
+  if (value === undefined) {
+    return "";
+  }
+  return atob(value.toString());
+};
+
+const extractUrlFromScript = (html: string): string => {
+  const doubleAtobMatch = html.match(
+    /(?:var|let|const)\s+\w+\s*=\s*atob\(atob\(['"]([^'"]+)['"]\)\)/,
+  );
+  if (doubleAtobMatch?.[1]) {
+    return atob(atob(doubleAtobMatch[1]));
+  }
+  const plainMatch = html.match(/var\s+url\s*=\s*['"]([^'"]+)['"]/);
+  return (
+    hubcloudDecode(plainMatch?.[1]?.split("r=")?.[1] ?? "") ||
+    plainMatch?.[1] ||
+    ""
+  );
+};
+
+const getPixelDrainUrl = (html: string) => {
+  const match = html.match(/var\s+pxl\s*=\s*['"]([^'"]+)['"];?/i);
+  return match?.[1] || "";
+};
+
+const getRedirectedPixelDrainUrl = (
+  ...htmlSources: Array<string | undefined>
+) => {
+  for (const html of htmlSources) {
+    if (!html) {
+      continue;
+    }
+
+    const redirectedUrl = getPixelDrainUrl(html);
+    if (redirectedUrl) {
+      return redirectedUrl;
+    }
+  }
+
+  return "";
+};
+
+export async function zcloudExtractor(
+  link: string,
+  signal: AbortSignal,
+  axios: any,
+  cheerio: any,
+  headers: Record<string, string>,
+  providerContext?: any,
+) {
+  try {
+    if (!headers["Cookie"]) {
+      headers["Cookie"] =
+        "ext_name=ojplmecpdpgccookcobabopnaifgidhf; xla=s4t; cf_clearance=woQrFGXtLfmEMBEiGUsVHrUBMT8s3cmguIzmMjmvpkg-1770053679-1.2.1.1-xBrQdciOJsweUF6F2T_OtH6jmyanN_TduQ0yslc_XqjU6RcHSxI7.YOKv6ry7oYo64868HYoULnVyww536H2eVI3R2e4wKzsky6abjPdfQPxqpUaXjxfJ02o6jl3_Vkwr4uiaU7Wy596Vdst3y78HXvVmKdIohhtPvp.vZ9_L7wvWdce0GRixjh_6JiqWmWMws46hwEt3hboaS1e1e4EoWCvj5b0M_jVwvSxBOAW5emFzvT3QrnRh4nyYmKDERnY";
+    }
+    console.log("zcloudExtractor", link);
+    // console.log("headers", headers);
+    const baseUrl = link.split("/").slice(0, 3).join("/");
+    const streamLinks: any[] = [];
+    const openWebView = providerContext?.openWebView;
+
+    let vLinkRes: any;
+    try {
+      vLinkRes = await axios(`${link}`, { headers, signal });
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        if (openWebView) {
+          console.log(
+            `zcloudExtractor: WAF detected (403) for ${link}, using solver...`,
+          );
+          const wafResult = await openWebView(baseUrl, {
+            title: "Solve the captcha below and click done",
+            description: "Required to bypass anti-bot protection.",
+            headers: { ...headers, Referer: baseUrl },
+            waitForCookie: "cf_clearance",
+            force: true,
+          });
+          if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
+          headers["Cookie"] =
+            (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
+            wafResult.cookies;
+          vLinkRes = await axios(`${link}`, { headers, signal });
+        } else {
+          console.log(
+            `zcloudExtractor: 403 Forbidden for ${link}, but openWebView solver is not available!`,
+          );
+          throw error;
+        }
+      } else {
+        throw error;
+      }
+    }
+
+    const vLinkText = vLinkRes.data;
+    const doubleAtobMatch = vLinkText.match(/atob\(atob\(['"]([^'"]+)['"]\)\)/);
+    let vcloudLink = link;
+    if (doubleAtobMatch?.[1]) {
+      const decoded = atob(atob(doubleAtobMatch[1]));
+      try {
+        const linkUrl = new URL(link);
+        const decodedUrl = new URL(decoded);
+        decodedUrl.protocol = linkUrl.protocol;
+        decodedUrl.host = linkUrl.host;
+        vcloudLink = decodedUrl.toString();
+      } catch (e) {
+        vcloudLink = decoded.replace(/https?:\/\/(?:www\.)?vcloud\.fit/gi, baseUrl);
+      }
+    }
+    console.log("vcloudLink", vcloudLink);
+
+    let vcloudText = "";
+    try {
+      const vcloudRes = await axios.get(vcloudLink, { headers, signal });
+      vcloudText = vcloudRes.data;
+    } catch (error: any) {
+      if (error.response?.status === 403 && openWebView) {
+        console.log(
+          `zcloudExtractor: WAF detected (403) for ${vcloudLink}, using solver...`,
+        );
+        const vcloudBaseUrl = vcloudLink.split("/").slice(0, 3).join("/");
+        const wafResult = await openWebView(vcloudBaseUrl, {
+          title: "Solve the captcha below and click done",
+          description: "Required to bypass anti-bot protection.",
+          headers: { ...headers, Referer: vcloudBaseUrl },
+          waitForCookie: "cf_clearance",
+          force: true,
+        });
+        if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
+        headers["Cookie"] =
+          (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
+          wafResult.cookies;
+        const retryRes = await axios.get(vcloudLink, { headers, signal });
+        vcloudText = retryRes.data;
+      } else {
+        if (error.response?.status === 403 && !openWebView) {
+          console.log(
+            `zcloudExtractor: 403 Forbidden for ${vcloudLink}, but openWebView solver is not available!`,
+          );
+        }
+        // Fallback to fetch
+        let fetchRes = await fetch(vcloudLink, {
+          headers,
+          signal,
+          redirect: "follow",
+        });
+
+        if (fetchRes.status === 403 && openWebView) {
+          console.log(
+            `zcloudExtractor: WAF detected (403) for ${vcloudLink}, using solver...`,
+          );
+          const vcloudBaseUrl = vcloudLink.split("/").slice(0, 3).join("/");
+          const wafResult = await openWebView(vcloudBaseUrl, {
+            title: "Solve the captcha below and click done",
+            description: "Required to bypass anti-bot protection.",
+            headers: { ...headers, Referer: vcloudBaseUrl },
+            waitForCookie: "cf_clearance",
+            force: true,
+          });
+          if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
+          headers["Cookie"] =
+            (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
+            wafResult.cookies;
+          fetchRes = await fetch(vcloudLink, {
+            headers,
+            signal,
+            redirect: "follow",
+          });
+        }
+
+        if (!fetchRes.ok) {
+          throw new Error(
+            `HTTP ${fetchRes.status} ${fetchRes.statusText} | URL ${vcloudLink}`,
+          );
+        }
+        vcloudText = await fetchRes.text();
+      }
+    }
+    const $ = cheerio.load(vcloudText);
+    // console.log("vcloudRes", $.text());
+
+    const linkClass = $(".server");
+    for (const element of linkClass) {
+      const itm = $(element);
+      let link = itm.attr("href") || "";
+
+      switch (true) {
+        case link?.includes("pixeld"):
+          console.log("Pixeldrain link found:", link);
+          if (!link?.includes("api")) {
+            const redirectedPixelDrainUrl = getRedirectedPixelDrainUrl(
+              vLinkText,
+              vcloudText,
+            );
+            if (redirectedPixelDrainUrl) {
+              console.log(
+                "Special case for token negn6f",
+                redirectedPixelDrainUrl,
+              );
+              link = redirectedPixelDrainUrl;
+            }
+
+            const token = link.split("/").pop()?.split("?")[0];
+            const baseUrl = link.split("/").slice(0, -2).join("/");
+            link = `${baseUrl}/api/file/${token}?download`;
+          }
+          streamLinks.push({ server: "Pixeldrain", link: link, type: "mkv" });
+          break;
+
+        case link?.includes(".dev") && !link?.includes("/?id="):
+          streamLinks.push({ server: "Cf Worker", link: link, type: "mkv" });
+          break;
+
+        case link?.includes("hubcloud") || link?.includes("/?id="):
+          try {
+            const newLinkRes = await fetch(link, {
+              method: "HEAD",
+              headers,
+              signal,
+              redirect: "manual",
+            });
+
+            // Check if response is a redirect (301, 302, etc.)
+            let newLink = link;
+            if (newLinkRes.status >= 300 && newLinkRes.status < 400) {
+              newLink = newLinkRes.headers.get("location") || link;
+            } else if (newLinkRes.url && newLinkRes.url !== link) {
+              // Fallback: check if URL changed (redirect was followed)
+              newLink = newLinkRes.url;
+            } else {
+              newLink = newLinkRes.headers.get("location") || link;
+            }
+            if (newLink.includes("googleusercontent")) {
+              newLink = newLink.split("?link=")[1];
+            } else {
+              const newLinkRes2 = await fetch(newLink, {
+                method: "HEAD",
+                headers,
+                signal,
+                redirect: "manual",
+              });
+
+              // Check if response is a redirect
+              if (newLinkRes2.status >= 300 && newLinkRes2.status < 400) {
+                newLink =
+                  newLinkRes2.headers.get("location")?.split("?link=")[1] ||
+                  newLink;
+              } else if (newLinkRes2.url && newLinkRes2.url !== newLink) {
+                // Fallback: URL changed due to redirect
+                newLink = newLinkRes2.url.split("?link=")[1] || newLinkRes2.url;
+              } else {
+                newLink =
+                  newLinkRes2.headers.get("location")?.split("?link=")[1] ||
+                  newLink;
+              }
+            }
+
+            streamLinks.push({
+              server: "hubcloud",
+              link: newLink,
+              type: "mkv",
+            });
+          } catch (error) {
+            console.log("zcloudExtractor error in zcloud link: ", error);
+          }
+          break;
+
+        case link?.includes("cloudflarestorage"):
+          streamLinks.push({ server: "CfStorage", link: link, type: "mkv" });
+          break;
+
+        case link?.includes("fastdl") || link?.includes("fsl."):
+          streamLinks.push({ server: "FastDl", link: link, type: "mkv" });
+          break;
+
+        case link.includes("hubcdn") && !link.includes("/?id="):
+          streamLinks.push({
+            server: "HubCdn",
+            link: link,
+            type: "mkv",
+          });
+          break;
+
+        default:
+          if (link?.includes(".mkv") || link?.includes("?token=")) {
+            const serverName =
+              link
+                .match(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/i)?.[1]
+                ?.replace(/\./g, " ") || "Unknown";
+            streamLinks.push({ server: serverName, link: link, type: "mkv" });
+          }
+          break;
+      }
+    }
+
+    console.log("streamLinks", streamLinks);
+    return streamLinks;
+  } catch (error: any) {
+    throwProviderError("ZCloud", `extract ${link}`, error);
+  }
+}
