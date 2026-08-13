@@ -15,35 +15,64 @@ const hdbHeaders = {
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
 };
 
-function getEpisodeLinks($: any): Link["directLinks"] {
-  const episodes: Link["directLinks"] = [];
+function getEpisodeLinks($: any, seriesTitle: string): Link[] {
+  const qualityGroups: Record<string, Link["directLinks"]> = {};
 
   $("strong").each((_, element) => {
     const episodeTitle = $(element).text().trim();
     if (!/^episode\s*\d+$/i.test(episodeTitle)) return;
 
-    const heading = $(element).closest("h1,h2,h3,h4,h5,h6");
-    let episodeLink = "";
+    const heading = $(element).closest("h1,h2,h3,h4,h5,h6,p,div");
+    if (!heading.length) return;
+
     for (const sibling of heading.nextAll().toArray()) {
       const siblingHeading = $(sibling);
       if (/^episode\s*\d+$/i.test(siblingHeading.text().trim())) break;
 
-      const drive = siblingHeading
-        .find('a[href*="hubdrive"],a:contains("Drive")')
-        .first()
-        .attr("href");
-      if (drive) {
-        episodeLink = drive;
-        break;
-      }
-    }
+      const driveLinks = siblingHeading.find('a[href*="hubdrive"],a:contains("Drive")');
 
-    if (episodeLink) {
-      episodes.push({ title: episodeTitle.toUpperCase(), link: episodeLink });
+      driveLinks.each((_, aEl) => {
+        const driveLink = $(aEl).attr("href");
+        if (driveLink) {
+          const textContext =
+            $(aEl).text().toLowerCase() + " " +
+            $(aEl).parent().text().toLowerCase() + " " +
+            $(aEl).parent().prev().text().toLowerCase();
+
+          let quality = "Unknown";
+          if (textContext.includes("2160p") || textContext.includes("4k")) quality = "4K";
+          else if (textContext.includes("1080p")) quality = "1080p";
+          else if (textContext.includes("720p")) quality = "720p";
+          else if (textContext.includes("480p")) quality = "480p";
+
+          const epTitle = episodeTitle.toUpperCase();
+
+          if (!qualityGroups[quality]) {
+            qualityGroups[quality] = [];
+          }
+
+          if (!qualityGroups[quality].some(ep => ep.link === driveLink)) {
+            qualityGroups[quality].push({ title: epTitle, link: driveLink });
+          }
+        }
+      });
     }
   });
 
-  return episodes;
+  const links: Link[] = [];
+  for (const [quality, episodes] of Object.entries(qualityGroups)) {
+    const linkTitle = quality === "Unknown" ? seriesTitle : `${seriesTitle} - ${quality}`;
+    const linkObj: Link = {
+      title: linkTitle,
+      directLinks: episodes,
+    };
+    if (quality !== "Unknown") {
+      linkObj.quality = quality;
+    }
+    links.push(linkObj);
+  }
+
+  return links;
 }
 
 export const getMeta = async function ({
@@ -83,9 +112,10 @@ export const getMeta = async function ({
 
     // Links
     const links: Link[] = [];
-    const directLink = getEpisodeLinks($);
+    const episodeLinks = getEpisodeLinks($, title);
 
-    if (directLink.length === 0 && type === "movie") {
+    if (episodeLinks.length === 0) {
+      const directLink: Link["directLinks"] = [];
       container.find('a:contains("EPiSODE")').map((i, element) => {
         const epTitle = $(element).text();
         const episodesLink = $(element).attr("href");
@@ -96,14 +126,17 @@ export const getMeta = async function ({
           });
         }
       });
+      if (directLink.length > 0) {
+        links.push({
+          title: title,
+          directLinks: directLink,
+        });
+      }
+    } else {
+      links.push(...episodeLinks);
     }
-    if (directLink.length > 0) {
-      links.push({
-        title: title,
-        directLinks: directLink,
-      });
-    }
-    if (directLink.length === 0) {
+
+    if (links.length === 0) {
       container
         .find(
           'a:contains("480"),a:contains("720"),a:contains("1080"),a:contains("2160"),a:contains("4K")',

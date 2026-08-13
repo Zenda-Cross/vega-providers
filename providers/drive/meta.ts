@@ -70,15 +70,16 @@ export const getMeta = async function ({
       }
 
       if (episodesLink && linkTitle) {
-        links.push({
+        const linkObj: Link = {
           title: linkTitle,
-          episodesLink: type === "series" ? episodesLink : "",
-          directLinks:
-            type === "movie"
-              ? [{ title: "Movie", link: episodesLink, type: "movie" }]
-              : [],
           quality: quality,
-        });
+        };
+        if (type === "movie") {
+          linkObj.directLinks = [{ title: "Movie", link: episodesLink, type: "movie" }];
+        } else {
+          linkObj.episodesLink = episodesLink;
+        }
+        links.push(linkObj);
       }
     });
 

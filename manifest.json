@@ -18,7 +18,7 @@
   {
     "display_name": "MoviesDrive",
     "value": "drive",
-    "version": "2.14",
+    "version": "2.15",
     "icon": "",
     "type": "global",
     "disabled": false
@@ -202,7 +202,7 @@
   {
     "display_name": "HdHub4u",
     "value": "hdhub4u",
-    "version": "2.12",
+    "version": "2.13",
     "icon": "",
     "type": "global",
     "disabled": false

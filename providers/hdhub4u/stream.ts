@@ -33,11 +33,30 @@ export async function getStream({
     const redirectLinkRes = await axios.get(redirectLink, { headers, signal });
     const redirectLinkText = redirectLinkRes.data;
     const $ = cheerio.load(redirectLinkText);
+    const driveLinks: { quality: string; link: string }[] = [];
+    $('a[href*="hubcloud"][href*="/drive/"]').each((i, el) => {
+      const href = $(el).attr("href");
+      if (!href) return;
+      const text =
+        $(el).text().toLowerCase() +
+        $(el).parent().text().toLowerCase() +
+        $(el).parent().parent().text().toLowerCase();
+
+      let quality = "Unknown";
+      if (text.includes("2160p") || text.includes("4k")) quality = "4k";
+      else if (text.includes("1080p")) quality = "1080p";
+      else if (text.includes("720p")) quality = "720p";
+      else if (text.includes("480p")) quality = "480p";
+
+      driveLinks.push({ quality, link: href });
+    });
+
+    const qualityOrder: Record<string, number> = { "4k": 4, "1080p": 3, "720p": 2, "480p": 1, "Unknown": 0 };
+    driveLinks.sort((a, b) => qualityOrder[b.quality] - qualityOrder[a.quality]);
+
     hubdriveLink =
-      $('h3:contains("1080p")').find("a").attr("href") ||
-      redirectLinkText.match(
-        /href="(https:\/\/hubcloud\.[^\/]+\/drive\/[^"]+)"/,
-      )[1];
+      driveLinks[0]?.link ||
+      redirectLinkText.match(/href="(https:\/\/hubcloud\.[^\/]+\/drive\/[^"]+)"/)?.[1] || "";
     console.log("hubdriveLink", hubdriveLink);
     if (hubdriveLink.includes("hubdrive")) {
       const hubdriveRes = await axios.get(hubdriveLink, { headers, signal });
