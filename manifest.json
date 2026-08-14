@@ -374,5 +374,13 @@
     "icon": "",
     "type": "global",
     "disabled": false
+  },
+  {
+    "display_name": "CineFreak",
+    "value": "cinefreak",
+    "version": "1.0",
+    "icon": "https://cinefreak.net/wp-content/uploads/2024/08/cropped-cgk-192x192.png",
+    "type": "global",
+    "disabled": false
   }
 ]

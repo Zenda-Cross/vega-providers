@@ -146,5 +146,9 @@
   "1cinevood": {
     "name": "cinewood",
     "url": "https://cinevood.cl"
+  },
+  "cinefreak": {
+    "name": "CineFreak",
+    "url": "https://cinefreak.net"
   }
 }
