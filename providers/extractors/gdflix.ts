@@ -182,7 +182,7 @@ export async function gdflixExtractor(
         if (instantLinkData.error === false) {
           const instantLink = instantLinkData.url;
           streamLinks.push({
-            server: "Gdrive-Instant",
+            server: "G-Drive (download only)",
             link: instantLink,
             type: "mkv",
           });

@@ -28,7 +28,9 @@ function getLanguageCodes(title: string): string {
   );
 
   if (flagCodes.length > 0) {
-    return [...new Set(flagCodes)].join(", ");
+    const unique = [...new Set(flagCodes)];
+    if (unique.length > 2) return "MULTI";
+    return unique.join(", ");
   }
 
   const uppercaseTitle = title.toUpperCase();
@@ -116,31 +118,40 @@ export const getStream = async ({
         const uploader = title.match(/⚙️\s*([^\n]+)/)?.[1]?.trim() || "";
 
         let seeders = "";
-        const seedersMatch = title.match(/👤\s*\d+/);
+        const seedersMatch = title.match(/👤\s*(\d+)/);
         if (seedersMatch) {
-          seeders = seedersMatch[0];
+          seeders = `👤${seedersMatch[1]}`;
         } else {
-          const slMatch = title.match(/S:\s*\d+\s*L:\s*\d+/i);
+          const slMatch = title.match(/S:\s*(\d+)/i);
           if (slMatch) {
-            seeders = slMatch[0];
+            seeders = `👤${slMatch[1]}`;
           }
         }
 
-        let resolution = quality ? `${quality}p` : "";
-        if (s.name && s.name.includes("\n")) {
-          resolution = s.name.split("\n")[1].trim();
-        }
+        // Extract format tags (DV, HDR, Remux)
+        const formatTags: string[] = [];
+        const fullTitle = `${s.name || ""} ${title}`;
+        if (/[\b\s.]DV[\b\s.]|Dolby\s*Vision/i.test(fullTitle)) formatTags.push("DV");
+        if (/[\b\s.]HDR(?:10(?:\+)?)?[\b\s.]/i.test(fullTitle)) formatTags.push("HDR");
+        if (/REMUX/i.test(fullTitle)) formatTags.push("Remux");
 
-        const serverName = [resolution, language, size, uploader, seeders]
-          .filter(Boolean)
-          .join(" | ");
+        const tagStr = formatTags.join("/");
+
+        const serverParts: string[] = [];
+        if (tagStr) serverParts.push(tagStr);
+        if (language && language !== "ENG") serverParts.push(language);
+        if (seeders) serverParts.push(seeders);
+        if (size) serverParts.push(size);
+        serverParts.push(uploader || "Torrentio");
+
+        const serverName = serverParts.join(" •");
 
         if (link) {
           streams.push({
             server: serverName,
             link: link,
             type: link.startsWith("magnet:") ? "torrent" : "mp4",
-            // quality: quality,
+            quality: quality,
           });
         }
       });

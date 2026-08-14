@@ -256,7 +256,7 @@ export const getStream = async function ({
       }
       console.log("Gdrive-Instant-2 link", newLink?.split("?url=")[1]);
       servers.push({
-        server: "Gdrive-Instant-2",
+        server: "G-Drive (download only)",
         link: newLink?.split("?url=")[1] || newLink,
         type: "mkv",
       });

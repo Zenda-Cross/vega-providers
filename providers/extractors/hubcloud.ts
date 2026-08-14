@@ -227,7 +227,7 @@ export async function hubcloudExtractor(
           break;
 
         case link?.includes(".dev") && !link?.includes("/?id="):
-          streamLinks.push({ server: "Cf Worker", link: link, type: "mkv" });
+          streamLinks.push({ server: "CF Worker", link: link, type: "mkv" });
           break;
 
         case link?.includes("hubcloud") || link?.includes("/?id="):
@@ -275,7 +275,7 @@ export async function hubcloudExtractor(
             }
 
             streamLinks.push({
-              server: "hubcloud",
+              server: "GDrive (download only)",
               link: newLink,
               type: "mkv",
             });
@@ -285,7 +285,7 @@ export async function hubcloudExtractor(
           break;
 
         case link?.includes("cloudflarestorage"):
-          streamLinks.push({ server: "CfStorage", link: link, type: "mkv" });
+          streamLinks.push({ server: "CF Storage", link: link, type: "mkv" });
           break;
 
         case link?.includes("fastdl") || link?.includes("fsl."):

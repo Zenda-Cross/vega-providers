@@ -46,7 +46,7 @@ export const getStream = async ({
       if (instantLinkData.error === false) {
         const instantLink = instantLinkData.url;
         ServerLinks.push({
-          server: "Gdrive-Instant",
+          server: "G-Drive (download only)",
           link: instantLink,
           type: "mkv",
         });
@@ -78,7 +78,7 @@ export const getStream = async ({
       }
       console.log("Gdrive-Instant-2 link", newLink?.split("?url=")[1]);
       ServerLinks.push({
-        server: "Gdrive-Instant-2",
+        server: "G-Drive (download only)",
         link: newLink?.split("?url=")[1] || newLink,
         type: "mkv",
       });
