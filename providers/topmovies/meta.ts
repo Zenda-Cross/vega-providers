@@ -67,7 +67,6 @@ export const getMeta = async function ({
       }
     });
     const imdbId = meta.imdbId;
-    meta.imdbId = "";
     meta.linkList = links;
     if (!imdbId) return meta;
 

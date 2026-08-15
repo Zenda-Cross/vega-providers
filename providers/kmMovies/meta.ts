@@ -236,7 +236,7 @@ export const getMeta = async function ({
       title,
       synopsis,
       image,
-      imdbId: "",
+      imdbId: imdbId || "",
       type,
       tags,
       cast,

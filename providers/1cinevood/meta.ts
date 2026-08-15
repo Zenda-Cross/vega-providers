@@ -25,7 +25,7 @@ async function getWithWAF(
         description: "Required to bypass anti-bot protection.",
         headers: { ...headers, Referer: baseUrl },
         waitForCookie: "cf_clearance",
-        force: true,
+        // force: true,
       });
       return await axios.get(url, {
         headers: {
@@ -244,7 +244,6 @@ export const getMeta = async function ({
     result.linkList = links;
     result.webUrl = url;
     const imdbId = result.imdbId;
-    result.imdbId = "";
     if (!imdbId) return result;
 
     let cinemeta;

@@ -184,7 +184,6 @@ export const getMeta = async function ({
     result.linkList = links;
     result.webUrl = url;
     const imdbId = result.imdbId;
-    result.imdbId = "";
     if (!imdbId) return result;
 
     const cinemeta = await getCinemetaMeta(

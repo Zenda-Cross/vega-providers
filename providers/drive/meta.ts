@@ -89,7 +89,7 @@ export const getMeta = async function ({
       title,
       synopsis,
       image,
-      imdbId: "",
+      imdbId: imdbId || "",
       type,
       linkList: links,
       webUrl: url,

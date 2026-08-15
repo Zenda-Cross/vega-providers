@@ -17,6 +17,7 @@ export const getMeta = async function ({
       synopsis: data?.meta?.description || "",
       image: data?.meta?.background || "",
       imdbId: data?.meta?.imdb_id || "",
+      tmdbId: data?.meta?.moviedb_id?.toString() || undefined,
       type: data?.meta?.type || "movie",
     };
 
