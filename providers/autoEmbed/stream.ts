@@ -26,22 +26,10 @@ export const VIDEASY_SERVERS: VideasyServer[] = [
 ];
 
 function pctEncode(s: string): string {
-  const bytes = Buffer.from(s, "utf8");
-  let out = "";
-  const HEX = "0123456789ABCDEF";
-  for (const b of bytes) {
-    const unreserved =
-      (b >= 0x30 && b <= 0x39) ||
-      (b >= 0x41 && b <= 0x5a) ||
-      (b >= 0x61 && b <= 0x7a) ||
-      b === 0x2d || b === 0x2e || b === 0x5f || b === 0x7e;
-    if (unreserved) {
-      out += String.fromCharCode(b);
-    } else {
-      out += "%" + HEX[(b >> 4) & 0x0f] + HEX[b & 0x0f];
-    }
-  }
-  return out;
+  return encodeURIComponent(s).replace(
+    /[!'()*]/g,
+    (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase()
+  );
 }
 
 const doubleEncode = (s: string) => pctEncode(pctEncode(s));
@@ -88,9 +76,8 @@ export const getStream = async ({
     // If tmdbId or title/year is missing, resolve via Cinemeta or TMDb proxy
     if (!tmdbId && imdbId) {
       try {
-        const cinemetaUrl = `https://v3-cinemeta.strem.io/meta/${
-          isMovie ? "movie" : "series"
-        }/${imdbId}.json`;
+        const cinemetaUrl = `https://v3-cinemeta.strem.io/meta/${isMovie ? "movie" : "series"
+          }/${imdbId}.json`;
         const cRes = await providerContext.axios.get(cinemetaUrl, {
           headers: providerContext.commonHeaders,
           timeout: 8000,
@@ -108,9 +95,8 @@ export const getStream = async ({
 
     if (tmdbId && (!title || !year)) {
       try {
-        const detailUrl = `https://db.speedracelight.com/3/${
-          isMovie ? "movie" : "tv"
-        }/${tmdbId}?append_to_response=external_ids`;
+        const detailUrl = `https://db.speedracelight.com/3/${isMovie ? "movie" : "tv"
+          }/${tmdbId}?append_to_response=external_ids`;
         const dRes = await providerContext.axios.get(detailUrl, {
           headers: {
             Referer: `${ORIGIN}/`,
@@ -224,9 +210,8 @@ export const getStream = async ({
           }
           sources.forEach((src: any) => {
             const q = extractQuality(src.quality);
-            const serverLabel = `${server.displayName} (${
-              server.audioLabel || "Original"
-            })`;
+            const serverLabel = `${server.displayName} (${server.audioLabel || "Original"
+              })`;
             streams.push({
               server: serverLabel,
               link: src.url,
@@ -238,9 +223,8 @@ export const getStream = async ({
           });
         } else if (result.url) {
           streams.push({
-            server: `${server.displayName} (${
-              server.audioLabel || "Original"
-            })`,
+            server: `${server.displayName} (${server.audioLabel || "Original"
+              })`,
             link: result.url,
             type: "m3u8",
             subtitles: subtitles.length > 0 ? subtitles : undefined,
@@ -249,9 +233,8 @@ export const getStream = async ({
         } else if (result.streams) {
           for (const [qStr, sUrl] of Object.entries(result.streams)) {
             streams.push({
-              server: `${server.displayName} (${
-                server.audioLabel || "Original"
-              })`,
+              server: `${server.displayName} (${server.audioLabel || "Original"
+                })`,
               link: sUrl as string,
               type: (sUrl as string).includes(".m3u8") ? "m3u8" : "mp4",
               quality: extractQuality(qStr),
@@ -266,6 +249,7 @@ export const getStream = async ({
     });
 
     await Promise.allSettled(tasks);
+    console.log(streams);
     return streams;
   } catch (err) {
     console.error("autoEmbed getStream error:", err);
