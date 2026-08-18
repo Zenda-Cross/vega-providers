@@ -1,5 +1,61 @@
 import { Stream, ProviderContext, TextTracks } from "../types";
-import { getBaseUrl } from "../getBaseUrl";
+
+const VIDEASY_API_BASE = "https://api.speedracelight.com";
+const DECRYPTION_API_URL = "https://enc-dec.app/api/dec-videasy";
+const ORIGIN = "https://www.cineby.at";
+
+export interface VideasyServer {
+  displayName: string;
+  path: string;
+  mayHave4K?: boolean;
+  audioLabel?: string;
+  qualityFilter?: string;
+  language?: string;
+}
+
+export const VIDEASY_SERVERS: VideasyServer[] = [
+  { displayName: "Yoru", path: "cdn", mayHave4K: true, audioLabel: "Original" },
+  { displayName: "Cypher", path: "downloader2", audioLabel: "Original" },
+  { displayName: "Breach", path: "m4uhd", audioLabel: "Original" },
+  { displayName: "Neon", path: "vsrc", audioLabel: "Original" },
+  { displayName: "Vyse", path: "hdmovie", qualityFilter: "English", audioLabel: "Original" },
+  { displayName: "Killjoy", path: "meine", language: "german", audioLabel: "German" },
+  { displayName: "Fade", path: "hdmovie", qualityFilter: "Hindi", audioLabel: "Hindi" },
+  { displayName: "Omen", path: "lamovie", audioLabel: "Spanish" },
+  { displayName: "Raze", path: "superflix", audioLabel: "Portuguese" },
+];
+
+function pctEncode(s: string): string {
+  const bytes = Buffer.from(s, "utf8");
+  let out = "";
+  const HEX = "0123456789ABCDEF";
+  for (const b of bytes) {
+    const unreserved =
+      (b >= 0x30 && b <= 0x39) ||
+      (b >= 0x41 && b <= 0x5a) ||
+      (b >= 0x61 && b <= 0x7a) ||
+      b === 0x2d || b === 0x2e || b === 0x5f || b === 0x7e;
+    if (unreserved) {
+      out += String.fromCharCode(b);
+    } else {
+      out += "%" + HEX[(b >> 4) & 0x0f] + HEX[b & 0x0f];
+    }
+  }
+  return out;
+}
+
+const doubleEncode = (s: string) => pctEncode(pctEncode(s));
+
+function extractQuality(q: string | undefined): "360" | "480" | "720" | "1080" | "2160" | undefined {
+  if (!q) return undefined;
+  const str = String(q).toLowerCase();
+  if (str.includes("2160") || str.includes("4k")) return "2160";
+  if (str.includes("1080")) return "1080";
+  if (str.includes("720")) return "720";
+  if (str.includes("480")) return "480";
+  if (str.includes("360")) return "360";
+  return undefined;
+}
 
 export const getStream = async ({
   link: id,
@@ -20,295 +76,199 @@ export const getStream = async ({
       }
     })();
 
-    const tmdbId: string | number =
-      payload.tmdbId ?? payload.id ?? payload.tmdId ?? "";
-    const imdbId: string = payload.imdbId ?? "";
-    const season: string = payload.season ?? "";
-    const episode: string = payload.episode ?? "";
+    let tmdbId: string = String(payload.tmdbId ?? payload.id ?? payload.tmdId ?? "");
+    let imdbId: string = payload.imdbId ?? "";
+    const season: string | number = payload.season || 1;
+    const episode: string | number = payload.episode || 1;
     const effectiveType: string = payload.type ?? type ?? "movie";
+    const isMovie = effectiveType === "movie";
+    let title: string = payload.title ?? "";
+    let year: string = (payload.year ? String(payload.year) : "").slice(0, 4);
 
-    await getWebstreamerStream(
-      String(imdbId),
-      episode,
-      season,
-      effectiveType,
-      streams,
-      providerContext,
-    );
+    // If tmdbId or title/year is missing, resolve via Cinemeta or TMDb proxy
+    if (!tmdbId && imdbId) {
+      try {
+        const cinemetaUrl = `https://v3-cinemeta.strem.io/meta/${
+          isMovie ? "movie" : "series"
+        }/${imdbId}.json`;
+        const cRes = await providerContext.axios.get(cinemetaUrl, {
+          headers: providerContext.commonHeaders,
+          timeout: 8000,
+        });
+        const cMeta = cRes.data?.meta;
+        if (cMeta) {
+          tmdbId = String(cMeta.moviedb_id || "");
+          if (!title) title = cMeta.name || "";
+          if (!year) year = String(cMeta.year || "").slice(0, 4);
+        }
+      } catch {
+        // ignore fallback error
+      }
+    }
 
-    await getRiveStream(
-      String(tmdbId),
-      episode,
-      season,
-      effectiveType,
-      streams,
-      providerContext,
+    if (tmdbId && (!title || !year)) {
+      try {
+        const detailUrl = `https://db.speedracelight.com/3/${
+          isMovie ? "movie" : "tv"
+        }/${tmdbId}?append_to_response=external_ids`;
+        const dRes = await providerContext.axios.get(detailUrl, {
+          headers: {
+            Referer: `${ORIGIN}/`,
+            Origin: ORIGIN,
+            ...providerContext.commonHeaders,
+          },
+          timeout: 8000,
+        });
+        const dData = dRes.data;
+        if (dData) {
+          if (!title) title = dData.title || dData.name || "";
+          if (!year) {
+            year = (dData.release_date || dData.first_air_date || "").slice(
+              0,
+              4
+            );
+          }
+          if (!imdbId) imdbId = dData.external_ids?.imdb_id || "";
+        }
+      } catch {
+        // ignore fallback error
+      }
+    }
+
+    if (!tmdbId) {
+      return [];
+    }
+
+    const backendHeaders = {
+      Referer: `${ORIGIN}/`,
+      Origin: ORIGIN,
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    };
+
+    // Get seed for mediaId
+    const seedRes = await providerContext.axios.get(
+      `${VIDEASY_API_BASE}/seed?mediaId=${tmdbId}`,
+      { headers: backendHeaders, timeout: 10000 }
     );
+    const seed = seedRes.data?.seed;
+    if (!seed) {
+      return [];
+    }
+
+    const tasks = VIDEASY_SERVERS.map(async (server) => {
+      try {
+        let serverUrl = `${VIDEASY_API_BASE}/${server.path}/sources-with-title?title=${doubleEncode(
+          title
+        )}&mediaType=${isMovie ? "movie" : "tv"}&year=${year}&episodeId=${episode}&seasonId=${season}&tmdbId=${tmdbId}&enc=2&seed=${seed}`;
+        if (imdbId) serverUrl += `&imdbId=${imdbId}`;
+        if (server.language) serverUrl += `&language=${server.language}`;
+
+        const encRes = await providerContext.axios.get(serverUrl, {
+          headers: backendHeaders,
+          timeout: 8000,
+        });
+
+        const encText =
+          typeof encRes.data === "string"
+            ? encRes.data
+            : JSON.stringify(encRes.data);
+        if (!encText || encText.length < 5) return;
+
+        const decRes = await providerContext.axios.post(
+          DECRYPTION_API_URL,
+          {
+            text: encText,
+            id: String(tmdbId),
+            seed: seed,
+          },
+          {
+            headers: { "Content-Type": "application/json" },
+            timeout: 8000,
+          }
+        );
+
+        const result = decRes.data?.result;
+        if (!result) return;
+
+        const subtitles: TextTracks = (result.subtitles || [])
+          .map((sub: any) => {
+            const u = sub.url || sub.file || sub.src;
+            const lang =
+              sub.language || sub.lang || sub.label || sub.name || "Unknown";
+            if (!u) return null;
+            return {
+              title: lang,
+              language: lang.slice(0, 2).toLowerCase(),
+              type: u.endsWith(".srt")
+                ? ("application/x-subrip" as const)
+                : ("text/vtt" as const),
+              uri: u,
+            };
+          })
+          .filter(Boolean) as TextTracks;
+
+        const videoHeaders = {
+          Referer: `${ORIGIN}/`,
+          Origin: ORIGIN,
+        };
+
+        if (result.sources && result.sources.length > 0) {
+          let sources = result.sources;
+          if (server.qualityFilter) {
+            sources = sources.filter(
+              (s: any) =>
+                s.quality &&
+                s.quality.toLowerCase() === server.qualityFilter!.toLowerCase()
+            );
+          }
+          sources.forEach((src: any) => {
+            const q = extractQuality(src.quality);
+            const serverLabel = `${server.displayName} (${
+              server.audioLabel || "Original"
+            })`;
+            streams.push({
+              server: serverLabel,
+              link: src.url,
+              type: src.url.includes(".m3u8") ? "m3u8" : "mp4",
+              quality: q,
+              subtitles: subtitles.length > 0 ? subtitles : undefined,
+              headers: videoHeaders,
+            });
+          });
+        } else if (result.url) {
+          streams.push({
+            server: `${server.displayName} (${
+              server.audioLabel || "Original"
+            })`,
+            link: result.url,
+            type: "m3u8",
+            subtitles: subtitles.length > 0 ? subtitles : undefined,
+            headers: videoHeaders,
+          });
+        } else if (result.streams) {
+          for (const [qStr, sUrl] of Object.entries(result.streams)) {
+            streams.push({
+              server: `${server.displayName} (${
+                server.audioLabel || "Original"
+              })`,
+              link: sUrl as string,
+              type: (sUrl as string).includes(".m3u8") ? "m3u8" : "mp4",
+              quality: extractQuality(qStr),
+              subtitles: subtitles.length > 0 ? subtitles : undefined,
+              headers: videoHeaders,
+            });
+          }
+        }
+      } catch {
+        // Ignore individual server failures
+      }
+    });
+
+    await Promise.allSettled(tasks);
     return streams;
   } catch (err) {
-    console.error(err);
+    console.error("autoEmbed getStream error:", err);
     return [];
   }
 };
-
-///////// Webstreamer
-export async function getWebstreamerStream(
-  imdbId: string,
-  episode: string,
-  season: string,
-  type: string,
-  Streams: Stream[],
-  providerContext: ProviderContext,
-) {
-  if (!imdbId || imdbId === "undefined") return;
-  const url = `https://webstreamr.hayd.uk/{"multi":"on","al":"on","de":"on","es":"on","fr":"on","hi":"on","it":"on","mx":"on","mediaFlowProxyUrl":"","mediaFlowProxyPassword":""}/stream/${type}/${imdbId}${
-    type === "series" ? `:${season}:${episode}` : ""
-  }.json`;
-
-  console.log("Webstreamer URL: ", encodeURI(url));
-  try {
-    const res = await providerContext.axios.get(encodeURI(url), {
-      timeout: 30000,
-      headers: providerContext.commonHeaders,
-    });
-    res.data?.streams.forEach((source: any) => {
-      const url = source?.url;
-      const name = source?.name || "WebStreamer";
-      // Infer type from URL
-      const qualityMatch = name?.match(/(\d{3,4})p/);
-      const quality = qualityMatch
-        ? (qualityMatch[1] as "360" | "480" | "720" | "1080" | "2160")
-        : undefined;
-      Streams.push({
-        server: name,
-        link: url,
-        type,
-        quality,
-      });
-    });
-  } catch (e) {
-    throw e;
-  }
-}
-
-// // Rive Stream Fetcher
-export async function getRiveStream(
-  tmdId: string,
-  episode: string,
-  season: string,
-  type: string,
-  Streams: Stream[],
-  providerContext: ProviderContext,
-) {
-  if (!tmdId || tmdId === "undefined") {
-    console.warn("autoEmbed/rive: missing tmdbId in link payload");
-    return;
-  }
-  const secret = generateSecretKey(tmdId);
-  const servers = [
-    "flowcast",
-    "asiacloud",
-    "humpy",
-    "primevids",
-    "shadow",
-    "hindicast",
-    "animez",
-    "aqua",
-    "yggdrasil",
-    "putafilme",
-    "ophim",
-  ];
-  const baseUrl = await getBaseUrl("rive");
-  const cors = process.env.CORS_PRXY ? process.env.CORS_PRXY + "?url=" : "";
-  console.log("CORS: " + cors);
-  const route =
-    type === "series"
-      ? `/api/backendfetch?requestID=tvVideoProvider&id=${tmdId}&season=${season}&episode=${episode}&secretKey=${secret}&service=`
-      : `/api/backendfetch?requestID=movieVideoProvider&id=${tmdId}&secretKey=${secret}&service=`;
-  const url = cors
-    ? cors + encodeURIComponent(baseUrl + route)
-    : baseUrl + route;
-  await Promise.all(
-    servers.map(async (server) => {
-      console.log("Rive: " + url + server);
-      try {
-        const res = await providerContext.axios.get(url + server, {
-          timeout: 8000,
-        });
-        const subtitles: TextTracks = [];
-        // if (res.data?.data?.captions) {
-        //   res.data?.data?.captions.forEach((sub: any) => {
-        //     subtitles.push({
-        //       language: sub?.label?.slice(0, 2) || "Und",
-        //       uri: sub?.file,
-        //       title: sub?.label || "Undefined",
-        //       type: sub?.file?.endsWith(".vtt")
-        //         ? "text/vtt"
-        //         : "application/x-subrip",
-        //     });
-        //   });
-        // }
-        res.data?.data?.sources.forEach((source: any) => {
-          Streams.push({
-            server: source?.source + "-" + source?.quality,
-            link: source?.url,
-            type: source?.format === "hls" ? "m3u8" : "mp4",
-            quality: source?.quality,
-            // subtitles: subtitles,
-            headers: {
-              referer: baseUrl,
-            },
-          });
-        });
-      } catch (e) {
-        console.log(e);
-      }
-    }),
-  );
-}
-
-function generateSecretKey(id: number | string) {
-  // Updated array from module 2873 in the provided source
-  const c = [
-    "4Z7lUo",
-    "gwIVSMD",
-    "PLmz2elE2v",
-    "Z4OFV0",
-    "SZ6RZq6Zc",
-    "zhJEFYxrz8",
-    "FOm7b0",
-    "axHS3q4KDq",
-    "o9zuXQ",
-    "4Aebt",
-    "wgjjWwKKx",
-    "rY4VIxqSN",
-    "kfjbnSo",
-    "2DyrFA1M",
-    "YUixDM9B",
-    "JQvgEj0",
-    "mcuFx6JIek",
-    "eoTKe26gL",
-    "qaI9EVO1rB",
-    "0xl33btZL",
-    "1fszuAU",
-    "a7jnHzst6P",
-    "wQuJkX",
-    "cBNhTJlEOf",
-    "KNcFWhDvgT",
-    "XipDGjST",
-    "PCZJlbHoyt",
-    "2AYnMZkqd",
-    "HIpJh",
-    "KH0C3iztrG",
-    "W81hjts92",
-    "rJhAT",
-    "NON7LKoMQ",
-    "NMdY3nsKzI",
-    "t4En5v",
-    "Qq5cOQ9H",
-    "Y9nwrp",
-    "VX5FYVfsf",
-    "cE5SJG",
-    "x1vj1",
-    "HegbLe",
-    "zJ3nmt4OA",
-    "gt7rxW57dq",
-    "clIE9b",
-    "jyJ9g",
-    "B5jXjMCSx",
-    "cOzZBZTV",
-    "FTXGy",
-    "Dfh1q1",
-    "ny9jqZ2POI",
-    "X2NnMn",
-    "MBtoyD",
-    "qz4Ilys7wB",
-    "68lbOMye",
-    "3YUJnmxp",
-    "1fv5Imona",
-    "PlfvvXD7mA",
-    "ZarKfHCaPR",
-    "owORnX",
-    "dQP1YU",
-    "dVdkx",
-    "qgiK0E",
-    "cx9wQ",
-    "5F9bGa",
-    "7UjkKrp",
-    "Yvhrj",
-    "wYXez5Dg3",
-    "pG4GMU",
-    "MwMAu",
-    "rFRD5wlM",
-  ];
-
-  if (id === undefined) {
-    return "rive";
-  }
-
-  try {
-    let t: string, n: number;
-    const r = String(id);
-
-    if (isNaN(Number(id))) {
-      const sum = r.split("").reduce((e, ch) => e + ch.charCodeAt(0), 0);
-      t = c[sum % c.length] || btoa(r);
-      n = Math.floor((sum % r.length) / 2);
-    } else {
-      const num = Number(id);
-      t = c[num % c.length] || btoa(r);
-      n = Math.floor((num % r.length) / 2);
-    }
-
-    const i = r.slice(0, n) + t + r.slice(n);
-
-    /* eslint-disable no-bitwise */
-    const innerHash = (e: string) => {
-      e = String(e);
-      let t = 0 >>> 0;
-      for (let n = 0; n < e.length; n++) {
-        const r = e.charCodeAt(n);
-        const i =
-          (((t = (r + (t << 6) + (t << 16) - t) >>> 0) << (n % 5)) |
-            (t >>> (32 - (n % 5)))) >>>
-          0;
-        t = (t ^ (i ^ (((r << (n % 7)) | (r >>> (8 - (n % 7)))) >>> 0))) >>> 0;
-        t = (t + ((t >>> 11) ^ (t << 3))) >>> 0;
-      }
-      t ^= t >>> 15;
-      t = ((t & 65535) * 49842 + ((((t >>> 16) * 49842) & 65535) << 16)) >>> 0;
-      t ^= t >>> 13;
-      t = ((t & 65535) * 40503 + ((((t >>> 16) * 40503) & 65535) << 16)) >>> 0;
-      t ^= t >>> 16;
-      return t.toString(16).padStart(8, "0");
-    };
-
-    const outerHash = (e: string) => {
-      const t = String(e);
-      let n = (3735928559 ^ t.length) >>> 0;
-      for (let idx = 0; idx < t.length; idx++) {
-        let r = t.charCodeAt(idx);
-        r ^= ((131 * idx + 89) ^ (r << (idx % 5))) & 255;
-        n = (((n << 7) | (n >>> 25)) >>> 0) ^ r;
-        const i = ((n & 65535) * 60205) >>> 0;
-        const o = (((n >>> 16) * 60205) << 16) >>> 0;
-        n = (i + o) >>> 0;
-        n ^= n >>> 11;
-      }
-      n ^= n >>> 15;
-      n = (((n & 65535) * 49842 + (((n >>> 16) * 49842) << 16)) >>> 0) >>> 0;
-      n ^= n >>> 13;
-      n = (((n & 65535) * 40503 + (((n >>> 16) * 40503) << 16)) >>> 0) >>> 0;
-      n ^= n >>> 16;
-      n = (((n & 65535) * 10196 + (((n >>> 16) * 10196) << 16)) >>> 0) >>> 0;
-      n ^= n >>> 15;
-      return n.toString(16).padStart(8, "0");
-    };
-    /* eslint-enable no-bitwise */
-
-    const o = outerHash(innerHash(i));
-    return btoa(o);
-  } catch (e) {
-    return "topSecret";
-  }
-}
