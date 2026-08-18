@@ -1,4 +1,38 @@
+import {
+  applyCinemetaMeta,
+  CinemetaMeta,
+  CinemetaVideo,
+  enrichCinemetaEpisodes,
+  getCinemetaMeta,
+} from "../getCinemetaMeta";
 import { EpisodeLink, Info, Link, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
+
+function getRequest(link: string): { imdbId: string; type: string } {
+  const imdbId = link.match(/tt\d+/)?.[0] || "";
+  const type = /\/series\//i.test(link) ? "series" : "movie";
+  if (!imdbId) throw new Error(`Missing IMDb ID in metadata link: ${link}`);
+  return { imdbId, type };
+}
+
+function createPayload(
+  imdbId: string,
+  type: string,
+  meta: CinemetaMeta,
+  video?: CinemetaVideo,
+): string {
+  const videoParts = video?.id?.split(":") || [];
+  return JSON.stringify({
+    title: meta.name || "",
+    imdbId,
+    season: video?.season?.toString() || videoParts[1] || "",
+    episode:
+      (video?.episode ?? video?.number)?.toString() || videoParts[2] || "",
+    type,
+    tmdbId: meta.moviedb_id?.toString() || "",
+    year: meta.year,
+  });
+}
 
 export const getMeta = async function ({
   link,
@@ -7,85 +41,59 @@ export const getMeta = async function ({
   link: string;
   providerContext: ProviderContext;
 }): Promise<Info> {
-  const axios = providerContext.axios;
   try {
-    console.log("all", link);
-    const res = await axios.get(link);
-    const data = res.data;
-    const meta = {
-      title: data?.meta?.name || "",
-      synopsis: data?.meta?.description || "",
-      image: data?.meta?.background || "",
-      imdbId: data?.meta?.imdb_id || "",
-      tmdbId: data?.meta?.moviedb_id?.toString() || undefined,
-      type: data?.meta?.type || "movie",
-    };
+    const { imdbId, type } = getRequest(link);
+    const meta = await getCinemetaMeta(imdbId, type, providerContext);
+    const linkList: Link[] = [];
 
-    const links: Link[] = [];
-    let directLinks: EpisodeLink[] = [];
-    let season = new Map();
-    if (meta.type === "series") {
-      data?.meta?.videos?.map((video: any) => {
-        if (video?.season <= 0) return;
-        if (!season.has(video?.season)) {
-          season.set(video?.season, []);
-        }
-        season.get(video?.season).push({
-          title: "Episode " + video?.episode,
-          type: "series",
-          link: JSON.stringify({
-            title: data?.meta?.name as string,
-            imdbId: data?.meta?.imdb_id,
-            season: video?.id?.split(":")[1],
-            episode: video?.id?.split(":")[2],
-            type: data?.meta?.type,
-            tmdbId: data?.meta?.moviedb_id?.toString() || "",
-            year: data?.meta?.year,
-          }),
+    if (type === "series") {
+      const seasons = new Map<number, EpisodeLink[]>();
+      for (const video of meta.videos || []) {
+        const episode = video.episode ?? video.number;
+        if (!video.season || video.season <= 0 || !episode) continue;
+        const episodes = seasons.get(video.season) || [];
+        episodes.push({
+          title: `Episode ${episode}`,
+          link: createPayload(imdbId, "series", meta, video),
         });
-      });
-      const keys = Array.from(season.keys());
-      keys.sort();
-      keys.map((key) => {
-        directLinks = season.get(key);
-        links.push({
-          title: `Season ${key}`,
-          directLinks: directLinks,
+        seasons.set(video.season, episodes);
+      }
+      for (const season of [...seasons.keys()].sort((a, b) => a - b)) {
+        linkList.push({
+          title: `Season ${season}`,
+          directLinks: enrichCinemetaEpisodes(
+            seasons.get(season) || [],
+            meta.videos || [],
+            season,
+          ),
         });
-      });
+      }
     } else {
-      links.push({
-        title: data?.meta?.name as string,
+      linkList.push({
+        title: meta.name || "Movie",
         directLinks: [
           {
             title: "Movie",
             type: "movie",
-            link: JSON.stringify({
-              title: data?.meta?.name as string,
-              imdbId: data?.meta?.imdb_id,
-              season: "",
-              episode: "",
-              type: data?.meta?.type,
-              tmdbId: data?.meta?.moviedb_id?.toString() || "",
-              year: data?.meta?.year,
-            }),
+            link: createPayload(imdbId, "movie", meta),
           },
         ],
       });
     }
-    return {
-      ...meta,
-      linkList: links,
-    };
+
+    return applyCinemetaMeta(
+      {
+        title: meta.name || "",
+        synopsis: meta.description || "",
+        image: meta.background || meta.poster || "",
+        poster: meta.poster || "",
+        imdbId: imdbId || meta.imdb_id || "",
+        type,
+        linkList,
+      },
+      meta,
+    );
   } catch (err) {
-    console.error(err);
-    return {
-      title: "",
-      synopsis: "",
-      image: "",
-      imdbId: "",
-      type: "movie",
-      linkList: [],
-    };
+    throwProviderError("AutoEmbed", "metadata", err);
   }
 };
