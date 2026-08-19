@@ -186,9 +186,26 @@ export const getStream = async ({
       });
     }
 
-    console.log("Torrentio streams:", streams);
+    const isQualityAllowed = (q?: string) => {
+      if (!q) return true;
+      if (qualityFilter === "all" || !qualityFilter) return true;
+      if (qualityFilter === "720" || qualityFilter === "720p,480p") {
+        return q === "720" || q === "480" || q === "360";
+      }
+      if (qualityFilter === "1080" || qualityFilter === "1080p,720p,480p") {
+        return q === "1080" || q === "720" || q === "480" || q === "360";
+      }
+      if (qualityFilter === "480") {
+        return q === "480" || q === "360";
+      }
+      return true;
+    };
 
-    return streams;
+    const filteredStreams = streams.filter((s) => isQualityAllowed(s.quality));
+
+    console.log(`Torrentio streams (${filteredStreams.length}/${streams.length} allowed for quality=${qualityFilter}):`, filteredStreams);
+
+    return filteredStreams;
   } catch (err) {
     throwProviderError("Torrentio", "stream", err);
   }

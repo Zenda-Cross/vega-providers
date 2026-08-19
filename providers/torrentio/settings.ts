@@ -36,9 +36,10 @@ export const getSettingsSchema = async function ({
       description: "Limit results to maximum or specific qualities",
       options: [
         { label: "All Qualities (4K, 1080p, 720p, 480p)", value: "all" },
-        { label: "Up to 4K / 2160p", value: "4k,1080p,720p" },
-        { label: "Up to 1080p (Exclude 4K)", value: "1080p,720p,480p" },
-        { label: "Up to 720p (HD only)", value: "720p,480p" },
+        { label: "Up to 4K / 2160p", value: "2160" },
+        { label: "Up to 1080p (Exclude 4K)", value: "1080" },
+        { label: "Up to 720p (Exclude 4K & 1080p)", value: "720" },
+        { label: "480p SD only", value: "480" },
       ],
       defaultValue: "all",
     },
