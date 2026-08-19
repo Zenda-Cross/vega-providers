@@ -146,3 +146,96 @@ The script will prompt you for the necessary parameters (like filter, link, etc.
 After modifying or creating a provider, it MUST be built using:
 `npm run build`
 This generates the CommonJS outputs into the `dist/` folder, which the Vega app consumes.
+
+## 9. Advanced: Settings & Key-Value Storage
+
+### A. Provider Settings (`settings.ts`)
+Providers can expose user-configurable settings in the Vega App by adding `settings.ts`.
+Export `getSettingsSchema`:
+```ts
+import { ProviderContext, SettingsField } from "../types";
+
+export const getSettingsSchema = async function ({
+  providerContext,
+}: {
+  providerContext: ProviderContext;
+}): Promise<SettingsField[]> {
+  return [
+    {
+      key: "preferredQuality",
+      type: "select",
+      label: "Preferred Quality",
+      description: "Default streaming resolution",
+      options: [
+        { label: "Auto", value: "auto" },
+        { label: "1080p", value: "1080" },
+        { label: "720p", value: "720" },
+      ],
+      defaultValue: "auto",
+    },
+    {
+      key: "allowedResolutions",
+      type: "multiselect",
+      label: "Allowed Resolutions",
+      description: "Filter streams by selected resolutions",
+      options: [
+        { label: "4K (2160p)", value: "2160" },
+        { label: "1080p", value: "1080" },
+        { label: "720p", value: "720" },
+      ],
+      defaultValue: ["1080", "720"],
+    },
+    {
+      key: "baseUrlOverride",
+      type: "text",
+      label: "Custom Domain / Mirror URL",
+      placeholder: "https://my-domain.com",
+      defaultValue: "",
+    },
+    {
+      key: "autoSubtitles",
+      type: "toggle",
+      label: "Auto-enable subtitles",
+      defaultValue: true,
+    },
+    {
+      key: "timeoutSecs",
+      type: "number",
+      label: "Request Timeout (seconds)",
+      defaultValue: 15,
+      min: 5,
+      max: 60,
+    },
+  ];
+};
+```
+
+### B. Persistent Key-Value Store (`providerContext.kvStore`)
+Each provider has an isolated persistent storage instance injected into `providerContext.kvStore`:
+- `await kvStore.get<T>(key: string): Promise<T | undefined>`
+- `await kvStore.set(key: string, value: unknown): Promise<void>`
+- `await kvStore.delete(key: string): Promise<boolean>`
+- `await kvStore.keys(): Promise<string[]>`
+- `await kvStore.clear(): Promise<void>`
+
+User settings configured in the app are automatically saved under their respective `key`. Scraper functions can read them directly:
+```ts
+export const getStream = async function ({ link, type, signal, providerContext }): Promise<Stream[]> {
+  const { axios, kvStore } = providerContext;
+  
+  // Read user-defined settings
+  const customDomain = await kvStore.get<string>("baseUrlOverride");
+  const preferredQuality = await kvStore.get<string>("preferredQuality");
+  const allowed = await kvStore.get<string[]>("allowedResolutions");
+
+  // Read or cache session tokens/cookies
+  let token = await kvStore.get<string>("sessionToken");
+  if (!token) {
+    token = await fetchToken(axios);
+    await kvStore.set("sessionToken", token);
+  }
+
+  // ... implementation ...
+};
+```
+

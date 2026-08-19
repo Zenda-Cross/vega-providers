@@ -200,6 +200,12 @@ interface SettingsSelectField extends SettingsFieldBase {
   defaultValue?: string;
 }
 
+interface SettingsMultiSelectField extends SettingsFieldBase {
+  type: "multiselect";
+  options: { label: string; value: string }[];
+  defaultValue?: string[];
+}
+
 interface SettingsNumberField extends SettingsFieldBase {
   type: "number";
   defaultValue?: number;
@@ -211,6 +217,7 @@ export type SettingsField =
   | SettingsTextField
   | SettingsToggleField
   | SettingsSelectField
+  | SettingsMultiSelectField
   | SettingsNumberField;
 
 export type ProviderContext = {

@@ -255,6 +255,168 @@ linkList: [
 
 This gives you flexibility to support both providers that need extra requests for episodes and those that can return all links up front.
 
+---
+
+# Advanced: Settings & Key-Value Storage
+
+Providers can expose custom settings in the Vega app (such as custom mirror URLs, quality preferences, resolution filters, API keys, or toggles) and persist state across sessions using the built-in Key-Value Store (`kvStore`).
+
+## 1. Provider Settings (`settings.ts`)
+
+To provide a native settings UI in the Vega App's **Provider Settings**, add a `settings.ts` file inside your provider folder.
+
+### `settings.ts` Signature
+Export an async function `getSettingsSchema`:
+
+```ts
+import { ProviderContext, SettingsField } from "../types";
+
+export const getSettingsSchema = async function ({
+  providerContext,
+}: {
+  providerContext: ProviderContext;
+}): Promise<SettingsField[]> {
+  return [
+    // Array of settings field definitions
+  ];
+};
+```
+
+### Supported Field Types
+
+| Field Type | UI Component | Value Type | Properties |
+|---|---|---|---|
+| `'select'` | Native Dropdown Menu | `string` | `key`, `label`, `description?`, `options: { label, value }[]`, `defaultValue?` |
+| `'multiselect'` | Checkbox List Group | `string[]` | `key`, `label`, `description?`, `options: { label, value }[]`, `defaultValue?: string[]` |
+| `'toggle'` | Switch Toggle (On/Off) | `boolean` | `key`, `label`, `description?`, `defaultValue?: boolean` |
+| `'text'` | Text Input Field | `string` | `key`, `label`, `description?`, `placeholder?`, `defaultValue?: string` |
+| `'number'` | Numeric Input Field | `number` | `key`, `label`, `description?`, `min?`, `max?`, `defaultValue?: number` |
+
+### Complete Example: `settings.ts`
+
+```ts
+import { ProviderContext, SettingsField } from "../types";
+
+export const getSettingsSchema = async function ({
+  providerContext,
+}: {
+  providerContext: ProviderContext;
+}): Promise<SettingsField[]> {
+  return [
+    {
+      key: "preferredQuality",
+      type: "select",
+      label: "Preferred Streaming Quality",
+      description: "Default streaming quality when multiple are available",
+      options: [
+        { label: "Auto (Best Available)", value: "auto" },
+        { label: "1080p Full HD", value: "1080" },
+        { label: "720p HD", value: "720" },
+        { label: "480p SD", value: "480" },
+      ],
+      defaultValue: "auto",
+    },
+    {
+      key: "allowedResolutions",
+      type: "multiselect",
+      label: "Allowed Resolutions",
+      description: "Choose which video resolutions to show in playback sources",
+      options: [
+        { label: "4K Ultra HD (2160p)", value: "2160" },
+        { label: "1080p Full HD", value: "1080" },
+        { label: "720p HD", value: "720" },
+        { label: "480p SD", value: "480" },
+      ],
+      defaultValue: ["2160", "1080", "720"],
+    },
+    {
+      key: "baseUrlOverride",
+      type: "text",
+      label: "Custom Mirror Domain",
+      description: "Override default domain if main website is blocked in your region",
+      placeholder: "https://my-mirror.com",
+      defaultValue: "",
+    },
+    {
+      key: "autoSubtitles",
+      type: "toggle",
+      label: "Auto-enable English Subtitles",
+      description: "Automatically load English subtitles when available",
+      defaultValue: true,
+    },
+    {
+      key: "requestTimeout",
+      type: "number",
+      label: "Request Timeout (seconds)",
+      description: "Maximum response wait time for requests",
+      defaultValue: 15,
+      min: 5,
+      max: 60,
+    },
+  ];
+};
+```
+
+## 2. Key-Value Storage (`providerContext.kvStore`)
+
+Each provider has access to an isolated, persistent Key-Value Store through `providerContext.kvStore`. 
+
+Values configured by the user via the Settings modal are automatically saved to this store under the corresponding `key`. You can also write, read, and delete custom data directly in your scraper functions.
+
+### `kvStore` API
+
+```ts
+interface ProviderKvStore {
+  // Retrieve a stored value by key
+  get: <T = unknown>(key: string) => Promise<T | undefined>;
+
+  // Store a value (serializable objects, arrays, primitives)
+  set: (key: string, value: unknown) => Promise<void>;
+
+  // Delete a specific key
+  delete: (key: string) => Promise<boolean>;
+
+  // List all stored keys for this provider
+  keys: () => Promise<string[]>;
+
+  // Clear all stored data for this provider
+  clear: () => Promise<void>;
+}
+```
+
+### Reading Settings Inside Scrapers (`posts.ts`, `stream.ts`, etc.)
+
+```ts
+import { Stream, ProviderContext } from "../types";
+
+export const getStream = async function ({
+  link,
+  type,
+  signal,
+  providerContext,
+}: {
+  link: string;
+  type: string;
+  signal: AbortSignal;
+  providerContext: ProviderContext;
+}): Promise<Stream[]> {
+  const { axios, kvStore } = providerContext;
+
+  // 1. Read user configured settings
+  const customDomain = (await kvStore.get<string>("baseUrlOverride")) || "https://example.com";
+  const preferredQuality = (await kvStore.get<string>("preferredQuality")) || "auto";
+  const allowedResolutions = (await kvStore.get<string[]>("allowedResolutions")) || ["1080", "720"];
+
+  // 2. Use in scraper requests
+  const response = await axios.get(`${customDomain}${link}`);
+  // ... parse streams and filter by allowedResolutions ...
+
+  return streams;
+};
+```
+
+---
+
 # How to Test Your Provider
 
 ## Test with CLI
