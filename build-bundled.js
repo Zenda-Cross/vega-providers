@@ -28,7 +28,7 @@ async function buildProvider(providerName) {
     fs.mkdirSync(distPath, { recursive: true });
   }
 
-  const modules = ["catalog", "posts", "meta", "stream", "episodes"];
+  const modules = ["catalog", "posts", "meta", "stream", "episodes", "settings"];
   const results = [];
 
   for (const moduleName of modules) {

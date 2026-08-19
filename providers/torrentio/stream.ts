@@ -79,8 +79,37 @@ export const getStream = async ({
       return [];
     }
 
+    const kv = providerContext.kvStore;
+    let baseUrl = "https://torrentio.strem.fun";
+    let debridService = "none";
+    let debridApiKey = "";
+    let qualityFilter = "all";
+    let sortBy = "qualitythenseeders";
+
+    if (kv) {
+      const customUrl = await kv.get<string>("customInstanceUrl");
+      if (customUrl && customUrl.trim()) baseUrl = customUrl.trim().replace(/\/+$/, "");
+      debridService = (await kv.get<string>("debridService")) || "none";
+      debridApiKey = ((await kv.get<string>("debridApiKey")) || "").trim();
+      qualityFilter = (await kv.get<string>("qualityFilter")) || "all";
+      sortBy = (await kv.get<string>("sortBy")) || "qualitythenseeders";
+    }
+
+    const optionsParts: string[] = [];
+    if (sortBy && sortBy !== "qualitythenseeders") {
+      optionsParts.push(`sort=${sortBy}`);
+    }
+    if (qualityFilter && qualityFilter !== "all") {
+      optionsParts.push(`qualityfilter=${qualityFilter}`);
+    }
+    if (debridService && debridService !== "none" && debridApiKey) {
+      optionsParts.push(`${debridService}=${debridApiKey}`);
+    }
+
+    const optionsSegment = optionsParts.length > 0 ? `${optionsParts.join("|")}/` : "";
+
     // Torrentio API format
-    let url = `https://torrentio.strem.fun/stream/${effectiveType}/${imdbId}`;
+    let url = `${baseUrl}/${optionsSegment}stream/${effectiveType}/${imdbId}`;
     if (effectiveType === "series" && season && episode) {
       url += `:${season}:${episode}`;
     }

@@ -7,12 +7,13 @@ Follow these strict rules and conventions when creating or modifying a provider:
 
 ## 1. Directory Structure
 Each provider MUST be placed in its own folder under `providers/` (e.g., `providers/myProvider/`).
-A complete provider consists of up to 5 files:
+A complete provider consists of up to 6 files:
 - `catalog.ts` (Required)
 - `meta.ts` (Required)
 - `posts.ts` (Required)
 - `stream.ts` (Required)
 - `episodes.ts` (Optional - only needed if episodes must be fetched dynamically)
+- `settings.ts` (Optional - exports `getSettingsSchema` to provide a settings UI in Provider Manager)
 
 ## 2. API Signatures & Types
 ALWAYS import types from `../types`. Do NOT define your own types for the core returns.
