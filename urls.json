@@ -150,5 +150,13 @@
   "cinefreak": {
     "name": "CineFreak",
     "url": "https://cinefreak.net"
+  },
+  "anikoto": {
+    "name": "anikoto",
+    "url": "https://anikototv.to"
+  },
+  "kickAssAnime": {
+    "name": "kickAssAnime",
+    "url": "https://kaa.lt"
   }
 }

@@ -34,10 +34,15 @@ function getQuality(resolutions?: string): Stream["quality"] {
     : undefined;
 }
 
-function getStreamType(format?: string): string {
+function getStreamType(format?: string, url?: string): string {
   const normalized = format?.toUpperCase();
   if (normalized === "HLS" || normalized === "M3U8") return "m3u8";
-  if (normalized === "DASH") return "mpd";
+  if (normalized === "DASH" || normalized === "MPD") return "mpd";
+  if (url) {
+    const cleanUrl = url.split("?")[0].toLowerCase();
+    if (cleanUrl.endsWith(".m3u8")) return "m3u8";
+    if (cleanUrl.endsWith(".mpd")) return "mpd";
+  }
   return "mp4";
 }
 
@@ -152,7 +157,7 @@ export const getStream = async function ({
         server:
           `${playback.language} ${source.resolutions || source.format || ""}`.trim(),
         link: source.url || "",
-        type: getStreamType(source.format),
+        type: getStreamType(source.format, source.url),
         quality: getQuality(source.resolutions),
         subtitles: await getCaptions(baseUrl, playback, source, referer),
         headers: { Referer: baseUrl, Origin: baseUrl },
