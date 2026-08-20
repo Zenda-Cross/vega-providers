@@ -31,19 +31,21 @@ export const getPosts = async function ({
     const posts: Post[] = [];
 
     $(".ani.items .item, .items .item, div.item").each((_, el) => {
-      const linkEl = $(el).find("a.name.d-title, a[href*='/watch/'], a.name").first();
+      // Find the specific title in .info or img alt
+      const title =
+        $(el).find(".info a.name, .info a.d-title, a.name.d-title").first().text().trim() ||
+        $(el).find(".info a.name, a.name.d-title").first().attr("data-jp") ||
+        $(el).find("img").attr("alt") ||
+        "";
+
+      // Find the watch link
+      const linkEl = $(el).find(".info a.name, .info a.d-title, .poster a, a[href*='/watch/']").first();
       let href = linkEl.attr("href") || "";
       if (!href) return;
 
       if (!href.startsWith("http")) {
         href = `${BASE_URL}${href.startsWith("/") ? "" : "/"}${href}`;
       }
-
-      const title =
-        linkEl.text().trim() ||
-        $(el).find(".name").text().trim() ||
-        $(el).find("img").attr("alt") ||
-        "";
 
       const image = $(el).find("img").attr("src") || "";
 
@@ -93,19 +95,19 @@ export const getSearchPosts = async function ({
     const posts: Post[] = [];
 
     $(".ani.items .item, .items .item, div.item").each((_, el) => {
-      const linkEl = $(el).find("a.name.d-title, a[href*='/watch/'], a.name").first();
+      const title =
+        $(el).find(".info a.name, .info a.d-title, a.name.d-title").first().text().trim() ||
+        $(el).find(".info a.name, a.name.d-title").first().attr("data-jp") ||
+        $(el).find("img").attr("alt") ||
+        "";
+
+      const linkEl = $(el).find(".info a.name, .info a.d-title, .poster a, a[href*='/watch/']").first();
       let href = linkEl.attr("href") || "";
       if (!href) return;
 
       if (!href.startsWith("http")) {
         href = `${BASE_URL}${href.startsWith("/") ? "" : "/"}${href}`;
       }
-
-      const title =
-        linkEl.text().trim() ||
-        $(el).find(".name").text().trim() ||
-        $(el).find("img").attr("alt") ||
-        "";
 
       const image = $(el).find("img").attr("src") || "";
 

@@ -3,6 +3,12 @@ import { throwProviderError } from "../providerErrors";
 
 const BASE_URL = "https://anikototv.to";
 
+const defaultHeaders = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+  Accept: "*/*",
+};
+
 function rc4(key: string, input: string): string {
   const s = Array.from({ length: 256 }, (_, i) => i);
   let a = 0;
@@ -74,7 +80,7 @@ export const getStream = async function ({
     const watchUrl = `${BASE_URL}/watch/${slug}/ep-${epNum || 1}`;
 
     const headers = {
-      ...providerContext.commonHeaders,
+      ...defaultHeaders,
       Referer: `${BASE_URL}/`,
     };
 
@@ -129,22 +135,31 @@ export const getStream = async function ({
 
     const $s = cheerio.load(srvRes.data.result);
     const tasks: { dataType: string; serverName: string; linkId: string }[] = [];
+    const seenLinkIds = new Set<string>();
 
     $s("div.type, .server-type, div.types > div.type").each((_, typeEl) => {
-      let dataType = $s(typeEl).attr("data-type") || "sub";
+      const dataType = $s(typeEl).attr("data-type") || "sub";
       $s(typeEl)
-        .find("li[data-link-id], .server, div.item, .item")
+        .find("[data-link-id]")
         .each((_, sEl) => {
-          const linkId =
-            $s(sEl).attr("data-link-id") || $s(sEl).attr("data-id");
+          const linkId = $s(sEl).attr("data-link-id") || "";
           const serverName = $s(sEl).text().trim() || "Server";
-          if (linkId) {
+          if (linkId && !seenLinkIds.has(linkId)) {
+            seenLinkIds.add(linkId);
             tasks.push({ dataType, serverName, linkId });
           }
         });
     });
 
     const streams: Stream[] = [];
+    const seenIframeUrls = new Set<string>();
+    const seenStreamLinks = new Set<string>();
+
+    const addStream = (stream: Stream) => {
+      if (!stream.link || seenStreamLinks.has(stream.link)) return;
+      seenStreamLinks.add(stream.link);
+      streams.push(stream);
+    };
 
     await Promise.all(
       tasks.map(async (task) => {
@@ -164,7 +179,17 @@ export const getStream = async function ({
           const iframeUrl = getRes.data?.result?.url;
           if (!iframeUrl) return;
 
-          const host = iframeUrl.split("://")[1]?.split("/")[0] || "";
+          // Deduplicate iframe URLs (e.g. ignore duplicate CDN query parameters for same video)
+          const baseIframe = iframeUrl.split("?")[0] + "#" + task.dataType;
+          if (seenIframeUrls.has(baseIframe)) return;
+          seenIframeUrls.add(baseIframe);
+
+          let host = "";
+          try {
+            host = new URL(iframeUrl).host;
+          } catch {
+            host = iframeUrl.split("://")[1]?.split("/")[0] || "";
+          }
           const audioLabel = task.dataType.toUpperCase();
 
           if (
@@ -173,7 +198,11 @@ export const getStream = async function ({
             host.includes("vidwish")
           ) {
             const pageRes = await axios.get(iframeUrl, {
-              headers: { ...headers, Referer: `https://${host}/` },
+              headers: {
+                ...headers,
+                Referer: `https://${host}/`,
+                Origin: `https://${host}`,
+              },
               timeout: 8000,
             });
             const matchId = pageRes.data.match(/data-id="(\d+)"/);
@@ -184,13 +213,15 @@ export const getStream = async function ({
                 headers: {
                   ...headers,
                   "X-Requested-With": "XMLHttpRequest",
-                  Referer: "https://vidtube.site/",
+                  Referer: `https://${host}/`,
+                  Origin: `https://${host}`,
                 },
                 timeout: 8000,
               });
 
               const srcData = srcRes.data;
               if (srcData?.sources?.file) {
+                const masterUrl = srcData.sources.file;
                 const subtitles: TextTracks = (srcData.tracks || [])
                   .filter((t: any) => t.file && t.label)
                   .map((t: any) => ({
@@ -200,16 +231,55 @@ export const getStream = async function ({
                     uri: t.file,
                   }));
 
-                streams.push({
+                const streamHeaders = {
+                  Referer: `https://${host}/`,
+                  Origin: `https://${host}`,
+                  "User-Agent": defaultHeaders["User-Agent"],
+                };
+
+                // Add Auto Master stream
+                addStream({
                   server: `${task.serverName} (${audioLabel})`,
-                  link: srcData.sources.file,
+                  link: masterUrl,
                   type: "m3u8",
+                  quality: "auto",
                   subtitles: subtitles.length > 0 ? subtitles : undefined,
-                  headers: {
-                    Referer: `https://${host}/`,
-                    Origin: `https://${host}`,
-                  },
+                  headers: streamHeaders,
                 });
+
+                // Parse master m3u8 for resolution sub-streams
+                try {
+                  const m3u8Res = await axios.get(masterUrl, {
+                    headers: streamHeaders,
+                    timeout: 6000,
+                  });
+                  const lines: string[] = m3u8Res.data.split("\n");
+                  const baseUrl = masterUrl.substring(0, masterUrl.lastIndexOf("/") + 1);
+
+                  for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line.startsWith("#EXT-X-STREAM-INF")) {
+                      const resMatch = line.match(/RESOLUTION=\d+x(\d+)/);
+                      const quality = resMatch ? `${resMatch[1]}p` : "unknown";
+                      const nextLine = lines[i + 1]?.trim();
+                      if (nextLine && !nextLine.startsWith("#")) {
+                        const streamUrl = nextLine.startsWith("http")
+                          ? nextLine
+                          : baseUrl + nextLine;
+                        addStream({
+                          server: `${task.serverName} (${audioLabel}) ${quality}`,
+                          link: streamUrl,
+                          type: "m3u8",
+                          quality,
+                          subtitles: subtitles.length > 0 ? subtitles : undefined,
+                          headers: streamHeaders,
+                        });
+                      }
+                    }
+                  }
+                } catch {
+                  // Master stream is already added
+                }
               }
             }
           } else if (iframeUrl.includes("#")) {
@@ -218,13 +288,14 @@ export const getStream = async function ({
               try {
                 const decoded = atob(fragment);
                 if (decoded.startsWith("http")) {
-                  streams.push({
+                  addStream({
                     server: `${task.serverName} (${audioLabel})`,
                     link: decoded,
                     type: "m3u8",
                     headers: {
                       Referer: "https://vibeplayer.site/",
                       Origin: "https://vibeplayer.site",
+                      "User-Agent": defaultHeaders["User-Agent"],
                     },
                   });
                 }
