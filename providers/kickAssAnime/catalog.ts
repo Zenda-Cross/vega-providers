@@ -1,9 +1,10 @@
 export const catalog = [
   { title: "Trending", filter: "/api/show/trending" },
-  { title: "Recent Updates", filter: "/api/show/recent?type=all" },
+  { title: "Popular", filter: "/api/show/popular" },
+  { title: "Recent (Sub)", filter: "/api/show/recent?type=sub" },
+  { title: "Recent (Dub)", filter: "/api/show/recent?type=dub" },
+  { title: "Recent (Chinese)", filter: "/api/show/recent?type=chinese" },
   { title: "All Anime", filter: "/api/anime" },
-  { title: "Ongoing", filter: "/api/anime?status=currently_airing" },
-  { title: "Completed", filter: "/api/anime?status=finished_airing" },
 ];
 
 export const genres = [

@@ -32,12 +32,12 @@ export const getPosts = async function ({
 
   if (filter.includes("/api/show/trending")) {
     url = `${BASE_URL}/api/show/trending?page=${page}`;
+  } else if (filter.includes("/api/show/popular")) {
+    url = `${BASE_URL}/api/show/popular?page=${page}`;
   } else if (filter.includes("/api/show/recent")) {
-    url = `${BASE_URL}/api/show/recent?type=all&page=${page}`;
-  } else if (filter.includes("status=")) {
-    const status = filter.split("status=")[1];
-    const encoded = btoa(JSON.stringify({ status }));
-    url = `${BASE_URL}/api/anime?page=${page}&filters=${encoded}`;
+    const typeMatch = filter.match(/type=([a-z]+)/);
+    const type = typeMatch ? typeMatch[1] : "all";
+    url = `${BASE_URL}/api/show/recent?type=${type}&page=${page}`;
   } else if (filter.startsWith("/api/anime")) {
     url = `${BASE_URL}/api/anime?page=${page}`;
   } else {
