@@ -222,20 +222,22 @@ export const getStream = async function ({
               const srcData = srcRes.data;
               if (srcData?.sources?.file) {
                 const masterUrl = srcData.sources.file;
+                const streamHeaders = {
+                  Referer: `https://${host}/`,
+                  Origin: `https://${host}`,
+                  "User-Agent": defaultHeaders["User-Agent"],
+                };
+
                 const subtitles: TextTracks = (srcData.tracks || [])
                   .filter((t: any) => t.file && t.label)
                   .map((t: any) => ({
                     title: t.label,
                     language: inferLang(t.label),
                     type: "text/vtt" as const,
-                    uri: t.file,
+                    uri: `https://worker.zendax.me/api/fetch?url=${encodeURIComponent(
+                      t.file
+                    )}&headers=${encodeURIComponent(JSON.stringify(streamHeaders))}`,
                   }));
-
-                const streamHeaders = {
-                  Referer: `https://${host}/`,
-                  Origin: `https://${host}`,
-                  "User-Agent": defaultHeaders["User-Agent"],
-                };
 
                 // Add Auto Master stream
                 addStream({
