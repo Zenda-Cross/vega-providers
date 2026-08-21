@@ -102,13 +102,11 @@ export async function getStream({
   type,
   signal,
   providerContext,
-  isDownload,
 }: {
   link: string;
   type: string;
   signal?: AbortSignal;
   providerContext: ProviderContext;
-  isDownload?: boolean;
 }): Promise<Stream[]> {
   const { axios, cheerio, commonHeaders } = providerContext;
   try {
@@ -192,10 +190,8 @@ export async function getStream({
 
       try {
         if (href.includes(".dev") && !href.includes("/?id=")) {
-          // Fast Cloud [FSL]
           streamLinks.push({ server: "Fast Cloud", link: href, type: "mkv" });
         } else if (href.includes("/w/") || href.includes("/gp/") || text.includes("instant download")) {
-          // Instant Download and Instant Download [V2] - Follow redirects
           const newLink = await followRedirect(href, commonHeaders, signal, cheerio);
           if (newLink && newLink !== href) {
             streamLinks.push({
@@ -205,7 +201,6 @@ export async function getStream({
             });
           }
         } else if (href.includes("/d/") || text.includes("cloud [resumable]")) {
-          // Cloud [Resumable] - Scrape direct link from /d/ page
           let dPageHtml = "";
           try {
             const dPageRes = await axios.get(href, { headers: commonHeaders, signal });
@@ -246,7 +241,6 @@ export async function getStream({
             }
           }
         } else if (href.includes("/x/") || text.includes("stream online")) {
-          // Stream online - Extract direct stream from embedded iframe
           try {
             const xRes = await axios.get(href, { headers: commonHeaders, signal });
             const $x = cheerio.load(xRes.data);
@@ -265,7 +259,6 @@ export async function getStream({
       }
     }
 
-    // Prioritize Fast Cloud and Resumable before Instant download
     const getPriority = (server: string = "") => {
       const s = server.toLowerCase();
       if (s.includes("fast cloud")) return 1;
@@ -277,14 +270,6 @@ export async function getStream({
     };
 
     streamLinks.sort((a, b) => getPriority(a.server) - getPriority(b.server));
-
-    const quickDownloadSetting = await providerContext.kvStore?.get<boolean>(
-      "quickDownload",
-    );
-
-    if ((isDownload || quickDownloadSetting) && streamLinks.length > 0) {
-      return [streamLinks[0]];
-    }
 
     return streamLinks;
   } catch (error: any) {
