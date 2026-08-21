@@ -46,14 +46,12 @@ const getRedirectedPixelDrainUrl = (
 
 async function checkStreamHealth(
   stream: { server: string; link: string; headers?: any },
-  headers: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<boolean> {
   if (!stream?.link) return false;
-  const reqHeaders = {
+  const reqHeaders: Record<string, string> = {
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-    ...(headers || {}),
     ...(stream.headers || {}),
   };
 
@@ -413,7 +411,6 @@ export async function hubcloudExtractor(
     if (isDownload && streamLinks.length > 0) {
       const isTopHealthy = await checkStreamHealth(
         streamLinks[0],
-        headers,
         signal,
       );
       if (!isTopHealthy) {
@@ -421,7 +418,6 @@ export async function hubcloudExtractor(
         for (let i = 1; i < streamLinks.length; i++) {
           const isHealthy = await checkStreamHealth(
             streamLinks[i],
-            headers,
             signal,
           );
           if (isHealthy) {
