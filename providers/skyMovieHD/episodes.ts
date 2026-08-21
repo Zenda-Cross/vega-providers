@@ -38,7 +38,12 @@ export const getEpisodes = function ({
           });
       });
 
-      return episodes;
+      return providerContext.kvStore?.get<boolean>("quickDownload").then((quickDownload) => {
+        return episodes.map((e) => ({
+          ...e,
+          quickDownload: Boolean(quickDownload),
+        }));
+      });
     })
     .catch((err) => {
       console.log("getEpisodeLinks error:", err);

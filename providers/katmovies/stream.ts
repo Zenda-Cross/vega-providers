@@ -54,13 +54,16 @@ async function extractKmhdLink(
 }
 export const getStream = async function ({
   link,
+  type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
   signal: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }): Promise<Stream[]> {
   const { axios, cheerio, commonHeaders, openWebView } = providerContext;
   const streamLinks: Stream[] = [];
@@ -84,6 +87,8 @@ export const getStream = async function ({
         axios,
         cheerio,
         commonHeaders,
+        providerContext,
+        isDownload,
       );
     }
     if (link.includes("gdflix")) {
@@ -157,6 +162,8 @@ export const getStream = async function ({
       axios,
       cheerio,
       commonHeaders,
+      providerContext,
+      isDownload,
     );
     return stereams;
   } catch (error: any) {

@@ -4,13 +4,16 @@ import { gdflixExtractor } from "../extractors/gdflix";
 
 export const getStream = async ({
   link,
+  type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
   signal: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }): Promise<Stream[]> => {
   const { axios, cheerio, commonHeaders: headers } = providerContext;
   try {
@@ -85,6 +88,8 @@ export const getStream = async ({
       axios,
       cheerio,
       headers,
+      providerContext,
+      isDownload,
     );
     return hubCloudLinks;
   } catch (err) {

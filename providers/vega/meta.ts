@@ -215,12 +215,14 @@ export const getMeta = async ({
         });
       }
     });
+    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
     const websiteInfo: Info = {
       title,
       synopsis,
       image,
       imdbId: imdbId || "",
       type,
+      quickDownload: Boolean(quickDownload),
       linkList: links,
       webUrl: url,
     };

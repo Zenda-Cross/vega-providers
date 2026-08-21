@@ -27,18 +27,28 @@ export async function getStream({
   type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
   signal: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }) {
   const { axios, cheerio, commonHeaders } = providerContext;
   try {
     const streamLinks: Stream[] = [];
     console.log("dotlink", link);
 
-    return await hubcloudExtractor(link, signal, axios, cheerio, commonHeaders);
+    return await hubcloudExtractor(
+      link,
+      signal,
+      axios,
+      cheerio,
+      commonHeaders,
+      providerContext,
+      isDownload,
+    );
   } catch (error: any) {
     console.log("getStream error: ", error);
     if (error.message.includes("Aborted")) {

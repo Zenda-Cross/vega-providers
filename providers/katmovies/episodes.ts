@@ -53,17 +53,27 @@ export const getEpisodes = async function ({
     const context = readCinemetaContext(url);
     const requestUrl = context.requestUrl;
     const finish = async (): Promise<EpisodeLink[]> => {
-      if (!context.imdbId || !context.season) return episodesLink;
+      const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+      if (!context.imdbId || !context.season) {
+        return episodesLink.map((e) => ({
+          ...e,
+          quickDownload: Boolean(quickDownload),
+        }));
+      }
       const cinemeta = await getCinemetaMeta(
         context.imdbId,
         "series",
         providerContext,
       );
-      return enrichCinemetaEpisodes(
+      const enriched = await enrichCinemetaEpisodes(
         episodesLink,
         cinemeta.videos || [],
         context.season,
       );
+      return enriched.map((e) => ({
+        ...e,
+        quickDownload: Boolean(quickDownload),
+      }));
     };
 
     if (requestUrl.includes("gdflix")) {

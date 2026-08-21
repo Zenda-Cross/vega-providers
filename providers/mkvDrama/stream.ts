@@ -35,13 +35,16 @@ function pixelDrainStream(link: string): Stream[] {
 
 export async function getStream({
   link,
+  type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
   signal: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }): Promise<Stream[]> {
   const baseUrl = await getMkvDramaUrl("/");
   let target = link;
@@ -87,7 +90,15 @@ export async function getStream({
     );
   }
   if (/hubcloud|hubdrive|vcloud|cloud/.test(hostname)) {
-    return hubcloudExtractor(target, signal, axios, cheerio, headers);
+    return hubcloudExtractor(
+      target,
+      signal,
+      axios,
+      cheerio,
+      headers,
+      providerContext,
+      isDownload,
+    );
   }
 
   return [

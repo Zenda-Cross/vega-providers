@@ -49,9 +49,13 @@ providers/
 
 ### 4. `stream.ts`
 
-- **Purpose:** Fetches streaming links or sources for a given item.
+- **Purpose:** Fetches streaming and downloadable links/sources for a given item.
 - **Exports:**
-  - `getStream({ link, type, signal, providerContext })`: Returns an array of `Stream` objects with streaming info.
+  - `getStream({ link, type, signal, providerContext, isDownload })`: Returns an array of `Stream` objects with streaming info.
+  - **`isDownload?: boolean` parameter:**
+    - When `true`, the user is downloading the media (quick download or download sheet). Providers can prioritize download-friendly or download-only servers at the top of the returned array.
+    - When `false` or omitted, providers should prioritize streaming-friendly servers (e.g. HLS/m3u8, direct streaming web players).
+    - **Important:** Always return all available servers regardless of `isDownload`. The app will use the 1st server for Quick Download while enabling the user to choose alternative servers in the download dialog.
 
 ### 5. `episodes.ts` (Optional)
 
@@ -178,14 +182,17 @@ export const getStream = async function ({
   type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
-  signal: AbortSignal;
+  signal?: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }): Promise<Stream[]> {
   // Fetch and return streaming sources
-  // ...implementation...
+  // If isDownload is true, place download-optimized servers first:
+  // const servers = ...
   return [
     {
       server: "ExampleServer",
@@ -394,11 +401,13 @@ export const getStream = async function ({
   type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
-  signal: AbortSignal;
+  signal?: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }): Promise<Stream[]> {
   const { axios, kvStore } = providerContext;
 

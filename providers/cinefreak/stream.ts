@@ -102,11 +102,13 @@ export async function getStream({
   type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
   signal?: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }): Promise<Stream[]> {
   const { axios, cheerio, commonHeaders } = providerContext;
   try {
@@ -259,17 +261,102 @@ export async function getStream({
       }
     }
 
+    let preferredServer = "auto";
+    try {
+      preferredServer = (
+        (await providerContext?.kvStore?.get<string>("preferredDownloadServer")) ||
+        "auto"
+      )
+        .toLowerCase()
+        .trim();
+    } catch {}
+
     const getPriority = (server: string = "") => {
       const s = server.toLowerCase();
-      if (s.includes("fast cloud")) return 1;
-      if (s.includes("resumable")) return 2;
-      if (s.includes("instant (download only)")) return 3;
-      if (s.includes("instant v2")) return 4;
-      if (s.includes("stream online")) return 5;
+      if (
+        preferredServer !== "auto" &&
+        preferredServer !== "" &&
+        s.includes(preferredServer)
+      ) {
+        return 0;
+      }
+      if (isDownload) {
+        if (s.includes("fast cloud")) return 1;
+        if (s.includes("resumable")) return 2;
+        if (s.includes("instant (download only)")) return 3;
+        if (s.includes("instant v2")) return 4;
+        if (s.includes("stream online")) return 5;
+      } else {
+        if (s.includes("fast cloud")) return 1;
+        if (s.includes("stream online")) return 2;
+        if (s.includes("resumable")) return 3;
+        if (s.includes("instant (download only)")) return 4;
+        if (s.includes("instant v2")) return 5;
+      }
       return 6;
     };
 
     streamLinks.sort((a, b) => getPriority(a.server) - getPriority(b.server));
+
+    if (isDownload && streamLinks.length > 0) {
+      const checkHealth = async (linkUrl: string): Promise<boolean> => {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4000);
+          if (signal) {
+            signal.addEventListener("abort", () => controller.abort(), { once: true });
+          }
+          const res = await fetch(linkUrl, {
+            method: "HEAD",
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            },
+            signal: controller.signal,
+            redirect: "follow",
+          });
+          clearTimeout(timeoutId);
+          if (res.status >= 200 && res.status < 400) return true;
+          if (res.status === 405 || res.status === 403) {
+            const getController = new AbortController();
+            const getTimeoutId = setTimeout(() => getController.abort(), 4000);
+            if (signal) {
+              signal.addEventListener("abort", () => getController.abort(), { once: true });
+            }
+            const getRes = await fetch(linkUrl, {
+              method: "GET",
+              headers: {
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                Range: "bytes=0-0",
+              },
+              signal: getController.signal,
+            });
+            clearTimeout(getTimeoutId);
+            return getRes.status >= 200 && getRes.status < 400;
+          }
+          return false;
+        } catch {
+          return false;
+        }
+      };
+
+      const isTopHealthy = await checkHealth(streamLinks[0].link);
+      if (!isTopHealthy) {
+        let healthyIndex = -1;
+        for (let i = 1; i < streamLinks.length; i++) {
+          const isHealthy = await checkHealth(streamLinks[i].link);
+          if (isHealthy) {
+            healthyIndex = i;
+            break;
+          }
+        }
+        if (healthyIndex > 0) {
+          const [workingStream] = streamLinks.splice(healthyIndex, 1);
+          streamLinks.unshift(workingStream);
+        }
+      }
+    }
 
     return streamLinks;
   } catch (error: any) {

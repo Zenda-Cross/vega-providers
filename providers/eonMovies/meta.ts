@@ -74,12 +74,15 @@ export async function getMeta({
     .trim();
   const type = $(".meta-pills").text().includes("Series") ? "series" : "movie";
 
+  const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+
   return {
     title,
     image,
     synopsis,
     imdbId: "",
     type,
+    quickDownload: Boolean(quickDownload),
     tags: getTags($),
     linkList: getDownloadLinks($, baseUrl),
     webUrl: url,

@@ -29,11 +29,13 @@ export async function getStream({
   type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
   signal: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }) {
   const { axios, cheerio, commonHeaders, openWebView } = providerContext;
   try {
@@ -177,6 +179,7 @@ export async function getStream({
         cheerio,
         headers,
         providerContext,
+        isDownload,
       );
     }
 

@@ -280,11 +280,21 @@ async function resolveHubcloud(
   axios: any,
   cheerio: any,
   commonHeaders: Record<string, string>,
+  providerContext?: ProviderContext,
+  isDownload?: boolean,
 ): Promise<Stream | null> {
-  const streams = await hubcloudExtractor(link, signal, axios, cheerio, {
-    ...headers,
-    ...commonHeaders,
-  });
+  const streams = await hubcloudExtractor(
+    link,
+    signal,
+    axios,
+    cheerio,
+    {
+      ...headers,
+      ...commonHeaders,
+    },
+    providerContext,
+    isDownload,
+  );
   return streams.find((stream: Stream) => stream?.link) || null;
 }
 
@@ -293,11 +303,13 @@ export async function getStream({
   type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
   signal: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }) {
   const { axios, cheerio, openWebView, commonHeaders } = providerContext;
 
@@ -316,7 +328,15 @@ export async function getStream({
       SKYDROP: (l) => resolveSkyDrop(l, axios),
       GOFILE: (l) => resolveGofile(l, axios),
       HUBCLOUD: (l) =>
-        resolveHubcloud(l, signal, axios, cheerio, commonHeaders || {}),
+        resolveHubcloud(
+          l,
+          signal,
+          axios,
+          cheerio,
+          commonHeaders || {},
+          providerContext,
+          isDownload,
+        ),
     };
 
     const streams: Stream[] = [];

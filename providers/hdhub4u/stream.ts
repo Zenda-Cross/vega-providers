@@ -4,18 +4,29 @@ import { throwProviderError } from "../providerErrors";
 
 export async function getStream({
   link,
+  type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
   signal: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }) {
   const { axios, cheerio, commonHeaders: headers } = providerContext;
   let hubdriveLink = "";
   if (link.includes("hubcloud") || link.includes("/drive/")) {
-    return await hubcloudExtractor(link, signal, axios, cheerio, headers);
+    return await hubcloudExtractor(
+      link,
+      signal,
+      axios,
+      cheerio,
+      headers,
+      providerContext,
+      isDownload,
+    );
   }
   if (link.includes("hubdrive")) {
     const hubdriveRes = await axios.get(link, { headers, signal });
@@ -87,6 +98,8 @@ export async function getStream({
       axios,
       cheerio,
       headers,
+      providerContext,
+      isDownload,
     );
   } catch (error: any) {
     throwProviderError("HDHub4u", "stream", error);

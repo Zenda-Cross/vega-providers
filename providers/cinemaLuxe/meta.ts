@@ -74,6 +74,7 @@ export const getMeta = async function ({
         }
       });
     }
+    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
     return {
       title,
       tags,
@@ -82,6 +83,7 @@ export const getMeta = async function ({
       image,
       imdbId,
       type,
+      quickDownload: Boolean(quickDownload),
       linkList: links,
     };
   } catch (err) {

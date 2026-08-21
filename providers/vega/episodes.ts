@@ -46,14 +46,24 @@ export const getEpisodes = async function ({
         episodes.push({ title, link });
       }
     });
-    if (!context.imdbId || !context.season) return episodes;
+    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    if (!context.imdbId || !context.season) {
+      return episodes.map((e) => ({
+        ...e,
+        quickDownload: Boolean(quickDownload),
+      }));
+    }
 
     const cinemeta = await getCinemetaMeta(
       context.imdbId,
       "series",
       providerContext,
     );
-    return enrichEpisodes(episodes, cinemeta.videos || [], context.season);
+    const enriched = enrichEpisodes(episodes, cinemeta.videos || [], context.season);
+    return enriched.map((e) => ({
+      ...e,
+      quickDownload: Boolean(quickDownload),
+    }));
   } catch (err) {
     throwProviderError("Vega", "episodes", err);
   }

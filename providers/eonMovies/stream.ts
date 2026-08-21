@@ -198,6 +198,7 @@ async function extractDownloadStreams(
   signal: AbortSignal,
   headers: Record<string, string>,
   providerContext: ProviderContext,
+  isDownload?: boolean,
 ): Promise<Stream[]> {
   if (getDotflixSharingCode(link)) {
     return extractDotflixStream(link, signal, headers, providerContext);
@@ -209,6 +210,8 @@ async function extractDownloadStreams(
       providerContext.axios,
       providerContext.cheerio,
       { ...headers },
+      providerContext,
+      isDownload,
     );
   }
   return [];
@@ -216,13 +219,16 @@ async function extractDownloadStreams(
 
 export async function getStream({
   link,
+  type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
   signal: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }): Promise<Stream[]> {
   const headers = { ...providerContext.commonHeaders };
   const page = await followDownloadLink(link, signal, headers);
@@ -232,6 +238,7 @@ export async function getStream({
       signal,
       headers,
       providerContext,
+      isDownload,
     );
     return addQuality(streams);
   }
@@ -276,6 +283,7 @@ export async function getStream({
       signal,
       headers,
       providerContext,
+      isDownload,
     );
     addQuality(extracted, downloadLink.quality).forEach((stream) => {
       if (!seen.has(stream.link)) {

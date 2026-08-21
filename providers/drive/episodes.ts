@@ -129,18 +129,28 @@ export const getEpisodes = async function ({
       preferredEpisodeLinks.length > 0
         ? preferredEpisodeLinks
         : [{ title: "Play", link: context.requestUrl }];
-    if (!context.imdbId || !context.season) return episodes;
+    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    if (!context.imdbId || !context.season) {
+      return episodes.map((e) => ({
+        ...e,
+        quickDownload: Boolean(quickDownload),
+      }));
+    }
 
     const cinemeta = await getCinemetaMeta(
       context.imdbId,
       "series",
       providerContext,
     );
-    return enrichCinemetaEpisodes(
+    const enrichedEpisodes = await enrichCinemetaEpisodes(
       episodes,
       cinemeta.videos || [],
       context.season,
     );
+    return enrichedEpisodes.map((e) => ({
+      ...e,
+      quickDownload: Boolean(quickDownload),
+    }));
   } catch (err) {
     throwProviderError("Drive", "episodes", err);
   }

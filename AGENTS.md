@@ -62,9 +62,12 @@ Export `getStream`.
 ```ts
 import { Stream, ProviderContext } from "../types";
 
-export const getStream = async function ({ link, type, signal, providerContext }): Promise<Stream[]> {
+export const getStream = async function ({ link, type, signal, providerContext, isDownload }): Promise<Stream[]> {
   const { axios, cheerio, commonHeaders } = providerContext;
   // Scrape and resolve the final video files (e.g., .m3u8, .mp4)
+  // - If isDownload is true: sort download-optimized / download-only servers first
+  // - If isDownload is false/undefined: sort streaming-optimized servers first
+  // - Always return ALL extracted servers (app uses 1st for quick download and lets user choose from the rest)
   // Return array of `{ server, link, type, quality }`
 }
 ```

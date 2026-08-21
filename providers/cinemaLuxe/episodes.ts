@@ -67,7 +67,11 @@ export const getEpisodes = async function ({
         }
       }
     );
-    return episodeLinks;
+    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    return episodeLinks.map((e) => ({
+      ...e,
+      quickDownload: Boolean(quickDownload),
+    }));
   } catch (err) {
     console.error("cl episode links", err);
     return [];

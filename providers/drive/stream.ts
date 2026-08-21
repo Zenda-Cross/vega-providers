@@ -8,11 +8,13 @@ export const getStream = async function ({
   type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
   signal: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }): Promise<Stream[]> {
   const { axios, cheerio, commonHeaders: headers } = providerContext;
   try {
@@ -41,7 +43,15 @@ export const getStream = async function ({
     if (!redirectUrl) {
       if (url.includes("hubcloud")) {
         console.log(" hubcloud link found in:", url);
-        return await hubcloudExtractor(url, signal, axios, cheerio, headers);
+        return await hubcloudExtractor(
+          url,
+          signal,
+          axios,
+          cheerio,
+          headers,
+          providerContext,
+          isDownload,
+        );
       } else if (url.includes("gdflix")) {
         // handle gdflix links
         console.log("gdflix link found:", url);
@@ -67,6 +77,8 @@ export const getStream = async function ({
       axios,
       cheerio,
       headers,
+      providerContext,
+      isDownload,
     );
   } catch (err: any) {
     throwProviderError("Drive", "stream", err);

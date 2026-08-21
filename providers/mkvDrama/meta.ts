@@ -62,12 +62,15 @@ export async function getMeta({
         },
   ];
 
+  const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+
   return {
     title,
     image,
     synopsis,
     imdbId,
     type,
+    quickDownload: Boolean(quickDownload),
     tags,
     cast,
     rating,

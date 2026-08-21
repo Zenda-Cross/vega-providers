@@ -236,12 +236,14 @@ export const getMeta = async function ({
       });
     }
 
+    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
     return {
       title,
       synopsis,
       image,
       imdbId,
       type: type as "movie" | "series",
+      quickDownload: Boolean(quickDownload),
       tags,
       cast: [],
       rating: $(".entry-meta .entry-date").text().trim() || "",

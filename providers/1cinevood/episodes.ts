@@ -134,7 +134,12 @@ export const getEpisodes = async function ({
       }
     }
 
-    return enrich(episodes);
+    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const enrichedEpisodes = await enrich(episodes);
+    return enrichedEpisodes.map((e) => ({
+      ...e,
+      quickDownload: Boolean(quickDownload),
+    }));
   } catch (err) {
     throw err;
   }

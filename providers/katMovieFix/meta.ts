@@ -79,7 +79,17 @@ export const getMeta = async function ({
         });
       }
 
-      return { title, synopsis, image, imdbId, type, linkList };
+      return providerContext.kvStore?.get<boolean>("quickDownload").then((quickDownload) => {
+        return {
+          title,
+          synopsis,
+          image,
+          imdbId,
+          type,
+          quickDownload: Boolean(quickDownload),
+          linkList,
+        };
+      });
     })
     .catch((err) => {
       console.error("getMeta error:", err);

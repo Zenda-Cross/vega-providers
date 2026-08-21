@@ -4,13 +4,16 @@ import { throwProviderError } from "../providerErrors";
 
 export async function getStream({
   link,
+  type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
   signal: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }) {
   const { axios, cheerio, commonHeaders: headers } = providerContext;
   let hubdriveLink = "";
@@ -37,6 +40,8 @@ export async function getStream({
         axios,
         cheerio,
         headers,
+        providerContext,
+        isDownload,
       );
     }
     const redirectLinkRes = await axios.get(redirectLink, { headers, signal });
@@ -69,6 +74,8 @@ export async function getStream({
       axios,
       cheerio,
       headers,
+      providerContext,
+      isDownload,
     );
   } catch (error: any) {
     throwProviderError("4KHDHub", "stream", error);
