@@ -382,6 +382,7 @@ export async function hubcloudExtractor(
     const getPriority = (serverName: string = "") => {
       const s = serverName.toLowerCase();
       if (
+        isDownload &&
         preferredServer !== "auto" &&
         preferredServer !== "" &&
         s.includes(preferredServer)

@@ -274,6 +274,7 @@ export async function getStream({
     const getPriority = (server: string = "") => {
       const s = server.toLowerCase();
       if (
+        isDownload &&
         preferredServer !== "auto" &&
         preferredServer !== "" &&
         s.includes(preferredServer)
