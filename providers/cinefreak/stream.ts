@@ -140,9 +140,13 @@ export async function getStream({
       baseUrl = "https://new5.cinecloud.site";
     }
 
+    const idMatch = targetLink.match(/\/(?:x|f|d|w|gp)\/([a-zA-Z0-9]+)/);
+    const id = idMatch ? idMatch[1] : "";
+    const mainPageUrl = id ? `${baseUrl}/f/${id}` : targetLink;
+
     let pageHtml = "";
     try {
-      const res = await axios.get(targetLink, {
+      const res = await axios.get(mainPageUrl, {
         headers: commonHeaders,
         signal,
       });
@@ -165,7 +169,7 @@ export async function getStream({
         });
         if (wafResult.userAgent) commonHeaders["User-Agent"] = wafResult.userAgent;
         commonHeaders["Cookie"] = (commonHeaders["Cookie"] ? commonHeaders["Cookie"] + "; " : "") + wafResult.cookies;
-        const retryRes = await axios.get(targetLink, { headers: commonHeaders, signal });
+        const retryRes = await axios.get(mainPageUrl, { headers: commonHeaders, signal });
         pageHtml = retryRes.data;
       } else {
         throw e;
@@ -201,7 +205,7 @@ export async function getStream({
             });
           }
         } else if (href.includes("/d/") || text.includes("cloud [resumable]")) {
-          // Cloud [Resumable]
+          // Cloud [Resumable] - Scrape direct link from /d/ page
           let dPageHtml = "";
           try {
             const dPageRes = await axios.get(href, { headers: commonHeaders, signal });
@@ -210,35 +214,52 @@ export async function getStream({
             if (e.response?.status === 403 && providerContext.openWebView) {
               const retryRes = await axios.get(href, { headers: commonHeaders, signal });
               dPageHtml = retryRes.data;
-            } else {
-              throw e;
             }
           }
 
-          const $dPage = cheerio.load(dPageHtml);
-          let dPageLink = $dPage("a.btn-success, a.btn-primary, a.btn-danger, a.server-btn").attr("href");
+          if (dPageHtml && !dPageHtml.includes("File not Found") && !dPageHtml.includes("cannot be found")) {
+            const $dPage = cheerio.load(dPageHtml);
+            let dPageLink: string | null | undefined = $dPage("a.download-now, a.btn-warning, a:contains('Download Now')").attr("href");
 
-          if (!dPageLink) {
-            const match = dPageHtml.match(/https?:\/\/[^\s"'<>]*(?:cloudflarestorage|r2\.dev)[^\s"'<>]*/);
-            if (match) {
-              dPageLink = match[0];
+            if (dPageLink && (dPageLink.includes("/x/") || dPageLink.includes("/w/") || dPageLink.includes("/gp/") || dPageLink === "#")) {
+              dPageLink = null;
+            }
+
+            if (!dPageLink) {
+              $dPage("a[href]").each((_, aEl) => {
+                const h = $dPage(aEl).attr("href") || "";
+                if (h.includes("cloudflarestorage") || h.includes(".r2.dev") || h.includes("response-content-disposition")) {
+                  dPageLink = h;
+                }
+              });
+            }
+
+            if (!dPageLink) {
+              const match = dPageHtml.match(/https?:\/\/[^\s"'<>]*(?:cloudflarestorage|r2\.dev)[^\s"'<>]*/);
+              if (match) {
+                dPageLink = match[0];
+              }
+            }
+
+            if (dPageLink && dPageLink.startsWith("http") && !dPageLink.includes("/x/")) {
+              streamLinks.push({ server: "Cloud Resumable", link: dPageLink, type: "mkv" });
             }
           }
-
-          if (dPageLink) {
-            if (dPageLink.startsWith("/")) {
-              dPageLink = `${baseUrl}${dPageLink}`;
+        } else if (href.includes("/x/") || text.includes("stream online")) {
+          // Stream online - Extract direct stream from embedded iframe
+          try {
+            const xRes = await axios.get(href, { headers: commonHeaders, signal });
+            const $x = cheerio.load(xRes.data);
+            const iframeSrc = $x("iframe").attr("src");
+            if (iframeSrc) {
+              const u = new URL(iframeSrc.startsWith("//") ? "https:" + iframeSrc : iframeSrc);
+              const rawId = u.searchParams.get("id");
+              if (rawId && rawId.startsWith("http")) {
+                streamLinks.push({ server: "Stream Online", link: rawId, type: "mkv" });
+              }
             }
-            streamLinks.push({ server: "Cloud Resumable", link: dPageLink, type: "mkv" });
-          }
+          } catch (err) {}
         }
-        // else if (href.includes("/x/") || text.includes("stream online")) {
-        //    // Stream online button
-        //    const newLink = await followRedirect(href, commonHeaders, signal, cheerio);
-        //    if (newLink && newLink !== href) {
-        //       streamLinks.push({ server: "Stream Online", link: newLink, type: "mkv" });
-        //    }
-        // }
       } catch (error) {
         console.warn(`Cinefreak extraction error for ${href}:`, error);
       }
@@ -249,9 +270,10 @@ export async function getStream({
       const s = server.toLowerCase();
       if (s.includes("fast cloud")) return 1;
       if (s.includes("resumable")) return 2;
-      if (s.includes("instant")) return 3;
-      if (s.includes("stream")) return 4;
-      return 5;
+      if (s.includes("instant (download only)")) return 3;
+      if (s.includes("instant v2")) return 4;
+      if (s.includes("stream online")) return 5;
+      return 6;
     };
 
     streamLinks.sort((a, b) => getPriority(a.server) - getPriority(b.server));
