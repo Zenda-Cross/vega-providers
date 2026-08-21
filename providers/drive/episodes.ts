@@ -129,11 +129,11 @@ export const getEpisodes = async function ({
       preferredEpisodeLinks.length > 0
         ? preferredEpisodeLinks
         : [{ title: "Play", link: context.requestUrl }];
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("drive_quickDownload");
     if (!context.imdbId || !context.season) {
       return episodes.map((e) => ({
         ...e,
-        quickDownload: Boolean(quickDownload),
+        quickDownload: quickDownload ?? true,
       }));
     }
 
@@ -149,7 +149,7 @@ export const getEpisodes = async function ({
     );
     return enrichedEpisodes.map((e) => ({
       ...e,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
     }));
   } catch (err) {
     throwProviderError("Drive", "episodes", err);

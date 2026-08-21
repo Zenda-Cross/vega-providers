@@ -145,14 +145,14 @@ export const getMeta = async function ({
         });
     }
 
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("katmovies_quickDownload");
     const websiteInfo: Info = {
       title,
       synopsis,
       image,
       imdbId: imdbId || "",
       type,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
       linkList: links,
       webUrl: url,
     };

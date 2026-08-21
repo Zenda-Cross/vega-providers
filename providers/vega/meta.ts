@@ -215,14 +215,14 @@ export const getMeta = async ({
         });
       }
     });
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("vega_quickDownload");
     const websiteInfo: Info = {
       title,
       synopsis,
       image,
       imdbId: imdbId || "",
       type,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
       linkList: links,
       webUrl: url,
     };

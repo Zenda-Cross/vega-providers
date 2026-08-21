@@ -236,14 +236,14 @@ export const getMeta = async function ({
       });
     }
 
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("skyMovieHD_quickDownload");
     return {
       title,
       synopsis,
       image,
       imdbId,
       type: type as "movie" | "series",
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
       tags,
       cast: [],
       rating: $(".entry-meta .entry-date").text().trim() || "",

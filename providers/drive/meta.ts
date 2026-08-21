@@ -85,14 +85,14 @@ export const getMeta = async function ({
 
     // console.log('drive meta', title, synopsis, image, imdbId, type, links);
     console.log("drive meta", links, type);
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("drive_quickDownload");
     const websiteInfo: Info = {
       title,
       synopsis,
       image,
       imdbId: imdbId || "",
       type,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
       linkList: links,
       webUrl: url,
     };

@@ -46,11 +46,11 @@ export const getEpisodes = async function ({
         episodes.push({ title, link });
       }
     });
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("vega_quickDownload");
     if (!context.imdbId || !context.season) {
       return episodes.map((e) => ({
         ...e,
-        quickDownload: Boolean(quickDownload),
+        quickDownload: quickDownload ?? true,
       }));
     }
 
@@ -62,7 +62,7 @@ export const getEpisodes = async function ({
     const enriched = enrichEpisodes(episodes, cinemeta.videos || [], context.season);
     return enriched.map((e) => ({
       ...e,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
     }));
   } catch (err) {
     throwProviderError("Vega", "episodes", err);

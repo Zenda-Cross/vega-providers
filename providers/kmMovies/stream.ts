@@ -294,6 +294,7 @@ async function resolveHubcloud(
     },
     providerContext,
     isDownload,
+    "kmMovies",
   );
   return streams.find((stream: Stream) => stream?.link) || null;
 }

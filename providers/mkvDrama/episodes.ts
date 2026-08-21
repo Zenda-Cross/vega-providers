@@ -19,7 +19,7 @@ export async function getEpisodes({
     providerContext,
   );
 
-  const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+  const quickDownload = await providerContext.kvStore?.get<boolean>("mkvDrama_quickDownload");
   return episodes
     .sort((left, right) => {
       const difference = episodeNumber(left.title) - episodeNumber(right.title);
@@ -27,6 +27,6 @@ export async function getEpisodes({
     })
     .map((e) => ({
       ...e,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
     }));
 }

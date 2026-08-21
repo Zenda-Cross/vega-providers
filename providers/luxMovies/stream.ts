@@ -117,6 +117,7 @@ export async function getStream({
       commonHeaders,
       providerContext,
       isDownload,
+      "luxMovies",
     );
   } catch (error: any) {
     throwProviderError("LuxMovies", "stream", error);

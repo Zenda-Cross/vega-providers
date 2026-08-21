@@ -42,6 +42,7 @@ export async function getStream({
         headers,
         providerContext,
         isDownload,
+        "4khdhub",
       );
     }
     const redirectLinkRes = await axios.get(redirectLink, { headers, signal });
@@ -76,6 +77,7 @@ export async function getStream({
       headers,
       providerContext,
       isDownload,
+      "4khdhub",
     );
   } catch (error: any) {
     throwProviderError("4KHDHub", "stream", error);

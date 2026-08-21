@@ -89,6 +89,7 @@ export const getStream = async function ({
         commonHeaders,
         providerContext,
         isDownload,
+        "katmovies",
       );
     }
     if (link.includes("gdflix")) {
@@ -164,6 +165,7 @@ export const getStream = async function ({
       commonHeaders,
       providerContext,
       isDownload,
+      "katmovies",
     );
     return stereams;
   } catch (error: any) {

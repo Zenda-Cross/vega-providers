@@ -243,7 +243,7 @@ export const getMeta = async function ({
 
     result.linkList = links;
     result.webUrl = url;
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("1cinevood_quickDownload");
     result.quickDownload = Boolean(quickDownload);
     const imdbId = result.imdbId;
     if (!imdbId) return result;

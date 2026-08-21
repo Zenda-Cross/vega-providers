@@ -67,10 +67,10 @@ export const getEpisodes = async function ({
         }
       }
     );
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("cinemaLuxe_quickDownload");
     return episodeLinks.map((e) => ({
       ...e,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
     }));
   } catch (err) {
     console.error("cl episode links", err);

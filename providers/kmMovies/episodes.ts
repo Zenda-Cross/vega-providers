@@ -41,11 +41,11 @@ export const getEpisodes = async function ({
       }
     });
 
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("kmMovies_quickDownload");
     if (!context.imdbId || !context.season) {
       return episodes.map((e) => ({
         ...e,
-        quickDownload: Boolean(quickDownload),
+        quickDownload: quickDownload ?? true,
       }));
     }
 
@@ -61,7 +61,7 @@ export const getEpisodes = async function ({
     );
     return enriched.map((e) => ({
       ...e,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
     }));
   } catch (err) {
     throwProviderError("KMMovies", "episodes", err);

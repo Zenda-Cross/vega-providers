@@ -104,6 +104,7 @@ export async function hubcloudExtractor(
   headers: Record<string, string>,
   providerContext?: any,
   isDownload?: boolean,
+  providerValue?: string,
 ) {
   try {
     if (!headers["Cookie"]) {
@@ -364,13 +365,19 @@ export async function hubcloudExtractor(
 
     let preferredServer = "auto";
     try {
+      const specificKey = providerValue
+        ? `${providerValue}_preferredDownloadServer`
+        : "";
       preferredServer = (
+        (specificKey
+          ? await providerContext?.kvStore?.get<string>(specificKey)
+          : undefined) ||
         (await providerContext?.kvStore?.get<string>("preferredDownloadServer")) ||
         "auto"
       )
         .toLowerCase()
         .trim();
-    } catch { }
+    } catch {}
 
     const getPriority = (serverName: string = "") => {
       const s = serverName.toLowerCase();

@@ -277,7 +277,7 @@ export const getMeta = async function ({
     }
 
     const quickDownload = await providerContext.kvStore?.get<boolean>(
-      "quickDownload",
+      "cinefreak_quickDownload",
     );
 
     let info: Info = {
@@ -286,7 +286,7 @@ export const getMeta = async function ({
       synopsis,
       imdbId: imdbId || "",
       type: isSeries ? "series" : "movie",
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
       linkList,
     };
 

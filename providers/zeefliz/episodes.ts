@@ -36,10 +36,10 @@ export const getEpisodes = async function ({
         episodes.push({ title, link });
       }
     });
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("zeefliz_quickDownload");
     return episodes.map((e) => ({
       ...e,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
     }));
   } catch (err) {
     throwProviderError("ZeeFliz", "episodes", err);

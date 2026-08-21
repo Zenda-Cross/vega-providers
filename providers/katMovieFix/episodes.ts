@@ -28,10 +28,10 @@ export async function getEpisodeLinks({
       }
     });
 
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("katMovieFix_quickDownload");
     return episodes.map((e) => ({
       ...e,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
     }));
   } catch (err) {
     console.error("getEpisodeLinks error:", err);

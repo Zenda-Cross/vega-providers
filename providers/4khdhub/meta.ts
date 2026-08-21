@@ -72,7 +72,7 @@ export const getMeta = async function ({
     }
     // console.log('multi meta', links);
 
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("4khdhub_quickDownload");
 
     return {
       title,
@@ -80,7 +80,7 @@ export const getMeta = async function ({
       image,
       imdbId,
       type,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
       linkList: links,
       webUrl: url,
     };

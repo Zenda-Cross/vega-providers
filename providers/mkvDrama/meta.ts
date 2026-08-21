@@ -62,7 +62,7 @@ export async function getMeta({
         },
   ];
 
-  const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+  const quickDownload = await providerContext.kvStore?.get<boolean>("mkvDrama_quickDownload");
 
   return {
     title,
@@ -70,7 +70,7 @@ export async function getMeta({
     synopsis,
     imdbId,
     type,
-    quickDownload: Boolean(quickDownload),
+    quickDownload: quickDownload ?? true,
     tags,
     cast,
     rating,

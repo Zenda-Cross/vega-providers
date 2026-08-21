@@ -90,6 +90,7 @@ export const getStream = async ({
       headers,
       providerContext,
       isDownload,
+      "cinemaLuxe",
     );
     return hubCloudLinks;
   } catch (err) {

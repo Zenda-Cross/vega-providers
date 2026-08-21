@@ -44,6 +44,7 @@ export async function getStream({
       commonHeaders,
       providerContext,
       isDownload,
+      "1cinevood",
     );
 
     return hubcloudLink;

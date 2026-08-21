@@ -51,6 +51,7 @@ export const getStream = async function ({
           headers,
           providerContext,
           isDownload,
+          "drive",
         );
       } else if (url.includes("gdflix")) {
         // handle gdflix links
@@ -79,6 +80,7 @@ export const getStream = async function ({
       headers,
       providerContext,
       isDownload,
+      "drive",
     );
   } catch (err: any) {
     throwProviderError("Drive", "stream", err);

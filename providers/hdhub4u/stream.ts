@@ -26,6 +26,7 @@ export async function getStream({
       headers,
       providerContext,
       isDownload,
+      "hdhub4u",
     );
   }
   if (link.includes("hubdrive")) {
@@ -100,6 +101,7 @@ export async function getStream({
       headers,
       providerContext,
       isDownload,
+      "hdhub4u",
     );
   } catch (error: any) {
     throwProviderError("HDHub4u", "stream", error);

@@ -53,11 +53,11 @@ export const getEpisodes = async function ({
     const context = readCinemetaContext(url);
     const requestUrl = context.requestUrl;
     const finish = async (): Promise<EpisodeLink[]> => {
-      const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+      const quickDownload = await providerContext.kvStore?.get<boolean>("katmovies_quickDownload");
       if (!context.imdbId || !context.season) {
         return episodesLink.map((e) => ({
           ...e,
-          quickDownload: Boolean(quickDownload),
+          quickDownload: quickDownload ?? true,
         }));
       }
       const cinemeta = await getCinemetaMeta(
@@ -72,7 +72,7 @@ export const getEpisodes = async function ({
       );
       return enriched.map((e) => ({
         ...e,
-        quickDownload: Boolean(quickDownload),
+        quickDownload: quickDownload ?? true,
       }));
     };
 

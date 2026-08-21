@@ -74,7 +74,7 @@ export async function getMeta({
     .trim();
   const type = $(".meta-pills").text().includes("Series") ? "series" : "movie";
 
-  const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+  const quickDownload = await providerContext.kvStore?.get<boolean>("eonMovies_quickDownload");
 
   return {
     title,
@@ -82,7 +82,7 @@ export async function getMeta({
     synopsis,
     imdbId: "",
     type,
-    quickDownload: Boolean(quickDownload),
+    quickDownload: quickDownload ?? true,
     tags: getTags($),
     linkList: getDownloadLinks($, baseUrl),
     webUrl: url,

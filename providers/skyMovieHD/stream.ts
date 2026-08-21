@@ -48,6 +48,7 @@ export async function getStream({
       commonHeaders,
       providerContext,
       isDownload,
+      "skyMovieHD",
     );
   } catch (error: any) {
     console.log("getStream error: ", error);

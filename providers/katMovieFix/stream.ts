@@ -53,6 +53,7 @@ export async function getStream({
       commonHeaders,
       providerContext,
       isDownload,
+      "katMovieFix",
     );
     if (Array.isArray(hubcloudStreams)) {
       streamLinks.push(...hubcloudStreams);

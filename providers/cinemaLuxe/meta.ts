@@ -74,7 +74,7 @@ export const getMeta = async function ({
         }
       });
     }
-    const quickDownload = await providerContext.kvStore?.get<boolean>("quickDownload");
+    const quickDownload = await providerContext.kvStore?.get<boolean>("cinemaLuxe_quickDownload");
     return {
       title,
       tags,
@@ -83,7 +83,7 @@ export const getMeta = async function ({
       image,
       imdbId,
       type,
-      quickDownload: Boolean(quickDownload),
+      quickDownload: quickDownload ?? true,
       linkList: links,
     };
   } catch (err) {

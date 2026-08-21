@@ -117,6 +117,7 @@ export async function getStream({
       commonHeaders,
       providerContext,
       isDownload,
+      "vega",
     );
   } catch (error: any) {
     throwProviderError("Vega", "stream", error);

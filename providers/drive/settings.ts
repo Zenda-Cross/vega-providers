@@ -7,15 +7,15 @@ export const getSettingsSchema = async function ({
 }): Promise<SettingsField[]> {
   return [
     {
-      key: "quickDownload",
+      key: "drive_quickDownload",
       type: "toggle",
       label: "Quick Download",
       description:
         "Automatically download the preferred server in 1-click without showing server selection",
-      defaultValue: false,
+      defaultValue: true,
     },
     {
-      key: "preferredDownloadServer",
+      key: "drive_preferredDownloadServer",
       type: "select",
       label: "Preferred Download Server",
       description: "Server to prioritize for 1-click quick download",

@@ -192,6 +192,7 @@ export async function getStream({
       commonHeaders,
       providerContext,
       isDownload,
+      "movies4u",
     );
   } catch (error: any) {
     throwProviderError("Movies4u", "stream", error);

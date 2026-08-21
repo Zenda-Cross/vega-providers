@@ -264,7 +264,7 @@ export async function getStream({
     let preferredServer = "auto";
     try {
       preferredServer = (
-        (await providerContext?.kvStore?.get<string>("preferredDownloadServer")) ||
+        (await providerContext?.kvStore?.get<string>("cinefreak_preferredDownloadServer")) ||
         "auto"
       )
         .toLowerCase()

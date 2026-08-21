@@ -168,6 +168,7 @@ export async function getStream({
           commonHeaders,
           providerContext,
           isDownload,
+          "Joya9tv",
         );
         if (Array.isArray(hubStreams) && hubStreams.length > 0) {
           streamLinks.push(...hubStreams);

@@ -38,10 +38,10 @@ export const getEpisodes = function ({
           });
       });
 
-      return providerContext.kvStore?.get<boolean>("quickDownload").then((quickDownload) => {
+      return providerContext.kvStore?.get<boolean>("skyMovieHD_quickDownload").then((quickDownload) => {
         return episodes.map((e) => ({
           ...e,
-          quickDownload: Boolean(quickDownload),
+          quickDownload: quickDownload ?? true,
         }));
       });
     })

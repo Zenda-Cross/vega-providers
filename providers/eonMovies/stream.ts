@@ -212,6 +212,7 @@ async function extractDownloadStreams(
       { ...headers },
       providerContext,
       isDownload,
+      "eonMovies",
     );
   }
   return [];
@@ -239,6 +240,7 @@ export async function getStream({
       headers,
       providerContext,
       isDownload,
+      "eonMovies",
     );
     return addQuality(streams);
   }
@@ -284,6 +286,7 @@ export async function getStream({
       headers,
       providerContext,
       isDownload,
+      "eonMovies",
     );
     addQuality(extracted, downloadLink.quality).forEach((stream) => {
       if (!seen.has(stream.link)) {

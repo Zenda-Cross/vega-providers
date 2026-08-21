@@ -79,14 +79,14 @@ export const getMeta = async function ({
         });
       }
 
-      return providerContext.kvStore?.get<boolean>("quickDownload").then((quickDownload) => {
+      return providerContext.kvStore?.get<boolean>("katMovieFix_quickDownload").then((quickDownload) => {
         return {
           title,
           synopsis,
           image,
           imdbId,
           type,
-          quickDownload: Boolean(quickDownload),
+          quickDownload: quickDownload ?? true,
           linkList,
         };
       });

@@ -180,6 +180,7 @@ export async function getStream({
         headers,
         providerContext,
         isDownload,
+        "zeefliz",
       );
     }
 
