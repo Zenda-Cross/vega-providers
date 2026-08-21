@@ -1,4 +1,4 @@
-import { ProviderContext, Stream } from "../types";
+import { ProviderContext, Stream, TextTracks } from "../types";
 
 const BASE_URL = "https://kaa.lt";
 
@@ -77,22 +77,6 @@ export const getStream = async function ({
         let rawManifest = manifestMatch[1];
         const manifestUrl = fixUrl(rawManifest, playerUrl);
 
-        // Extract subtitles
-        const subtitles: { title: string; url: string }[] = [];
-        const trackRegex =
-          /"language":\[\d+,"([^"]+)"][^}]+?"name":\[\d+,"([^"]+)"][^}]+?"src":\[\d+,"([^"]+)"]/g;
-        let tMatch;
-        while ((tMatch = trackRegex.exec(cleanHtml)) !== null) {
-          const lang = tMatch[1];
-          const subName = tMatch[2];
-          let subSrc = tMatch[3].replace(/\\\//g, "/");
-          const subUrl = fixUrl(subSrc, playerUrl);
-          subtitles.push({
-            title: `${subName} (${lang})`,
-            url: subUrl,
-          });
-        }
-
         let origin = "";
         try {
           origin = new URL(playerUrl).origin;
@@ -105,6 +89,28 @@ export const getStream = async function ({
           Origin: origin,
           Referer: playerUrl,
         };
+
+        // Extract subtitles
+        const subtitles: TextTracks = [];
+        const trackRegex =
+          /"language":\[\d+,"([^"]+)"][^}]+?"name":\[\d+,"([^"]+)"][^}]+?"src":\[\d+,"([^"]+)"]/g;
+        let tMatch;
+        while ((tMatch = trackRegex.exec(cleanHtml)) !== null) {
+          const lang = tMatch[1];
+          const subName = tMatch[2];
+          let subSrc = tMatch[3].replace(/\\\//g, "/");
+          const subUrl = fixUrl(subSrc, playerUrl);
+          const proxyUrl = `https://worker.zendax.me/api/fetch?url=${encodeURIComponent(
+            subUrl
+          )}&headers=${encodeURIComponent(JSON.stringify(hlsHeaders))}`;
+
+          subtitles.push({
+            title: `${subName} (${lang})`,
+            language: lang,
+            type: "text/vtt",
+            uri: proxyUrl,
+          });
+        }
 
         if (manifestUrl.includes(".m3u8")) {
           // Add Auto master stream
