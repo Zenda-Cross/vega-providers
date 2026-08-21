@@ -102,11 +102,13 @@ export async function getStream({
   type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
-  signal: AbortSignal;
+  signal?: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }): Promise<Stream[]> {
   const { axios, cheerio, commonHeaders } = providerContext;
   try {
@@ -253,6 +255,14 @@ export async function getStream({
     };
 
     streamLinks.sort((a, b) => getPriority(a.server) - getPriority(b.server));
+
+    const quickDownloadSetting = await providerContext.kvStore?.get<boolean>(
+      "quickDownload",
+    );
+
+    if ((isDownload || quickDownloadSetting) && streamLinks.length > 0) {
+      return [streamLinks[0]];
+    }
 
     return streamLinks;
   } catch (error: any) {

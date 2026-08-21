@@ -276,12 +276,17 @@ export const getMeta = async function ({
       }
     }
 
+    const quickDownload = await providerContext.kvStore?.get<boolean>(
+      "quickDownload",
+    );
+
     let info: Info = {
       title,
       image,
       synopsis,
       imdbId: imdbId || "",
       type: isSeries ? "series" : "movie",
+      quickDownload: Boolean(quickDownload),
       linkList,
     };
 
