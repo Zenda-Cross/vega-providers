@@ -16,6 +16,14 @@ function formatPoster(poster?: { hq?: string; sm?: string; url?: string }): stri
   return "";
 }
 
+function formatThumbnail(thumbnail?: { hq?: string; sm?: string; url?: string }): string | undefined {
+  if (!thumbnail) return undefined;
+  if (thumbnail.hq) return `${BASE_URL}/image/thumbnail/${thumbnail.hq}.webp`;
+  if (thumbnail.sm) return `${BASE_URL}/image/thumbnail/${thumbnail.sm}.webp`;
+  if (thumbnail.url) return thumbnail.url.startsWith("http") ? thumbnail.url : `${BASE_URL}/${thumbnail.url}`;
+  return undefined;
+}
+
 function getLangLabel(lang: string): string {
   if (lang === "ja-JP") return "Sub";
   if (lang === "en-US") return "Dub";
@@ -92,6 +100,7 @@ export const getMeta = async function ({
               lang,
             }),
             type,
+            image: formatThumbnail(ep.thumbnail),
           };
         });
 
@@ -110,7 +119,9 @@ export const getMeta = async function ({
     title,
     synopsis,
     image,
+    imdbId: "",
     type,
     linkList,
+    webUrl: `${BASE_URL}/${slug}`,
   };
 };

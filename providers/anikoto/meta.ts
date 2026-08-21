@@ -78,7 +78,14 @@ export const getMeta = async function ({
       $("img").first().attr("src") ||
       "";
 
-    const rating = $("i.rating").text().trim() || undefined;
+    const rating =
+      $("[itemprop='ratingValue']").first().text().trim() ||
+      $(".meta div:contains('MAL'), #w-info div:contains('MAL')")
+        .first()
+        .text()
+        .match(/MAL:\s*(\d+(?:\.\d+)?)/)?.[1] ||
+      $(".score .value").text().match(/\d+(?:\.\d+)?/)?.[0] ||
+      undefined;
 
     const tags: string[] = [];
     $("div:contains(Genres) span a, .genre a").each((_, el) => {
@@ -184,6 +191,7 @@ export const getMeta = async function ({
       tags: tags.length > 0 ? tags : undefined,
       rating,
       linkList,
+      webUrl: watchUrl,
     };
   } catch (err) {
     throwProviderError("Anikoto", "metadata", err);
