@@ -172,7 +172,7 @@ export function readCinemetaContext(url: string): {
   return { requestUrl: parsedUrl.href };
 }
 
-function getEpisodeNumber(title: string, season: number): number | undefined {
+export function getEpisodeNumber(title: string, season: number): number | undefined {
   if (
     /\b(?:e\d+|episodes?\s*:?\s*\d+)\s*(?:[-–,&/]|\band\b)\s*(?:e|episodes?\s*:?\s*)?\d+/i.test(
       title,

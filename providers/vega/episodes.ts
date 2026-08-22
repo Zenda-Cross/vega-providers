@@ -2,6 +2,7 @@ import { EpisodeLink, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
 import { getCinemetaMeta } from "../getCinemetaMeta";
 import { enrichEpisodes, readEpisodeContext } from "./cinemeta";
+import { enrichEpisodesWithSkipTimings } from "../theintrodb";
 
 export const getEpisodes = async function ({
   url,
@@ -47,6 +48,8 @@ export const getEpisodes = async function ({
       }
     });
     const quickDownload = await providerContext.kvStore?.get<boolean>("vega_quickDownload");
+    const skipTimings = await providerContext.kvStore?.get<boolean>("vega_skipTimings");
+
     if (!context.imdbId || !context.season) {
       return episodes.map((e) => ({
         ...e,
@@ -59,7 +62,17 @@ export const getEpisodes = async function ({
       "series",
       providerContext,
     );
-    const enriched = enrichEpisodes(episodes, cinemeta.videos || [], context.season);
+    let enriched = enrichEpisodes(episodes, cinemeta.videos || [], context.season);
+
+    if (skipTimings) {
+      enriched = await enrichEpisodesWithSkipTimings(
+        enriched,
+        context.imdbId,
+        context.season,
+        providerContext,
+      );
+    }
+
     return enriched.map((e) => ({
       ...e,
       quickDownload: quickDownload ?? true,
