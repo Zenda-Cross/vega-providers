@@ -5,12 +5,13 @@ import {
   enrichCinemetaEpisodes,
   getCinemetaMeta,
 } from "../getCinemetaMeta";
+import { enrichEpisodesWithSkipTimings } from "../theintrodb";
 import { EpisodeLink, Info, Link, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
 
 function getRequest(link: string): { imdbId: string; type: string } {
   const imdbId = link.match(/tt\d+/)?.[0] || "";
-  const type = /\/series\//i.test(link) ? "series" : "movie";
+  const type = /\bseries\b/i.test(link) ? "series" : "movie";
   if (!imdbId) throw new Error(`Missing IMDb ID in metadata link: ${link}`);
   return { imdbId, type };
 }
@@ -58,14 +59,24 @@ export const getMeta = async function ({
         });
         seasons.set(video.season, episodes);
       }
+      const skipTimings = await providerContext.kvStore?.get<boolean>("autoEmbed_skipTimings");
       for (const season of [...seasons.keys()].sort((a, b) => a - b)) {
+        let directLinks = enrichCinemetaEpisodes(
+          seasons.get(season) || [],
+          meta.videos || [],
+          season,
+        );
+        if (skipTimings) {
+          directLinks = await enrichEpisodesWithSkipTimings(
+            directLinks,
+            imdbId,
+            season,
+            providerContext,
+          );
+        }
         linkList.push({
           title: `Season ${season}`,
-          directLinks: enrichCinemetaEpisodes(
-            seasons.get(season) || [],
-            meta.videos || [],
-            season,
-          ),
+          directLinks,
         });
       }
     } else {

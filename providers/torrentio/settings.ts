@@ -70,5 +70,13 @@ export const getSettingsSchema = async function ({
       description: "Include raw P2P torrent links when Debrid has not cached the file",
       defaultValue: true,
     },
+    {
+      key: "torrentio_skipTimings",
+      type: "toggle",
+      label: "Skip Timings",
+      description:
+        "Automatically fetch intro and recap skip timestamps from TheIntroDB for verified episodes",
+      defaultValue: false,
+    },
   ];
 };

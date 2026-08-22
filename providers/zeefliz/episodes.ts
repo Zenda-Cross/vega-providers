@@ -1,5 +1,11 @@
 import { EpisodeLink, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
+import {
+  enrichCinemetaEpisodes,
+  getCinemetaMeta,
+  readCinemetaContext,
+} from "../getCinemetaMeta";
+import { enrichEpisodesWithSkipTimings } from "../theintrodb";
 
 export const getEpisodes = async function ({
   url,
@@ -11,7 +17,8 @@ export const getEpisodes = async function ({
   const { axios, cheerio, commonHeaders: headers } = providerContext;
   console.log("getEpisodeLinks", url);
   try {
-    const res = await axios.get(url, {
+    const context = readCinemetaContext(url);
+    const res = await axios.get(context.requestUrl, {
       headers: {
         ...headers,
         cookie:
@@ -37,7 +44,33 @@ export const getEpisodes = async function ({
       }
     });
     const quickDownload = await providerContext.kvStore?.get<boolean>("zeefliz_quickDownload");
-    return episodes.map((e) => ({
+    if (!context.imdbId || !context.season) {
+      return episodes.map((e) => ({
+        ...e,
+        quickDownload: quickDownload ?? true,
+      }));
+    }
+
+    const cinemeta = await getCinemetaMeta(
+      context.imdbId,
+      "series",
+      providerContext,
+    );
+    let enriched = enrichCinemetaEpisodes(
+      episodes,
+      cinemeta.videos || [],
+      context.season,
+    );
+    const skipTimings = await providerContext.kvStore?.get<boolean>("zeefliz_skipTimings");
+    if (skipTimings) {
+      enriched = await enrichEpisodesWithSkipTimings(
+        enriched,
+        context.imdbId,
+        context.season,
+        providerContext,
+      );
+    }
+    return enriched.map((e) => ({
       ...e,
       quickDownload: quickDownload ?? true,
     }));

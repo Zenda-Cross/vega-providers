@@ -7,6 +7,7 @@ import {
   getCinemetaMeta,
   getCinemetaSeason,
 } from "../getCinemetaMeta";
+import { enrichEpisodesWithSkipTimings } from "../theintrodb";
 
 const hdbHeaders = {
   Cookie: "xla=s4t",
@@ -175,20 +176,32 @@ export const getMeta = async function ({
 
     const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
     if (type === "series" && cinemeta.type === "series") {
-      websiteInfo.linkList = websiteInfo.linkList.map((item) => {
-        if (!item.directLinks) return item;
-        const season =
-          getCinemetaSeason(item.title) || getCinemetaSeason(title);
-        if (!season) return item;
-        return {
-          ...item,
-          directLinks: enrichCinemetaEpisodes(
+      const skipTimings = await providerContext.kvStore?.get<boolean>("hdhub4u_skipTimings");
+      websiteInfo.linkList = await Promise.all(
+        websiteInfo.linkList.map(async (item) => {
+          if (!item.directLinks) return item;
+          const season =
+            getCinemetaSeason(item.title) || getCinemetaSeason(title);
+          if (!season) return item;
+          let enriched = enrichCinemetaEpisodes(
             item.directLinks,
             cinemeta.videos || [],
             season,
-          ),
-        };
-      });
+          );
+          if (skipTimings) {
+            enriched = await enrichEpisodesWithSkipTimings(
+              enriched,
+              imdbId,
+              season,
+              providerContext,
+            );
+          }
+          return {
+            ...item,
+            directLinks: enriched,
+          };
+        }),
+      );
     }
     return applyCinemetaMeta(websiteInfo, cinemeta);
   } catch (err) {

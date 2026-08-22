@@ -4,6 +4,7 @@ import {
   enrichCinemetaEpisodes,
   getCinemetaMeta,
 } from "../getCinemetaMeta";
+import { enrichEpisodesWithSkipTimings } from "../theintrodb";
 import { Info, Link, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
 
@@ -301,23 +302,35 @@ export const getMeta = async function ({
         if (cinemeta) {
           info = applyCinemetaMeta(info, cinemeta);
           if (cinemeta.videos && info.linkList) {
-            info.linkList = info.linkList.map((linkGroup) => {
-              if (linkGroup.directLinks) {
-                const seasonNum = parseInt(
-                  linkGroup.title.match(/season\s*(\d+)/i)?.[1] || "1",
-                  10,
-                );
-                return {
-                  ...linkGroup,
-                  directLinks: enrichCinemetaEpisodes(
+            const skipTimings = await providerContext.kvStore?.get<boolean>("cinefreak_skipTimings");
+            info.linkList = await Promise.all(
+              info.linkList.map(async (linkGroup) => {
+                if (linkGroup.directLinks) {
+                  const seasonNum = parseInt(
+                    linkGroup.title.match(/season\s*(\d+)/i)?.[1] || "1",
+                    10,
+                  );
+                  let enriched = enrichCinemetaEpisodes(
                     linkGroup.directLinks,
                     cinemeta.videos || [],
                     seasonNum,
-                  ),
-                };
-              }
-              return linkGroup;
-            });
+                  );
+                  if (skipTimings) {
+                    enriched = await enrichEpisodesWithSkipTimings(
+                      enriched,
+                      imdbId,
+                      seasonNum,
+                      providerContext,
+                    );
+                  }
+                  return {
+                    ...linkGroup,
+                    directLinks: enriched,
+                  };
+                }
+                return linkGroup;
+              }),
+            );
           }
         }
       } catch {

@@ -5,6 +5,7 @@ import {
   getCinemetaMeta,
   readCinemetaContext,
 } from "../getCinemetaMeta";
+import { enrichEpisodesWithSkipTimings } from "../theintrodb";
 
 export const getEpisodes = async function ({
   url,
@@ -62,11 +63,20 @@ export const getEpisodes = async function ({
       "series",
       providerContext,
     );
-    const enriched = await enrichCinemetaEpisodes(
+    let enriched = enrichCinemetaEpisodes(
       episodes,
       cinemeta.videos || [],
       context.season,
     );
+    const skipTimings = await providerContext.kvStore?.get<boolean>("luxMovies_skipTimings");
+    if (skipTimings) {
+      enriched = await enrichEpisodesWithSkipTimings(
+        enriched,
+        context.imdbId,
+        context.season,
+        providerContext,
+      );
+    }
     return enriched.map((e) => ({
       ...e,
       quickDownload: quickDownload ?? true,

@@ -5,6 +5,7 @@ import {
   getCinemetaMeta,
   readCinemetaContext,
 } from "../getCinemetaMeta";
+import { enrichEpisodesWithSkipTimings } from "../theintrodb";
 
 // यहाँ `getEpisodes` फ़ंक्शन मान रहा है कि यह उस पेज को स्क्रैप कर रहा है
 // जो 'Download Links' बटन से प्राप्त हुआ है (जैसे m4ulinks.com/number/42882)
@@ -160,11 +161,20 @@ export const getEpisodes = async function ({
       "series",
       providerContext,
     );
-    const enriched = await enrichCinemetaEpisodes(
+    let enriched = enrichCinemetaEpisodes(
       episodes,
       cinemeta.videos || [],
       context.season,
     );
+    const skipTimings = await providerContext.kvStore?.get<boolean>("movies4u_skipTimings");
+    if (skipTimings) {
+      enriched = await enrichEpisodesWithSkipTimings(
+        enriched,
+        context.imdbId,
+        context.season,
+        providerContext,
+      );
+    }
     return enriched.map((e) => ({
       ...e,
       quickDownload: quickDownload ?? true,

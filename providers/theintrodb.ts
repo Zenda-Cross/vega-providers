@@ -11,6 +11,23 @@ export interface TheIntroDbParams {
   timeout?: number;
 }
 
+function getIntroDbCache(): Record<
+  string,
+  SkipInterval[] | Promise<SkipInterval[]>
+> {
+  const state: any =
+    typeof providerGlobal !== "undefined" && providerGlobal
+      ? providerGlobal
+      : globalThis;
+  if (
+    !state.__vegaTheIntroDbCache__ ||
+    typeof state.__vegaTheIntroDbCache__ !== "object"
+  ) {
+    state.__vegaTheIntroDbCache__ = Object.create(null);
+  }
+  return state.__vegaTheIntroDbCache__;
+}
+
 export async function fetchTheIntroDbSkipTimings({
   imdbId,
   tmdbId,
@@ -23,26 +40,40 @@ export async function fetchTheIntroDbSkipTimings({
   if (!imdbId && !tmdbId) return [];
   if (!season || !episode || season < 1 || episode < 1) return [];
 
+  const cache = getIntroDbCache();
+  const cacheKey = `${imdbId || tmdbId}:${season}:${episode}`;
+  const cached = cache[cacheKey];
+  if (cached) {
+    if (typeof (cached as any).then === "function") {
+      return cached;
+    }
+    return cached as SkipInterval[];
+  }
+
   const params = new URLSearchParams();
   if (imdbId) params.set("imdb_id", imdbId);
   if (tmdbId) params.set("tmdb_id", tmdbId.toString());
   params.set("season", season.toString());
   params.set("episode", episode.toString());
 
-  try {
-    const url = `https://api.theintrodb.org/v2/media?${params.toString()}`;
-    const res = await providerContext.axios.get(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-        Accept: "application/json",
-      },
-      timeout,
-      signal,
-    });
+  const fetchPromise = (async () => {
+    try {
+      const url = `https://api.theintrodb.org/v2/media?${params.toString()}`;
+      const res = await providerContext.axios.get(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+          Accept: "application/json",
+        },
+        timeout,
+        signal,
+      });
 
-    const data = res.data;
-    if (!data || typeof data !== "object") return [];
+      const data = res.data;
+      if (!data || typeof data !== "object") {
+        cache[cacheKey] = [];
+        return [];
+      }
 
     const skipIntervals: SkipInterval[] = [];
 
@@ -110,10 +141,16 @@ export async function fetchTheIntroDbSkipTimings({
       }
     }
 
+    cache[cacheKey] = skipIntervals;
     return skipIntervals;
   } catch {
+    delete cache[cacheKey];
     return [];
   }
+})();
+
+  cache[cacheKey] = fetchPromise;
+  return fetchPromise;
 }
 
 export async function enrichEpisodesWithSkipTimings<T extends EpisodeLink>(

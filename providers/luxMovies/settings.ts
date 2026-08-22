@@ -30,5 +30,13 @@ export const getSettingsSchema = async function ({
       ],
       defaultValue: "auto",
     },
+    {
+      key: "luxMovies_skipTimings",
+      type: "toggle",
+      label: "Skip Timings",
+      description:
+        "Automatically fetch intro and recap skip timestamps from TheIntroDB for verified episodes",
+      defaultValue: false,
+    },
   ];
 };

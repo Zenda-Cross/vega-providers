@@ -1,6 +1,11 @@
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
-import { applyCinemetaMeta, getCinemetaMeta } from "../getCinemetaMeta";
+import {
+  addCinemetaContext,
+  applyCinemetaMeta,
+  getCinemetaMeta,
+  getCinemetaSeason,
+} from "../getCinemetaMeta";
 import { throwProviderError } from "../providerErrors";
 
 // Headers
@@ -193,6 +198,24 @@ export const getMeta = async function ({
       result.type,
       providerContext,
     );
+    if (result.type === "series" && cinemeta.type === "series") {
+      result.linkList = result.linkList.map((item) => {
+        const season =
+          getCinemetaSeason(item.title) || getCinemetaSeason(result.title);
+        if (!season) return item;
+        if (item.episodesLink) {
+          return {
+            ...item,
+            episodesLink: addCinemetaContext(
+              new URL(item.episodesLink, url).href,
+              imdbId,
+              season,
+            ),
+          };
+        }
+        return item;
+      });
+    }
     return applyCinemetaMeta(result, cinemeta);
   } catch (err) {
     throwProviderError("ZeeFliz", "metadata", err);

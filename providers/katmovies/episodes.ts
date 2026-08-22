@@ -5,6 +5,7 @@ import {
   getCinemetaMeta,
   readCinemetaContext,
 } from "../getCinemetaMeta";
+import { enrichEpisodesWithSkipTimings } from "../theintrodb";
 
 async function getWithWAF(
   url: string,
@@ -65,11 +66,20 @@ export const getEpisodes = async function ({
         "series",
         providerContext,
       );
-      const enriched = await enrichCinemetaEpisodes(
+      let enriched = enrichCinemetaEpisodes(
         episodesLink,
         cinemeta.videos || [],
         context.season,
       );
+      const skipTimings = await providerContext.kvStore?.get<boolean>("katmovies_skipTimings");
+      if (skipTimings) {
+        enriched = await enrichEpisodesWithSkipTimings(
+          enriched,
+          context.imdbId,
+          context.season,
+          providerContext,
+        );
+      }
       return enriched.map((e) => ({
         ...e,
         quickDownload: quickDownload ?? true,
