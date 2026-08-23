@@ -255,13 +255,17 @@ async function resolveSkyDrop(
   return { server: "SkyDrop", link: response.data.link, type: "mkv" };
 }
 
-async function resolveGofile(link: string, axios: any): Promise<Stream | null> {
+async function resolveGofile(
+  link: string,
+  axios: any,
+  providerContext?: any,
+): Promise<Stream | null> {
   const gofileUrl = new URL(link);
   const id = gofileUrl.pathname.split("/").filter(Boolean).pop();
   if (!id) return null;
 
-  const result = await gofileExtractor(id, axios);
-  if (!result.link || !result.token) return null;
+  const result = await gofileExtractor(id, axios, providerContext);
+  if (!result?.link || !result?.token) return null;
 
   return {
     server: "Gofile",
@@ -327,7 +331,7 @@ export async function getStream({
       BUZZHEAVIER: (l) =>
         resolveBuzzheavier(l, axios, cheerio, commonHeaders || {}),
       SKYDROP: (l) => resolveSkyDrop(l, axios),
-      GOFILE: (l) => resolveGofile(l, axios),
+      GOFILE: (l) => resolveGofile(l, axios, providerContext),
       HUBCLOUD: (l) =>
         resolveHubcloud(
           l,

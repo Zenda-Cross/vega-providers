@@ -65,8 +65,8 @@ export async function getStream({
   if (/gofile\.io/.test(hostname)) {
     const id = new URL(target).pathname.split("/").filter(Boolean).pop();
     if (!id) return [];
-    const result = await gofileExtractor(id, axios);
-    if (!result.link || !result.token) return [];
+    const result = await gofileExtractor(id, axios, providerContext);
+    if (!result?.link || !result?.token) return [];
     return [
       {
         server: "GoFile",

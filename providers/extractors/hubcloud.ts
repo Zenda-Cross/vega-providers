@@ -95,12 +95,16 @@ async function checkStreamHealth(
   }
 }
 
-async function resolveGofileLink(gofileLink: string, axios: any) {
+async function resolveGofileLink(
+  gofileLink: string,
+  axios: any,
+  providerContext?: any,
+) {
   try {
     const gofileUrl = new URL(gofileLink);
     const id = gofileUrl.pathname.split("/").filter(Boolean).pop();
     if (!id) return null;
-    const gfResult = await gofileExtractor(id, axios);
+    const gfResult = await gofileExtractor(id, axios, providerContext);
     if (!gfResult?.link || !gfResult?.token) return null;
     return {
       server: "Gofile",
@@ -185,7 +189,7 @@ export async function hubcloudExtractor(
     for (const el of vLinkGofileBtns) {
       const gfHref = $vLink(el).attr("href");
       if (gfHref) {
-        const gfStream = await resolveGofileLink(gfHref, axios);
+        const gfStream = await resolveGofileLink(gfHref, axios, providerContext);
         if (gfStream && !streamLinks.some((s) => s.link === gfStream.link)) {
           streamLinks.push(gfStream);
         }
@@ -204,7 +208,7 @@ export async function hubcloudExtractor(
 
     // If vcloudLink is directly a Gofile URL
     if (vcloudLink?.includes("gofile.io")) {
-      const gfStream = await resolveGofileLink(vcloudLink, axios);
+      const gfStream = await resolveGofileLink(vcloudLink, axios, providerContext);
       if (gfStream && !streamLinks.some((s) => s.link === gfStream.link)) {
         streamLinks.push(gfStream);
       }
@@ -384,21 +388,9 @@ export async function hubcloudExtractor(
 
         case link?.includes("gofile.io"):
           try {
-            const gofileUrl = new URL(link);
-            const id = gofileUrl.pathname.split("/").filter(Boolean).pop();
-            if (id) {
-              const gfResult = await gofileExtractor(id, axios);
-              if (gfResult?.link && gfResult?.token) {
-                streamLinks.push({
-                  server: "Gofile",
-                  link: gfResult.link,
-                  type: "mkv",
-                  headers: {
-                    Referer: "https://gofile.io/",
-                    Cookie: `accountToken=${gfResult.token}`,
-                  },
-                });
-              }
+            const gfStream = await resolveGofileLink(link, axios, providerContext);
+            if (gfStream && !streamLinks.some((s) => s.link === gfStream.link)) {
+              streamLinks.push(gfStream);
             }
           } catch (error) {
             console.log("hubcloudExtractor error in gofile link: ", error);

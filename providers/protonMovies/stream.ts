@@ -174,6 +174,7 @@ export const getStream = async function ({
           const goRes = await gofileExtractor(
             idRes.data.ppd["gofile.io"].link.split("/").pop(),
             axios,
+            providerContext,
           );
           console.log("link", goRes.link);
           if (goRes.link) {
