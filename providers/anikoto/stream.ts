@@ -1,4 +1,4 @@
-import { ProviderContext, Stream, TextTracks } from "../types";
+import { ProviderContext, SkipInterval, Stream, TextTracks } from "../types";
 import { throwProviderError } from "../providerErrors";
 
 const BASE_URL = "https://anikototv.to";
@@ -179,6 +179,35 @@ export const getStream = async function ({
           const iframeUrl = getRes.data?.result?.url;
           if (!iframeUrl) return;
 
+          const skipTimings =
+            await providerContext.kvStore?.get<boolean>("anikoto_skipTimings");
+          const skipTimingsEnabled = skipTimings ?? true;
+          let skipIntervals: SkipInterval[] | undefined = undefined;
+
+          if (skipTimingsEnabled) {
+            const skipData = getRes.data?.result?.skip_data;
+            if (skipData && typeof skipData === "object") {
+              const intervals: SkipInterval[] = [];
+              if (Array.isArray(skipData.intro) && skipData.intro.length >= 2) {
+                const from = Number(skipData.intro[0]);
+                const to = Number(skipData.intro[1]);
+                if (!isNaN(from) && !isNaN(to) && to > from) {
+                  intervals.push({ title: "Intro", from, to });
+                }
+              }
+              if (Array.isArray(skipData.outro) && skipData.outro.length >= 2) {
+                const from = Number(skipData.outro[0]);
+                const to = Number(skipData.outro[1]);
+                if (!isNaN(from) && !isNaN(to) && to > from) {
+                  intervals.push({ title: "Outro", from, to });
+                }
+              }
+              if (intervals.length > 0) {
+                skipIntervals = intervals;
+              }
+            }
+          }
+
           // Deduplicate iframe URLs (e.g. ignore duplicate CDN query parameters for same video)
           const baseIframe = iframeUrl.split("?")[0] + "#" + task.dataType;
           if (seenIframeUrls.has(baseIframe)) return;
@@ -247,6 +276,7 @@ export const getStream = async function ({
                   quality: "auto",
                   subtitles: subtitles.length > 0 ? subtitles : undefined,
                   headers: streamHeaders,
+                  skip: skipIntervals,
                 });
 
                 // Parse master m3u8 for resolution sub-streams
@@ -266,8 +296,8 @@ export const getStream = async function ({
                       const nextLine = lines[i + 1]?.trim();
                       if (nextLine && !nextLine.startsWith("#")) {
                         const streamUrl = nextLine.startsWith("http")
-                          ? nextLine
-                          : baseUrl + nextLine;
+                            ? nextLine
+                            : baseUrl + nextLine;
                         addStream({
                           server: `${task.serverName} (${audioLabel}) ${quality}`,
                           link: streamUrl,
@@ -275,6 +305,7 @@ export const getStream = async function ({
                           quality,
                           subtitles: subtitles.length > 0 ? subtitles : undefined,
                           headers: streamHeaders,
+                          skip: skipIntervals,
                         });
                       }
                     }
@@ -299,6 +330,7 @@ export const getStream = async function ({
                       Origin: "https://vibeplayer.site",
                       "User-Agent": defaultHeaders["User-Agent"],
                     },
+                    skip: skipIntervals,
                   });
                 }
               } catch {
