@@ -67,7 +67,7 @@ export const getEpisodes = async function ({
       context.season,
     );
     const skipTimings = await providerContext.kvStore?.get<boolean>("topmovies_skipTimings");
-    if (skipTimings) {
+    if (skipTimings ?? true) {
       enriched = await enrichEpisodesWithSkipTimings(
         enriched,
         context.imdbId,

@@ -149,7 +149,7 @@ export const getEpisodes = async function ({
       context.season,
     );
     const skipTimings = await providerContext.kvStore?.get<boolean>("drive_skipTimings");
-    if (skipTimings) {
+    if (skipTimings ?? true) {
       enrichedEpisodes = await enrichEpisodesWithSkipTimings(
         enrichedEpisodes,
         context.imdbId,

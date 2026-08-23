@@ -1,4 +1,5 @@
 import { throwProviderError } from "../providerErrors";
+import { gofileExtractor } from "./gofile";
 
 const hubcloudDecode = function (value: string) {
   if (value === undefined) {
@@ -94,6 +95,28 @@ async function checkStreamHealth(
   }
 }
 
+async function resolveGofileLink(gofileLink: string, axios: any) {
+  try {
+    const gofileUrl = new URL(gofileLink);
+    const id = gofileUrl.pathname.split("/").filter(Boolean).pop();
+    if (!id) return null;
+    const gfResult = await gofileExtractor(id, axios);
+    if (!gfResult?.link || !gfResult?.token) return null;
+    return {
+      server: "Gofile",
+      link: gfResult.link,
+      type: "mkv",
+      headers: {
+        Referer: "https://gofile.io/",
+        Cookie: `accountToken=${gfResult.token}`,
+      },
+    };
+  } catch (error) {
+    console.log("hubcloudExtractor: resolveGofileLink error:", error);
+    return null;
+  }
+}
+
 export async function hubcloudExtractor(
   link: string,
   signal: AbortSignal,
@@ -156,6 +179,19 @@ export async function hubcloudExtractor(
 
     const vLinkText = vLinkRes.data;
     const $vLink = cheerio.load(vLinkText);
+
+    // Check if initial page contains any direct Gofile download button/links
+    const vLinkGofileBtns = $vLink("a[href*='gofile.io']");
+    for (const el of vLinkGofileBtns) {
+      const gfHref = $vLink(el).attr("href");
+      if (gfHref) {
+        const gfStream = await resolveGofileLink(gfHref, axios);
+        if (gfStream && !streamLinks.some((s) => s.link === gfStream.link)) {
+          streamLinks.push(gfStream);
+        }
+      }
+    }
+
     let vcloudLink =
       extractUrlFromScript(vLinkText) ||
       $vLink(".fa-file-download.fa-lg").parent().attr("href") ||
@@ -166,11 +202,20 @@ export async function hubcloudExtractor(
       console.log("New vcloudLink", vcloudLink);
     }
 
+    // If vcloudLink is directly a Gofile URL
+    if (vcloudLink?.includes("gofile.io")) {
+      const gfStream = await resolveGofileLink(vcloudLink, axios);
+      if (gfStream && !streamLinks.some((s) => s.link === gfStream.link)) {
+        streamLinks.push(gfStream);
+      }
+    }
+
     let vcloudText = "";
-    try {
-      const vcloudRes = await axios.get(vcloudLink, { headers, signal });
-      vcloudText = vcloudRes.data;
-    } catch (error: any) {
+    if (vcloudLink && !vcloudLink.includes("gofile.io") && vcloudLink !== link) {
+      try {
+        const vcloudRes = await axios.get(vcloudLink, { headers, signal });
+        vcloudText = vcloudRes.data;
+      } catch (error: any) {
       if (error.response?.status === 403 && openWebView) {
         console.log(
           `hubcloudExtractor: WAF detected (403) for ${vcloudLink}, using solver...`,
@@ -246,6 +291,7 @@ export async function hubcloudExtractor(
         }
         vcloudText = await fetchRes.text();
       }
+    }
     }
     const $ = cheerio.load(vcloudText);
     // console.log("vcloudRes", $.text());
@@ -336,6 +382,29 @@ export async function hubcloudExtractor(
           }
           break;
 
+        case link?.includes("gofile.io"):
+          try {
+            const gofileUrl = new URL(link);
+            const id = gofileUrl.pathname.split("/").filter(Boolean).pop();
+            if (id) {
+              const gfResult = await gofileExtractor(id, axios);
+              if (gfResult?.link && gfResult?.token) {
+                streamLinks.push({
+                  server: "Gofile",
+                  link: gfResult.link,
+                  type: "mkv",
+                  headers: {
+                    Referer: "https://gofile.io/",
+                    Cookie: `accountToken=${gfResult.token}`,
+                  },
+                });
+              }
+            }
+          } catch (error) {
+            console.log("hubcloudExtractor error in gofile link: ", error);
+          }
+          break;
+
         case link?.includes("cloudflarestorage"):
           streamLinks.push({ server: "CF Storage", link: link, type: "mkv" });
           break;
@@ -391,17 +460,19 @@ export async function hubcloudExtractor(
         if (s.includes("cf worker") || s.includes("fast cloud")) return 1;
         if (s.includes("cf storage") || s.includes("resumable")) return 2;
         if (s.includes("gdrive") || s.includes("instant")) return 3;
-        if (s.includes("pixeldrain")) return 4;
-        if (s.includes("fastdl")) return 5;
-        if (s.includes("hubcdn")) return 6;
+        if (s.includes("gofile")) return 4;
+        if (s.includes("pixeldrain")) return 5;
+        if (s.includes("fastdl")) return 6;
+        if (s.includes("hubcdn")) return 7;
         return 10;
       } else {
         if (s.includes("cf worker") || s.includes("fast cloud")) return 1;
         if (s.includes("cf storage")) return 2;
-        if (s.includes("pixeldrain")) return 3;
-        if (s.includes("fastdl")) return 4;
-        if (s.includes("hubcdn")) return 5;
-        if (s.includes("gdrive")) return 6;
+        if (s.includes("gofile")) return 3;
+        if (s.includes("pixeldrain")) return 4;
+        if (s.includes("fastdl")) return 5;
+        if (s.includes("hubcdn")) return 6;
+        if (s.includes("gdrive")) return 7;
         return 10;
       }
     };

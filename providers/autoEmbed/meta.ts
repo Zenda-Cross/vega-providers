@@ -66,7 +66,7 @@ export const getMeta = async function ({
           meta.videos || [],
           season,
         );
-        if (skipTimings) {
+        if (skipTimings ?? true) {
           directLinks = await enrichEpisodesWithSkipTimings(
             directLinks,
             imdbId,

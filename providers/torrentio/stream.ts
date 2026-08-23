@@ -1,5 +1,6 @@
-import { Stream, ProviderContext } from "../types";
+import { Stream, ProviderContext, SkipInterval } from "../types";
 import { throwProviderError } from "../providerErrors";
+import { fetchTheIntroDbSkipTimings } from "../theintrodb";
 
 const languageCodes = [
   ["MULTI", "MULTI"],
@@ -77,6 +78,19 @@ export const getStream = async ({
     if (!imdbId || !imdbId.startsWith("tt")) {
       console.warn("torrentio: missing or invalid imdbId in link payload");
       return [];
+    }
+
+    const skipTimings = await providerContext.kvStore?.get<boolean>("torrentio_skipTimings");
+    const skipTimingsEnabled = skipTimings ?? true;
+    let streamSkip: SkipInterval[] | undefined = undefined;
+    if (skipTimingsEnabled && effectiveType === "series" && imdbId && season && episode) {
+      streamSkip = await fetchTheIntroDbSkipTimings({
+        imdbId,
+        season: Number(season),
+        episode: Number(episode),
+        providerContext,
+      });
+      if (!streamSkip?.length) streamSkip = undefined;
     }
 
     const kv = providerContext.kvStore;
@@ -181,6 +195,7 @@ export const getStream = async ({
             link: link,
             type: link.startsWith("magnet:") ? "torrent" : "mp4",
             quality: quality,
+            skip: streamSkip,
           });
         }
       });

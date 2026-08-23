@@ -1,4 +1,5 @@
-import { Stream, ProviderContext, TextTracks } from "../types";
+import { Stream, ProviderContext, TextTracks, SkipInterval } from "../types";
+import { fetchTheIntroDbSkipTimings } from "../theintrodb";
 
 const VIDEASY_API_BASE = "https://api.speedracelight.com";
 const DECRYPTION_API_URL = "https://enc-dec.app/api/dec-videasy";
@@ -125,6 +126,20 @@ export const getStream = async ({
       return [];
     }
 
+    const skipTimings = await providerContext.kvStore?.get<boolean>("autoEmbed_skipTimings");
+    const skipTimingsEnabled = skipTimings ?? true;
+    let streamSkip: SkipInterval[] | undefined = undefined;
+    if (skipTimingsEnabled && !isMovie && (imdbId || tmdbId)) {
+      streamSkip = await fetchTheIntroDbSkipTimings({
+        imdbId,
+        tmdbId,
+        season: Number(season),
+        episode: Number(episode),
+        providerContext,
+      });
+      if (!streamSkip?.length) streamSkip = undefined;
+    }
+
     const backendHeaders = {
       Referer: `${ORIGIN}/`,
       Origin: ORIGIN,
@@ -219,6 +234,7 @@ export const getStream = async ({
               quality: q,
               subtitles: subtitles.length > 0 ? subtitles : undefined,
               headers: videoHeaders,
+              skip: streamSkip,
             });
           });
         } else if (result.url) {
@@ -229,6 +245,7 @@ export const getStream = async ({
             type: "m3u8",
             subtitles: subtitles.length > 0 ? subtitles : undefined,
             headers: videoHeaders,
+            skip: streamSkip,
           });
         } else if (result.streams) {
           for (const [qStr, sUrl] of Object.entries(result.streams)) {
@@ -240,6 +257,7 @@ export const getStream = async ({
               quality: extractQuality(qStr),
               subtitles: subtitles.length > 0 ? subtitles : undefined,
               headers: videoHeaders,
+              skip: streamSkip,
             });
           }
         }

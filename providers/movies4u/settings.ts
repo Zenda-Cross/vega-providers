@@ -36,7 +36,7 @@ export const getSettingsSchema = async function ({
       label: "Skip Timings",
       description:
         "Automatically fetch intro and recap skip timestamps from TheIntroDB for verified episodes",
-      defaultValue: false,
+      defaultValue: true,
     },
   ];
 };

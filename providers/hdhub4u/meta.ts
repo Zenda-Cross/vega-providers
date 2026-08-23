@@ -188,7 +188,7 @@ export const getMeta = async function ({
             cinemeta.videos || [],
             season,
           );
-          if (skipTimings) {
+          if (skipTimings ?? true) {
             enriched = await enrichEpisodesWithSkipTimings(
               enriched,
               imdbId,
