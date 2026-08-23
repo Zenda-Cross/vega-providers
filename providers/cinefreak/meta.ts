@@ -75,7 +75,12 @@ export const getMeta = async function ({
       .replace(/\s*\|\s*CineFreak.*$/i, "")
       .replace(/–\s*GDrive.*$/i, "")
       .replace(/\|\s*GDrive.*$/i, "")
+      .replace(/\s*&\s*Watch Online.*$/i, "")
+      .replace(/\s*\|\s*Full Movie.*$/i, "")
+      .replace(/\s*Full Movie.*$/i, "")
       .replace(/\s*\[.*?\]/g, "")
+      .replace(/\s*\|\s*$/g, "")
+      .replace(/\s*&\s*$/g, "")
       .replace(/\s+/g, " ")
       .trim();
 
@@ -132,8 +137,8 @@ export const getMeta = async function ({
     const hasEpisodeCards = $(".ep-card").length > 0;
     const isSeries =
       hasEpisodeCards ||
-      /season|series|episode|k-drama/i.test(rawTitle) ||
-      $('a[href*="/web-series/"]').length > 0;
+      /\b(season\s*\d+|s\d+|complete\s+series|all\s+episodes|episode\s*\d+|k-drama|c-drama|drama\s+series|web\s+series)\b/i.test(rawTitle) ||
+      /-full-series-download|-season-\d+/i.test(url);
 
     const linkList: Link[] = [];
 
@@ -212,7 +217,7 @@ export const getMeta = async function ({
 
     // Process Movie download links or fallback download containers
     if (linkList.length === 0) {
-      $(".download-links-div h4.movie-title, .download-links-div h3.movie-title").each(
+      $(".download-links-div h4.movie-title, .download-links-div h3.movie-title, .download-links-div h4, .download-links-div h3").each(
         (_, headingEl) => {
           const heading = $(headingEl);
           const headingText = heading.text().replace(/\s+/g, " ").trim();
@@ -233,7 +238,9 @@ export const getMeta = async function ({
             const btnText = btn.text().replace(/\s+/g, " ").trim() || "Download";
 
             directLinks.push({
-              title: btnText.includes("Watch") ? "Watch Online" : "Download",
+              title: isSeries
+                ? btnText.includes("Watch") ? "Watch Online" : "Download"
+                : "Movie",
               link: fullLink,
               type: isSeries ? "series" : "movie",
             });
@@ -261,8 +268,11 @@ export const getMeta = async function ({
       $('a[href*="generate.php"]').each((_, el) => {
         const href = $(el).attr("href");
         if (href) {
+          const btnText = $(el).text().replace(/\s+/g, " ").trim() || "Download";
           fallbackLinks.push({
-            title: $(el).text().replace(/\s+/g, " ").trim() || "Download",
+            title: isSeries
+              ? btnText.includes("Watch") ? "Watch Online" : "Download"
+              : "Movie",
             link: decodeCinefreakLink(href, baseUrl),
             type: isSeries ? "series" : "movie",
           });
@@ -271,7 +281,7 @@ export const getMeta = async function ({
 
       if (fallbackLinks.length > 0) {
         linkList.push({
-          title: isSeries ? "Episodes" : "Movie Links",
+          title: isSeries ? "Episodes" : "Movie",
           directLinks: fallbackLinks,
         });
       }
