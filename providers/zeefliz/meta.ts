@@ -193,30 +193,37 @@ export const getMeta = async function ({
     const imdbId = result.imdbId;
     if (!imdbId) return result;
 
-    const cinemeta = await getCinemetaMeta(
-      imdbId,
-      result.type,
-      providerContext,
-    );
-    if (result.type === "series" && cinemeta.type === "series") {
-      result.linkList = result.linkList.map((item) => {
-        const season =
-          getCinemetaSeason(item.title) || getCinemetaSeason(result.title);
-        if (!season) return item;
-        if (item.episodesLink) {
-          return {
-            ...item,
-            episodesLink: addCinemetaContext(
-              new URL(item.episodesLink, url).href,
-              imdbId,
-              season,
-            ),
-          };
+    try {
+      const cinemeta = await getCinemetaMeta(
+        imdbId,
+        result.type,
+        providerContext,
+      );
+      if (cinemeta) {
+        if (result.type === "series" && cinemeta.type === "series") {
+          result.linkList = result.linkList.map((item) => {
+            const season =
+              getCinemetaSeason(item.title) || getCinemetaSeason(result.title);
+            if (!season) return item;
+            if (item.episodesLink) {
+              return {
+                ...item,
+                episodesLink: addCinemetaContext(
+                  new URL(item.episodesLink, url).href,
+                  imdbId,
+                  season,
+                ),
+              };
+            }
+            return item;
+          });
         }
-        return item;
-      });
+        return applyCinemetaMeta(result, cinemeta);
+      }
+    } catch {
+      // Fallback to scraped metadata if Cinemeta lookup fails
     }
-    return applyCinemetaMeta(result, cinemeta);
+    return result;
   } catch (err) {
     throwProviderError("ZeeFliz", "metadata", err);
   }
