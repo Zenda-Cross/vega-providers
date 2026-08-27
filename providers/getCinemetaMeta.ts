@@ -9,6 +9,8 @@ export type CinemetaVideo = {
   overview?: string;
   description?: string;
   thumbnail?: string;
+  released?: string;
+  firstAired?: string;
 };
 
 export type CinemetaMeta = {

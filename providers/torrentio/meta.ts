@@ -49,9 +49,20 @@ export const getMeta = async function ({
 
     if (type === "series") {
       const seasons = new Map<number, EpisodeLink[]>();
+      const now = Date.now();
       for (const video of meta.videos || []) {
         const episode = video.episode ?? video.number;
         if (!video.season || video.season <= 0 || !episode) continue;
+
+        // Filter out unreleased future episodes
+        const releaseStr = video.released || video.firstAired;
+        if (releaseStr) {
+          const releaseTime = new Date(releaseStr).getTime();
+          if (!isNaN(releaseTime) && releaseTime > now) {
+            continue;
+          }
+        }
+
         const episodes = seasons.get(video.season) || [];
         episodes.push({
           title: `Episode ${episode}`,
@@ -61,8 +72,10 @@ export const getMeta = async function ({
       }
       const skipTimings = await providerContext.kvStore?.get<boolean>("torrentio_skipTimings");
       for (const season of [...seasons.keys()].sort((a, b) => a - b)) {
+        const seasonEpisodes = seasons.get(season) || [];
+        if (seasonEpisodes.length === 0) continue;
         let directLinks = enrichCinemetaEpisodes(
-          seasons.get(season) || [],
+          seasonEpisodes,
           meta.videos || [],
           season,
         );

@@ -99,14 +99,34 @@ export const getStream = async ({
     let debridApiKey = "";
     let qualityFilter = "all";
     let sortBy = "qualitythenseeders";
+    let includeP2PFallback = true;
 
     if (kv) {
-      const customUrl = await kv.get<string>("customInstanceUrl");
+      const customUrl =
+        (await kv.get<string>("customInstanceUrl")) ||
+        (await kv.get<string>("torrentio_customInstanceUrl"));
       if (customUrl && customUrl.trim()) baseUrl = customUrl.trim().replace(/\/+$/, "");
-      debridService = (await kv.get<string>("debridService")) || "none";
-      debridApiKey = ((await kv.get<string>("debridApiKey")) || "").trim();
-      qualityFilter = (await kv.get<string>("qualityFilter")) || "all";
-      sortBy = (await kv.get<string>("sortBy")) || "qualitythenseeders";
+      debridService =
+        (await kv.get<string>("debridService")) ||
+        (await kv.get<string>("torrentio_debridService")) ||
+        "none";
+      debridApiKey = (
+        (await kv.get<string>("debridApiKey")) ||
+        (await kv.get<string>("torrentio_debridApiKey")) ||
+        ""
+      ).trim();
+      qualityFilter =
+        (await kv.get<string>("qualityFilter")) ||
+        (await kv.get<string>("torrentio_qualityFilter")) ||
+        "all";
+      sortBy =
+        (await kv.get<string>("sortBy")) ||
+        (await kv.get<string>("torrentio_sortBy")) ||
+        "qualitythenseeders";
+      const fallbackSetting =
+        (await kv.get<boolean>("includeP2PFallback")) ??
+        (await kv.get<boolean>("torrentio_includeP2PFallback"));
+      if (fallbackSetting !== undefined) includeP2PFallback = fallbackSetting;
     }
 
     const optionsParts: string[] = [];
@@ -118,6 +138,9 @@ export const getStream = async ({
     }
     if (debridService && debridService !== "none" && debridApiKey) {
       optionsParts.push(`${debridService}=${debridApiKey}`);
+      if (!includeP2PFallback) {
+        optionsParts.push("debridoptions=nodownloadlinks");
+      }
     }
 
     const optionsSegment = optionsParts.length > 0 ? `${optionsParts.join("|")}/` : "";
@@ -180,10 +203,17 @@ export const getStream = async ({
 
         const tagStr = formatTags.join("/");
 
+        // Extract Debrid badge from s.name (e.g., [RD+], [AD+], [PM+], [TB+], [DL+], [RD download])
+        const debridBadge = (s.name || "").match(/\[(RD\+?|AD\+?|PM\+?|TB\+?|DL\+?|OC\+?|RD download|AD download)\]/i)?.[0];
+        const isCachedDebrid =
+          Boolean(debridBadge && !debridBadge.toLowerCase().includes("download")) ||
+          Boolean(link && !link.startsWith("magnet:"));
+
         const serverParts: string[] = [];
+        if (debridBadge) serverParts.push(debridBadge);
         if (tagStr) serverParts.push(tagStr);
         if (language && language !== "ENG") serverParts.push(language);
-        if (seeders) serverParts.push(seeders);
+        if (seeders && !isCachedDebrid) serverParts.push(seeders);
         if (size) serverParts.push(size);
         serverParts.push(uploader || "Torrentio");
 
