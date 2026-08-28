@@ -299,44 +299,20 @@ export async function getStream({
 
     streamLinks.sort((a, b) => getPriority(a.server) - getPriority(b.server));
 
-    if (isDownload && streamLinks.length > 0) {
+    if (streamLinks.length > 0) {
       const checkHealth = async (linkUrl: string): Promise<boolean> => {
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 4000);
-          if (signal) {
-            signal.addEventListener("abort", () => controller.abort(), { once: true });
-          }
-          const res = await fetch(linkUrl, {
-            method: "HEAD",
+          const res = await axios.get(linkUrl, {
             headers: {
-              "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+              ...headers,
+              Range: "bytes=0-0",
             },
-            signal: controller.signal,
-            redirect: "follow",
+            timeout: 3500,
+            signal,
+            maxRedirects: 5,
+            validateStatus: (status: number) => status >= 200 && status < 400,
           });
-          clearTimeout(timeoutId);
-          if (res.status >= 200 && res.status < 400) return true;
-          if (res.status === 405 || res.status === 403) {
-            const getController = new AbortController();
-            const getTimeoutId = setTimeout(() => getController.abort(), 4000);
-            if (signal) {
-              signal.addEventListener("abort", () => getController.abort(), { once: true });
-            }
-            const getRes = await fetch(linkUrl, {
-              method: "GET",
-              headers: {
-                "User-Agent":
-                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                Range: "bytes=0-0",
-              },
-              signal: getController.signal,
-            });
-            clearTimeout(getTimeoutId);
-            return getRes.status >= 200 && getRes.status < 400;
-          }
-          return false;
+          return res.status >= 200 && res.status < 400;
         } catch {
           return false;
         }

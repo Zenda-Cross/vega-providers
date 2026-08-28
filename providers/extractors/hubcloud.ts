@@ -47,53 +47,31 @@ const getRedirectedPixelDrainUrl = (
 
 async function checkStreamHealth(
   stream: { server: string; link: string; headers?: any },
+  axios: any,
   signal?: AbortSignal,
 ): Promise<boolean> {
   if (!stream?.link) return false;
   const reqHeaders: Record<string, string> = {
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    Range: "bytes=0-0",
     ...(stream.headers || {}),
   };
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-    if (signal) {
-      signal.addEventListener("abort", () => controller.abort(), { once: true });
-    }
-
-    const res = await fetch(stream.link, {
-      method: "HEAD",
+    const res = await axios.get(stream.link, {
       headers: reqHeaders,
-      signal: controller.signal,
-      redirect: "follow",
+      timeout: 3500,
+      signal,
+      maxRedirects: 5,
+      validateStatus: (status: number) => status >= 200 && status < 400,
     });
-    clearTimeout(timeoutId);
-
-    if (res.status >= 200 && res.status < 400) {
-      return true;
-    }
-
-    if (res.status === 405 || res.status === 403) {
-      const getController = new AbortController();
-      const getTimeoutId = setTimeout(() => getController.abort(), 4000);
-      if (signal) {
-        signal.addEventListener("abort", () => getController.abort(), { once: true });
-      }
-      const getRes = await fetch(stream.link, {
-        method: "GET",
-        headers: { ...reqHeaders, Range: "bytes=0-0" },
-        signal: getController.signal,
-      });
-      clearTimeout(getTimeoutId);
-      return getRes.status >= 200 && getRes.status < 400;
-    }
-    return false;
+    return res.status >= 200 && res.status < 400;
   } catch {
     return false;
   }
 }
+
 
 async function resolveGofileLink(
   gofileLink: string,
@@ -449,11 +427,11 @@ export async function hubcloudExtractor(
         return 0;
       }
       if (isDownload) {
-        if (s.includes("cf worker") || s.includes("fast cloud")) return 1;
-        if (s.includes("cf storage") || s.includes("resumable")) return 2;
+        if (s.includes("cf storage") || s.includes("resumable")) return 1;
+        if (s.includes("cf worker") || s.includes("fast cloud")) return 2;
         if (s.includes("gdrive") || s.includes("instant")) return 3;
-        if (s.includes("gofile")) return 4;
-        if (s.includes("pixeldrain")) return 5;
+        if (s.includes("pixeldrain")) return 4;
+        if (s.includes("gofile")) return 5;
         if (s.includes("fastdl")) return 6;
         if (s.includes("hubcdn")) return 7;
         return 10;
@@ -471,9 +449,10 @@ export async function hubcloudExtractor(
 
     streamLinks.sort((a, b) => getPriority(a.server) - getPriority(b.server));
 
-    if (isDownload && streamLinks.length > 0) {
+    if (streamLinks.length > 0) {
       const isTopHealthy = await checkStreamHealth(
         streamLinks[0],
+        axios,
         signal,
       );
       if (!isTopHealthy) {
@@ -481,6 +460,7 @@ export async function hubcloudExtractor(
         for (let i = 1; i < streamLinks.length; i++) {
           const isHealthy = await checkStreamHealth(
             streamLinks[i],
+            axios,
             signal,
           );
           if (isHealthy) {
