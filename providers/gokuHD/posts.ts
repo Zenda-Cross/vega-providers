@@ -8,22 +8,9 @@ function normalizeLink(baseUrl: string, link: string): string {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-async function parsePosts(
-  url: string,
-  baseUrl: string,
-  signal: AbortSignal,
-  providerContext: ProviderContext,
-): Promise<Post[]> {
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw new Error(
-      `HTTP ${response.status} ${response.statusText} | URL ${url}`,
-    );
-  }
-
-  const $ = providerContext.cheerio.load(await response.text());
+function extractPosts($: any, baseUrl: string): Post[] {
   const posts: Post[] = [];
-  $("article.col_item").each((_, element) => {
+  $("article.col_item").each((_: number, element: any) => {
     const card = $(element);
     const anchor = card.find("h2 a, h3 a, a[href]").first();
     const href = anchor.attr("href") || "";
@@ -56,20 +43,28 @@ export const getPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
+  const { axios, cheerio, commonHeaders } = providerContext;
   const baseUrl = await getBaseUrl(providerValue);
   const path = filter ? `/${filter}/page/${page}/` : `/page/${page}/`;
-  return parsePosts(
-    new URL(path, `${baseUrl}/`).href,
-    baseUrl,
+  const url = new URL(path, `${baseUrl}/`).href;
+
+  const response = await axios.get(url, {
     signal,
-    providerContext,
-  );
+    headers: {
+      ...commonHeaders,
+      Referer: `${baseUrl}/`,
+    },
+  });
+
+  const $ = cheerio.load(response.data);
+  return extractPosts($, baseUrl);
 };
 
 export const getSearchPosts = async function ({
   searchQuery,
   page,
   signal,
+  providerContext,
 }: {
   searchQuery: string;
   page: number;
@@ -78,37 +73,35 @@ export const getSearchPosts = async function ({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   if (!searchQuery.trim()) return [];
+  const { axios, cheerio, commonHeaders } = providerContext;
   const baseUrl = await getBaseUrl(providerValue);
-  const params = new URLSearchParams({
-    search: searchQuery.trim(),
-    per_page: "20",
-    page: String(page),
-    _embed: "1",
-  });
-  const url = new URL(`/wp-json/wp/v2/posts?${params}`, `${baseUrl}/`).href;
-  const response = await fetch(url, {
-    signal,
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) {
-    throw new Error(
-      `HTTP ${response.status} ${response.statusText} | URL ${url}`,
-    );
-  }
 
-  const posts = (await response.json()) as any[];
-  return posts.map((post) => ({
-    title: String(post?.title?.rendered || "")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&#8211;/g, "-")
-      .replace(/&#8217;/g, "'")
-      .replace(/&amp;/g, "&")
-      .trim(),
-    link: normalizeLink(baseUrl, post?.link || ""),
-    image:
-      post?._embedded?.["wp:featuredmedia"]?.[0]?.source_url ||
-      post?._embedded?.["wp:featuredmedia"]?.[0]?.media_details?.sizes?.medium
-        ?.source_url ||
-      "",
-  }));
+  const searchUrl =
+    page > 1
+      ? new URL(`/page/${page}/`, `${baseUrl}/`).href
+      : new URL(`/`, `${baseUrl}/`).href;
+
+  const params = new URLSearchParams({
+    s: searchQuery.trim(),
+    post_type: "post",
+  });
+
+  try {
+    const response = await axios.post(searchUrl, params.toString(), {
+      signal,
+      headers: {
+        ...commonHeaders,
+        "Content-Type": "application/x-www-form-urlencoded",
+        Referer: `${baseUrl}/`,
+      },
+    });
+
+    const $ = cheerio.load(response.data);
+    return extractPosts($, baseUrl);
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      return [];
+    }
+    throw error;
+  }
 };

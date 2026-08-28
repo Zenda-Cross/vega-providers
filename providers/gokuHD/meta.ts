@@ -17,12 +17,18 @@ export const getMeta = async function ({
   link: string;
   providerContext: ProviderContext;
 }): Promise<Info> {
+  const { axios, cheerio, commonHeaders } = providerContext;
   const baseUrl = await getBaseUrl(providerValue);
   const pageUrl = new URL(link, `${baseUrl}/`).href;
-  const response = await fetch(pageUrl);
-  if (!response.ok) throw new Error(`GokuHD returned ${response.status}`);
 
-  const $ = providerContext.cheerio.load(await response.text());
+  const response = await axios.get(pageUrl, {
+    headers: {
+      ...commonHeaders,
+      Referer: `${baseUrl}/`,
+    },
+  });
+
+  const $ = cheerio.load(response.data);
   const content = $(
     "article.post-inner, .entry-content, .post-content",
   ).first();
