@@ -45,32 +45,6 @@ const getRedirectedPixelDrainUrl = (
   return "";
 };
 
-async function checkStreamHealth(
-  stream: { server: string; link: string; headers?: any },
-  axios: any,
-  signal?: AbortSignal,
-): Promise<boolean> {
-  if (!stream?.link) return false;
-  const reqHeaders: Record<string, string> = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-    Range: "bytes=0-0",
-    ...(stream.headers || {}),
-  };
-
-  try {
-    const res = await axios.get(stream.link, {
-      headers: reqHeaders,
-      timeout: 3500,
-      signal,
-      maxRedirects: 5,
-      validateStatus: (status: number) => status >= 200 && status < 400,
-    });
-    return res.status >= 200 && res.status < 400;
-  } catch {
-    return false;
-  }
-}
 
 
 async function resolveGofileLink(
@@ -365,53 +339,29 @@ export async function hubcloudExtractor(
         return 0;
       }
       if (isDownload) {
-        if (s.includes("cf storage") || s.includes("resumable")) return 1;
-        if (s.includes("cf worker") || s.includes("fast cloud")) return 2;
-        if (s.includes("gdrive") || s.includes("instant")) return 3;
-        if (s.includes("pixeldrain")) return 4;
-        if (s.includes("gofile")) return 5;
-        if (s.includes("fastdl")) return 6;
-        if (s.includes("hubcdn")) return 7;
+        if (s.includes("cf storage") || s.includes("storage") || s.includes("resumable")) return 1;
+        if (s.includes("gdrive") || s.includes("google") || s.includes("instant")) return 2;
+        if (s.includes("pixeldrain")) return 3;
+        if (s.includes("gofile")) return 4;
+        if (s.includes("fastdl") || s.includes("fsl")) return 5;
+        if (s.includes("hubcdn")) return 6;
+        if (s.includes("cf worker") || s.includes("worker") || s.includes("fast cloud")) return 8;
         return 10;
       } else {
-        if (s.includes("cf worker") || s.includes("fast cloud")) return 1;
-        if (s.includes("cf storage")) return 2;
+        if (s.includes("cf storage") || s.includes("storage")) return 1;
+        if (s.includes("cf worker") || s.includes("worker") || s.includes("fast cloud")) return 2;
         if (s.includes("gofile")) return 3;
         if (s.includes("pixeldrain")) return 4;
-        if (s.includes("fastdl")) return 5;
+        if (s.includes("fastdl") || s.includes("fsl")) return 5;
         if (s.includes("hubcdn")) return 6;
-        if (s.includes("gdrive")) return 7;
+        if (s.includes("gdrive") || s.includes("google")) return 7;
         return 10;
       }
     };
 
     streamLinks.sort((a, b) => getPriority(a.server) - getPriority(b.server));
 
-    if (streamLinks.length > 0) {
-      const isTopHealthy = await checkStreamHealth(
-        streamLinks[0],
-        axios,
-        signal,
-      );
-      if (!isTopHealthy) {
-        let healthyIndex = -1;
-        for (let i = 1; i < streamLinks.length; i++) {
-          const isHealthy = await checkStreamHealth(
-            streamLinks[i],
-            axios,
-            signal,
-          );
-          if (isHealthy) {
-            healthyIndex = i;
-            break;
-          }
-        }
-        if (healthyIndex > 0) {
-          const [workingStream] = streamLinks.splice(healthyIndex, 1);
-          streamLinks.unshift(workingStream);
-        }
-      }
-    }
+
 
     console.log("streamLinks", streamLinks);
     return streamLinks;

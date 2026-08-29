@@ -35,66 +35,64 @@ function resolveCinecloudUrl(link: string): string {
   return link;
 }
 
-async function followRedirect(link: string, headers: any, signal: AbortSignal, cheerio: any): Promise<string> {
-  const newLinkRes = await fetch(link, {
-    method: "GET",
-    headers,
-    signal,
-    redirect: "manual",
-  });
-
-  let newLink = link;
-  if (newLinkRes.status >= 300 && newLinkRes.status < 400) {
-    newLink = newLinkRes.headers.get("location") || link;
-  } else if (newLinkRes.status === 200) {
-    // Some cinecloud links return a 200 page with the real link in the DOM
-    try {
-      const html = await newLinkRes.text();
-      const $ = cheerio.load(html);
-      let instantLink = $("a.instant-download, a.download-btn, a.fsl-btn, a.server-btn").attr("href");
-
-      // Some templates use btn-success for the initial page redirect
-      if (!instantLink) {
-        instantLink = $("a.btn-success").attr("href");
-      }
-
-      if (instantLink && instantLink !== "#") {
-        newLink = instantLink;
-      }
-    } catch (e) {
-      console.warn("followRedirect: failed to parse 200 body", e);
-    }
-  } else if (newLinkRes.url && newLinkRes.url !== link) {
-    newLink = newLinkRes.url;
-  } else {
-    newLink = newLinkRes.headers.get("location") || link;
-  }
-
-  if (newLink.startsWith("/")) {
-    const url = new URL(link);
-    newLink = `${url.origin}${newLink}`;
-  }
-
-  if (newLink.includes("googleusercontent")) {
-    newLink = newLink.split("?link=")[1] || newLink;
-  } else if (newLink !== link) {
-    const newLinkRes2 = await fetch(newLink, {
-      method: "GET",
+async function followRedirect(
+  link: string,
+  headers: any,
+  signal: AbortSignal | undefined,
+  cheerio: any,
+  axios: any
+): Promise<string> {
+  try {
+    const res1 = await axios.get(link, {
       headers,
       signal,
-      redirect: "manual",
+      maxRedirects: 0,
+      timeout: 8000,
+      validateStatus: (s: number) => s >= 200 && s < 400,
     });
 
-    if (newLinkRes2.status >= 300 && newLinkRes2.status < 400) {
-      newLink = newLinkRes2.headers.get("location")?.split("?link=")[1] || newLink;
-    } else if (newLinkRes2.url && newLinkRes2.url !== newLink) {
-      newLink = newLinkRes2.url.split("?link=")[1] || newLinkRes2.url;
-    } else {
-      newLink = newLinkRes2.headers.get("location")?.split("?link=")[1] || newLink;
+    let newLink = link;
+    if (res1.headers?.["location"]) {
+      newLink = res1.headers["location"];
+    } else if (res1.status === 200 && typeof res1.data === "string") {
+      try {
+        const $ = cheerio.load(res1.data);
+        const instantLink = $(
+          "a.instant-download, a.download-btn, a.fsl-btn, a.server-btn, a.btn-success"
+        ).attr("href");
+        if (instantLink && instantLink !== "#") {
+          newLink = instantLink;
+        }
+      } catch {}
     }
-  }
 
-  return newLink;
+    if (newLink.startsWith("/")) {
+      const url = new URL(link);
+      newLink = `${url.origin}${newLink}`;
+    }
+
+    if (newLink.includes("googleusercontent")) {
+      newLink = newLink.split("?link=")[1] || newLink;
+    } else if (newLink !== link && newLink.startsWith("http")) {
+      try {
+        const res2 = await axios.get(newLink, {
+          headers,
+          signal,
+          maxRedirects: 0,
+          timeout: 8000,
+          validateStatus: (s: number) => s >= 200 && s < 400,
+        });
+        if (res2.headers?.["location"]) {
+          const loc = res2.headers["location"];
+          newLink = loc.includes("?link=") ? loc.split("?link=")[1] : loc;
+        }
+      } catch {}
+    }
+
+    return newLink;
+  } catch {
+    return link;
+  }
 }
 
 export async function getStream({
@@ -194,7 +192,7 @@ export async function getStream({
         if (href.includes(".dev") && !href.includes("/?id=")) {
           streamLinks.push({ server: "Fast Cloud", link: href, type: "mkv" });
         } else if (href.includes("/w/") || href.includes("/gp/") || text.includes("instant download")) {
-          const newLink = await followRedirect(href, commonHeaders, signal, cheerio);
+          const newLink = await followRedirect(href, commonHeaders, signal, cheerio, axios);
           if (newLink && newLink !== href) {
             streamLinks.push({
               server: text.includes("v2") || href.includes("/gp/") ? "Instant V2 (download only)" : "Instant (download only)",
@@ -282,15 +280,15 @@ export async function getStream({
         return 0;
       }
       if (isDownload) {
-        if (s.includes("fast cloud")) return 1;
-        if (s.includes("resumable")) return 2;
-        if (s.includes("instant (download only)")) return 3;
-        if (s.includes("instant v2")) return 4;
-        if (s.includes("stream online")) return 5;
+        if (s.includes("resumable") || s.includes("storage")) return 1;
+        if (s.includes("instant (download only)")) return 2;
+        if (s.includes("instant v2")) return 3;
+        if (s.includes("stream online")) return 4;
+        if (s.includes("fast cloud") || s.includes("worker")) return 5;
       } else {
-        if (s.includes("fast cloud")) return 1;
-        if (s.includes("stream online")) return 2;
-        if (s.includes("resumable")) return 3;
+        if (s.includes("resumable") || s.includes("storage")) return 1;
+        if (s.includes("fast cloud") || s.includes("worker")) return 2;
+        if (s.includes("stream online")) return 3;
         if (s.includes("instant (download only)")) return 4;
         if (s.includes("instant v2")) return 5;
       }
@@ -299,41 +297,7 @@ export async function getStream({
 
     streamLinks.sort((a, b) => getPriority(a.server) - getPriority(b.server));
 
-    if (streamLinks.length > 0) {
-      const checkHealth = async (linkUrl: string): Promise<boolean> => {
-        try {
-          const res = await axios.get(linkUrl, {
-            headers: {
-              ...headers,
-              Range: "bytes=0-0",
-            },
-            timeout: 3500,
-            signal,
-            maxRedirects: 5,
-            validateStatus: (status: number) => status >= 200 && status < 400,
-          });
-          return res.status >= 200 && res.status < 400;
-        } catch {
-          return false;
-        }
-      };
 
-      const isTopHealthy = await checkHealth(streamLinks[0].link);
-      if (!isTopHealthy) {
-        let healthyIndex = -1;
-        for (let i = 1; i < streamLinks.length; i++) {
-          const isHealthy = await checkHealth(streamLinks[i].link);
-          if (isHealthy) {
-            healthyIndex = i;
-            break;
-          }
-        }
-        if (healthyIndex > 0) {
-          const [workingStream] = streamLinks.splice(healthyIndex, 1);
-          streamLinks.unshift(workingStream);
-        }
-      }
-    }
 
     return streamLinks;
   } catch (error: any) {
