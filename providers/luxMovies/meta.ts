@@ -151,53 +151,55 @@ export const getMeta = async ({
     const links: Link[] = [];
     list.each((index, element: any) => {
       element = $(element);
-      // title
-      const title = element?.text() || "";
+      const title = element?.text()?.trim() || "";
+      if (!title || element.is("hr") || element.is("style") || element.is("script")) return;
 
-      const quality = element?.text().match(/\d+p\b/)?.[0] || "";
-      // console.log(title);
-      // movieLinks
-      const movieLinks =
-        element
-          ?.next()
-          .find(".dwd-button")
-          .text()
-          .toLowerCase()
-          .includes("download") ||
-        element.next().find("a").text().toLowerCase().includes("download")
-          ? element?.next().find(".dwd-button")?.parent()?.attr("href") ||
-            element?.next().find("a[href]")?.attr("href")
-          : "";
+      const quality = title.match(/\d+p\b/)?.[0] || "";
 
-      // episode links
-      const vcloudLinks = element
-        ?.next()
-        .find(".btn-outline[style*='#ed0b0b']")
-        ?.parent()
-        ?.attr("href");
-      const episodesLink =
-        (vcloudLinks
-          ? vcloudLinks
-          : element
-                ?.next()
-                .find(".dwd-button")
-                .text()
-                .toLowerCase()
-                .includes("episode")
-            ? element?.next().find(".dwd-button")?.parent()?.attr("href")
-            : "") ||
-        element
-          ?.next()
-          .find(".btn-outline[style*='#0ebac3']")
-          ?.parent()
-          ?.attr("href");
-      if (movieLinks || episodesLink) {
+      let nextP = element.next();
+      while (nextP.length && !nextP.is("p") && !nextP.find(".dwd-button, .btn-outline, a[href]").length) {
+        nextP = nextP.next();
+      }
+
+      const btnHref =
+        nextP.find("a[href*='vcloud']").attr("href") ||
+        nextP.find("a[href*='hubcloud']").attr("href") ||
+        nextP.find(".dwd-button")?.parent()?.attr("href") ||
+        nextP.find(".btn-outline")?.parent()?.attr("href") ||
+        nextP.find("a[href]")?.attr("href") ||
+        "";
+
+      if (
+        !btnHref ||
+        btnHref === "/" ||
+        btnHref === "#" ||
+        title.toLowerCase() === "download now" ||
+        title.toLowerCase().includes("winding up") ||
+        title.toLowerCase().includes("thank you")
+      ) {
+        return;
+      }
+
+      if (
+        links.some(
+          (l) =>
+            l.episodesLink === btnHref ||
+            (l.directLinks && l.directLinks[0]?.link === btnHref),
+        )
+      ) {
+        return;
+      }
+
+      if (type === "series") {
         links.push({
           title,
-          directLinks: movieLinks
-            ? [{ title: "Movie", link: movieLinks, type: "movie" }]
-            : [],
-          episodesLink,
+          episodesLink: btnHref,
+          quality,
+        });
+      } else {
+        links.push({
+          title,
+          directLinks: [{ title: "Movie", link: btnHref, type: "movie" }],
           quality,
         });
       }
