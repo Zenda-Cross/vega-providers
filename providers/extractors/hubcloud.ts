@@ -198,60 +198,22 @@ export async function hubcloudExtractor(
         const vcloudRes = await axios.get(vcloudLink, { headers, signal });
         vcloudText = vcloudRes.data;
       } catch (error: any) {
-      if (error.response?.status === 403 && openWebView) {
-        console.log(
-          `hubcloudExtractor: WAF detected (403) for ${vcloudLink}, using solver...`,
-        );
-        const vcloudBaseUrl = vcloudLink.split("/").slice(0, 3).join("/");
-        const cleanHeaders2 = { ...headers, Referer: vcloudBaseUrl };
-        delete cleanHeaders2["User-Agent"];
-        delete cleanHeaders2["sec-ch-ua"];
-        delete cleanHeaders2["sec-ch-ua-mobile"];
-        delete cleanHeaders2["sec-ch-ua-platform"];
-        delete cleanHeaders2["Cookie"];
-
-        const wafResult = await openWebView(vcloudBaseUrl, {
-          title: "Solve the captcha below and click done",
-          description: "Required to bypass anti-bot protection.",
-          headers: cleanHeaders2,
-          waitForCookie: "cf_clearance",
-          force: true,
-        });
-        if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
-        headers["Cookie"] =
-          (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
-          wafResult.cookies;
-        const retryRes = await axios.get(vcloudLink, { headers, signal });
-        vcloudText = retryRes.data;
-      } else {
-        if (error.response?.status === 403 && !openWebView) {
-          console.log(
-            `hubcloudExtractor: 403 Forbidden for ${vcloudLink}, but openWebView solver is not available!`,
-          );
-        }
-        // Fallback to fetch
-        let fetchRes = await fetch(vcloudLink, {
-          headers,
-          signal,
-          redirect: "follow",
-        });
-
-        if (fetchRes.status === 403 && openWebView) {
+        if (error.response?.status === 403 && openWebView) {
           console.log(
             `hubcloudExtractor: WAF detected (403) for ${vcloudLink}, using solver...`,
           );
           const vcloudBaseUrl = vcloudLink.split("/").slice(0, 3).join("/");
-          const cleanHeaders3 = { ...headers, Referer: vcloudBaseUrl };
-          delete cleanHeaders3["User-Agent"];
-          delete cleanHeaders3["sec-ch-ua"];
-          delete cleanHeaders3["sec-ch-ua-mobile"];
-          delete cleanHeaders3["sec-ch-ua-platform"];
-          delete cleanHeaders3["Cookie"];
+          const cleanHeaders2 = { ...headers, Referer: vcloudBaseUrl };
+          delete cleanHeaders2["User-Agent"];
+          delete cleanHeaders2["sec-ch-ua"];
+          delete cleanHeaders2["sec-ch-ua-mobile"];
+          delete cleanHeaders2["sec-ch-ua-platform"];
+          delete cleanHeaders2["Cookie"];
 
           const wafResult = await openWebView(vcloudBaseUrl, {
             title: "Solve the captcha below and click done",
             description: "Required to bypass anti-bot protection.",
-            headers: cleanHeaders3,
+            headers: cleanHeaders2,
             waitForCookie: "cf_clearance",
             force: true,
           });
@@ -259,21 +221,12 @@ export async function hubcloudExtractor(
           headers["Cookie"] =
             (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
             wafResult.cookies;
-          fetchRes = await fetch(vcloudLink, {
-            headers,
-            signal,
-            redirect: "follow",
-          });
+          const retryRes = await axios.get(vcloudLink, { headers, signal });
+          vcloudText = retryRes.data;
+        } else {
+          throw error;
         }
-
-        if (!fetchRes.ok) {
-          throw new Error(
-            `HTTP ${fetchRes.status} ${fetchRes.statusText} | URL ${vcloudLink}`,
-          );
-        }
-        vcloudText = await fetchRes.text();
       }
-    }
     }
     const $ = cheerio.load(vcloudText);
     // console.log("vcloudRes", $.text());
@@ -312,53 +265,38 @@ export async function hubcloudExtractor(
 
         case link?.includes("hubcloud") || link?.includes("/?id="):
           try {
-            const newLinkRes = await fetch(link, {
-              method: "HEAD",
+            let newLink = link;
+            const res1 = await axios.get(link, {
               headers,
               signal,
-              redirect: "manual",
+              maxRedirects: 0,
+              validateStatus: (s: number) => s >= 200 && s < 400,
             });
-
-            // Check if response is a redirect (301, 302, etc.)
-            let newLink = link;
-            if (newLinkRes.status >= 300 && newLinkRes.status < 400) {
-              newLink = newLinkRes.headers.get("location") || link;
-            } else if (newLinkRes.url && newLinkRes.url !== link) {
-              // Fallback: check if URL changed (redirect was followed)
-              newLink = newLinkRes.url;
-            } else {
-              newLink = newLinkRes.headers.get("location") || link;
+            if (res1.headers?.["location"]) {
+              newLink = res1.headers["location"];
             }
             if (newLink.includes("googleusercontent")) {
-              newLink = newLink.split("?link=")[1];
-            } else {
-              const newLinkRes2 = await fetch(newLink, {
-                method: "HEAD",
+              newLink = newLink.split("?link=")[1] || newLink;
+            } else if (newLink.includes("http")) {
+              const res2 = await axios.get(newLink, {
                 headers,
                 signal,
-                redirect: "manual",
+                maxRedirects: 0,
+                validateStatus: (s: number) => s >= 200 && s < 400,
               });
-
-              // Check if response is a redirect
-              if (newLinkRes2.status >= 300 && newLinkRes2.status < 400) {
-                newLink =
-                  newLinkRes2.headers.get("location")?.split("?link=")[1] ||
-                  newLink;
-              } else if (newLinkRes2.url && newLinkRes2.url !== newLink) {
-                // Fallback: URL changed due to redirect
-                newLink = newLinkRes2.url.split("?link=")[1] || newLinkRes2.url;
-              } else {
-                newLink =
-                  newLinkRes2.headers.get("location")?.split("?link=")[1] ||
-                  newLink;
+              if (res2.headers?.["location"]) {
+                const loc2 = res2.headers["location"];
+                newLink = loc2.includes("?link=") ? loc2.split("?link=")[1] : loc2;
               }
             }
 
-            streamLinks.push({
-              server: "GDrive (download only)",
-              link: newLink,
-              type: "mkv",
-            });
+            if (newLink && newLink !== link) {
+              streamLinks.push({
+                server: "GDrive (download only)",
+                link: newLink,
+                type: "mkv",
+              });
+            }
           } catch (error) {
             console.log("hubcloudExtractor error in hubcloud link: ", error);
           }

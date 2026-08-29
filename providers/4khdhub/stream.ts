@@ -16,6 +16,19 @@ export async function getStream({
   isDownload?: boolean;
 }) {
   const { axios, cheerio, commonHeaders: headers } = providerContext;
+  if (link.includes("hubcloud") || link.includes("/drive/")) {
+    return await hubcloudExtractor(
+      link,
+      signal,
+      axios,
+      cheerio,
+      headers,
+      providerContext,
+      isDownload,
+      "4khdhub",
+    );
+  }
+
   let hubdriveLink = "";
   if (link.includes("hubdrive")) {
     const hubdriveRes = await axios.get(link, { headers, signal });
@@ -31,7 +44,7 @@ export async function getStream({
     console.log("decodedString", decodedString);
     link = safeAtob(decodedString?.o) || link;
     console.log("Decoded link", link);
-    const redirectLink = await getRedirectLinks(link, signal, headers);
+    const redirectLink = await getRedirectLinks(link, signal, headers, axios);
     console.log("redirectLink", redirectLink);
     if (redirectLink.includes("hubcloud") || redirectLink.includes("/drive/")) {
       return await hubcloudExtractor(
@@ -52,7 +65,7 @@ export async function getStream({
       $('h3:contains("1080p")').find("a").attr("href") ||
       redirectLinkText.match(
         /href="(https:\/\/hubcloud\.[^\/]+\/drive\/[^"]+)"/,
-      )[1];
+      )?.[1] || "";
     if (hubdriveLink.includes("hubdrive")) {
       const hubdriveRes = await axios.get(hubdriveLink, { headers, signal });
       const hubdriveText = hubdriveRes.data;
@@ -128,27 +141,24 @@ export async function getRedirectLinks(
   link: string,
   signal: AbortSignal,
   headers: any,
+  axios: any,
 ) {
   try {
-    const res = await fetch(link, { headers, signal });
-    const resText = await res.text();
+    const res = await axios.get(link, { headers, signal });
+    const resText = res.data;
 
     var regex = /ck\('_wp_http_\d+','([^']+)'/g;
     var combinedString = "";
 
     var match;
     while ((match = regex.exec(resText)) !== null) {
-      // console.log(match[1]);
       combinedString += match[1];
     }
-    // console.log(decode(combinedString));
     const decodedString = decode(pen(decode(decode(combinedString))));
-    // console.log(decodedString);
     const data = JSON.parse(decodedString);
     console.log(data);
     const token = encode(data?.data);
     const blogLink = data?.wp_http1 + "?re=" + token;
-    // abort timeout on signal
     let wait = abortableTimeout((Number(data?.total_time) + 3) * 1000, {
       signal,
     });
@@ -158,17 +168,16 @@ export async function getRedirectLinks(
 
     let vcloudLink = "Invalid Request";
     while (vcloudLink.includes("Invalid Request")) {
-      const blogRes = await fetch(blogLink, { headers, signal });
-      const blogResText = (await blogRes.text()) as any;
+      const blogRes = await axios.get(blogLink, { headers, signal });
+      const blogResText = blogRes.data as string;
       if (blogResText.includes("Invalid Request")) {
         console.log(blogResText);
       } else {
-        vcloudLink = blogResText.match(/var reurl = "([^"]+)"/) || "";
+        vcloudLink = blogResText.match(/var reurl = "([^"]+)"/)?.[1] || "";
         break;
       }
     }
 
-    // console.log('vcloudLink', vcloudLink?.[1]);
     return blogLink || link;
   } catch (err) {
     console.log("Error in getRedirectLinks", err);
@@ -197,22 +206,12 @@ const safeAtob = (str: string) => {
 
 export function decodeString(encryptedString: string) {
   try {
-    // First base64 decode
     let decoded = atob(encryptedString);
-
-    // Second base64 decode
     decoded = atob(decoded);
-
-    // ROT13 decode
     decoded = rot13(decoded);
-
-    // Third base64 decode
     decoded = atob(decoded);
-
-    // Parse JSON
     return JSON.parse(decoded);
   } catch (error) {
-    console.error("Error decoding string:", error);
     return null;
   }
 }
