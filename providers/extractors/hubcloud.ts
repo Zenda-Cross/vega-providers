@@ -240,37 +240,61 @@ export async function hubcloudExtractor(
         case link?.includes("hubcloud") || link?.includes("/?id="):
           try {
             let newLink = link;
-            const res1 = await axios.get(link, {
-              headers,
-              signal,
-              maxRedirects: 0,
-              validateStatus: (s: number) => s >= 200 && s < 400,
-            });
-            if (res1.headers?.["location"]) {
-              newLink = res1.headers["location"];
-            }
-            if (newLink.includes("googleusercontent")) {
-              newLink = newLink.split("?link=")[1] || newLink;
-            } else if (newLink.includes("http")) {
-              const res2 = await axios.get(newLink, {
-                headers,
-                signal,
-                maxRedirects: 0,
-                validateStatus: (s: number) => s >= 200 && s < 400,
-              });
-              if (res2.headers?.["location"]) {
-                const loc2 = res2.headers["location"];
-                newLink = loc2.includes("?link=") ? loc2.split("?link=")[1] : loc2;
+
+            // 1. Try fetch with redirect: "follow" (ideal for mobile WebWorkers)
+            try {
+              if (typeof fetch !== "undefined") {
+                const fRes = await fetch(link, {
+                  headers,
+                  signal,
+                  redirect: "follow",
+                });
+                if (fRes.url && fRes.url.includes("googleusercontent")) {
+                  newLink = fRes.url.split("?link=")[1] || fRes.url;
+                } else if (fRes.url && fRes.url !== link) {
+                  newLink = fRes.url;
+                }
               }
+            } catch {}
+
+            // 2. Fallback to axios with maxRedirects: 0 (for Node/desktop)
+            if (!newLink.includes("googleusercontent")) {
+              try {
+                const res1 = await axios.get(newLink, {
+                  headers,
+                  signal,
+                  maxRedirects: 0,
+                  validateStatus: (s: number) => s >= 200 && s < 400,
+                });
+                if (res1.headers?.["location"]) {
+                  newLink = res1.headers["location"];
+                }
+                if (newLink.includes("googleusercontent")) {
+                  newLink = newLink.split("?link=")[1] || newLink;
+                } else if (newLink.includes("http")) {
+                  const res2 = await axios.get(newLink, {
+                    headers,
+                    signal,
+                    maxRedirects: 0,
+                    validateStatus: (s: number) => s >= 200 && s < 400,
+                  });
+                  if (res2.headers?.["location"]) {
+                    const loc2 = res2.headers["location"];
+                    newLink = loc2.includes("?link=") ? loc2.split("?link=")[1] : loc2;
+                  }
+                }
+              } catch {}
             }
 
-            if (newLink && newLink !== link) {
-              streamLinks.push({
-                server: "GDrive (download only)",
-                link: newLink,
-                type: "mkv",
-              });
+            if (newLink.includes("?link=")) {
+              newLink = newLink.split("?link=")[1] || newLink;
             }
+
+            streamLinks.push({
+              server: "GDrive (download only)",
+              link: newLink,
+              type: "mkv",
+            });
           } catch (error) {
             console.log("hubcloudExtractor error in hubcloud link: ", error);
           }
