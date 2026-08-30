@@ -56,6 +56,24 @@ export const getEpisodes = async function ({
         }
       }
     });
+
+    if (episodes.length === 0) {
+      const fallbackLink =
+        container.find("a:contains('V-Cloud'), a:contains('vcloud'), a[href*='vcloud']").attr("href") ||
+        container.find("a:contains('G-Direct'), a:contains('Direct'), a[href*='fastdl']").attr("href") ||
+        container.find("a[href*='hubcloud']").attr("href") ||
+        container.find(".btn-outline").parent().attr("href") ||
+        container.find(".btn-outline").attr("href") ||
+        container.find("a[href^='http']").first().attr("href");
+      if (fallbackLink) {
+        const pageTitle = $("h1").text().trim() || "Full Season Complete";
+        episodes.push({
+          title: pageTitle,
+          link: fallbackLink,
+        });
+      }
+    }
+
     const quickDownload = await providerContext.kvStore?.get<boolean>("vega_quickDownload");
     const skipTimings = await providerContext.kvStore?.get<boolean>("vega_skipTimings");
 

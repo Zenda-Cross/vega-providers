@@ -28,28 +28,35 @@ export const getMeta = async function ({
 
     if (type === "series") {
       $(".season-item").map((i, element) => {
-        const title = $(element).find(".episode-title").text();
+        const title = $(element)
+          .find(".episode-title")
+          .text()
+          .replace(/[\r\n\t]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
         let directLinks: Link["directLinks"] = [];
         $(element)
           .find(".episode-download-item")
           .map((i, element) => {
-            const title = $(element)
+            const epTitle = $(element)
               .find(".episode-file-info")
               .text()
-              .trim()
-              .replace("\n", " ");
+              .replace(/[\r\n\t]+/g, " ")
+              .replace(/\s+/g, " ")
+              .trim();
             const link = $(element)
               .find(".episode-links")
               .find("a:contains('HubCloud')")
               .attr("href");
-            // console.log("title⭐", title, "link", link);
-            if (title && link) {
-              directLinks.push({ title, link });
+            if (epTitle && link) {
+              directLinks.push({ title: epTitle, link });
             }
           });
         if (title && directLinks.length > 0) {
+          const quality = title.match(/\d+p\b/i)?.[0] || "";
           links.push({
             title,
+            quality,
             directLinks: directLinks,
           });
         }
@@ -59,14 +66,16 @@ export const getMeta = async function ({
         const title = $(element)
           .find(".flex-1.text-left.font-semibold")
           .text()
+          .replace(/[\r\n\t]+/g, " ")
+          .replace(/\s+/g, " ")
           .trim();
         const link = $(element)
           .find(".grid.grid-cols-2.gap-2")
           .find("a:contains('HubCloud')")
           .attr("href");
-        // console.log("title⭐", title, "link", link);
         if (title && link) {
-          links.push({ title, directLinks: [{ title, link }] });
+          const quality = title.match(/\d+p\b/i)?.[0] || "";
+          links.push({ title, quality, directLinks: [{ title, link }] });
         }
       });
     }

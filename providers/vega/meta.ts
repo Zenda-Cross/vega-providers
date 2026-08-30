@@ -179,16 +179,53 @@ export const getMeta = async ({
         return;
       }
 
-      const title = element.text().trim().replace(/\s+/g, " ");
+      let rawTitle = element.text();
+      // Clean all newlines, tabs, and multiple spaces
+      let title = rawTitle
+        .replace(/[\r\n\t]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (!title) return;
+
+      // Filter out decorative lines (e.g. —–==___==—–, ===, ---, ***)
+      if (/^[\s\-_=~*•–—:|]+$/.test(title)) return;
+
+      // Filter out winding up / thank you / join telegram
+      const lower = title.toLowerCase();
       if (
-        !title ||
-        title.toLowerCase().includes("winding up") ||
-        title.toLowerCase().includes("thank you")
+        lower.includes("winding up") ||
+        lower.includes("thank you") ||
+        lower.includes("telegram") ||
+        lower.includes("how to download") ||
+        lower.includes("join our") ||
+        lower === "download now"
       ) {
         return;
       }
 
+      // Quality extraction
       const quality = title.match(/\d+p\b/i)?.[0] || "";
+
+      // If it's a section banner without quality like "• SEASON 2 | NetFlix •" preceding actual headings, skip it
+      if (
+        !quality &&
+        !/episodes?\s*[:\d\-]/i.test(title) &&
+        !/\[.*(?:mb|gb|e).*\]/i.test(title)
+      ) {
+        const nextEl = element.next();
+        if (
+          nextEl.length &&
+          (nextEl.is("h1, h2, h3, h4, h5, h6, strong") ||
+            (nextEl.is("p") && nextEl.find("strong").length))
+        ) {
+          return;
+        }
+      }
+
+      // Clean leading/trailing symbols, bullets, dashes from title
+      title = title.replace(/^[\s•\-*—_:=~|]+|[\s•\-*—_:=~|]+$/g, "").trim();
+      if (!title) return;
 
       // Find the next sibling that contains download links
       let nextP = element.next();
