@@ -135,7 +135,7 @@ export const getMeta = async ({
     let hr = infoContainer?.first()?.find("hr");
 
     // Try to find the HR before the download buttons if possible
-    const firstButton = $(".dwd-button").first();
+    const firstButton = $(".dwd-button, a[href*='nexdrive'], a[href*='vcloud'], a[href*='fastdl'], a[href*='hubcloud']").first();
     if (firstButton.length > 0) {
       const containerP = firstButton.closest("p");
       let prev = containerP.prev();
@@ -151,34 +151,58 @@ export const getMeta = async ({
     const links: Link[] = [];
     list.each((index, element: any) => {
       element = $(element);
-      const title = element?.text()?.trim() || "";
-      if (!title || element.is("hr") || element.is("style") || element.is("script")) return;
+      
+      if (element.is("hr") || element.is("style") || element.is("script")) return;
 
-      const quality = title.match(/\d+p\b/)?.[0] || "";
-
-      let nextP = element.next();
-      while (nextP.length && !nextP.is("p") && !nextP.find(".dwd-button, .btn-outline, a[href]").length) {
-        nextP = nextP.next();
+      // Ignore elements that are button containers themselves
+      if (
+        element.find("a").length > 0 &&
+        (element.text().includes("Instant") ||
+          element.text().includes("Resumable") ||
+          element.text().includes("Download Now") ||
+          element.text().includes("Batch/Zip") ||
+          element.find(".dwd-button, .btn-outline").length > 0)
+      ) {
+        return;
       }
 
-      const btnHref =
-        nextP.find("a[href*='vcloud']").attr("href") ||
-        nextP.find("a[href*='hubcloud']").attr("href") ||
-        nextP.find(".dwd-button")?.parent()?.attr("href") ||
-        nextP.find(".btn-outline")?.parent()?.attr("href") ||
-        nextP.find("a[href]")?.attr("href") ||
-        "";
-
+      const title = element.text().trim().replace(/\s+/g, " ");
       if (
-        !btnHref ||
-        btnHref === "/" ||
-        btnHref === "#" ||
-        title.toLowerCase() === "download now" ||
+        !title ||
         title.toLowerCase().includes("winding up") ||
         title.toLowerCase().includes("thank you")
       ) {
         return;
       }
+
+      const quality = title.match(/\d+p\b/i)?.[0] || "";
+
+      // Find the next sibling that contains download links
+      let nextP = element.next();
+      while (nextP.length && !nextP.is("hr") && !nextP.find("a[href]").length) {
+        nextP = nextP.next();
+      }
+
+      if (!nextP.length || nextP.is("hr")) return;
+
+      // Pick V-Cloud first, then G-Direct / FastDL, then download button, then first link
+      let btn = nextP
+        .find("a:contains('V-Cloud'), a:contains('vcloud'), a[href*='vcloud']")
+        .first();
+      if (!btn.length) {
+        btn = nextP
+          .find("a:contains('G-Direct'), a:contains('Direct'), a[href*='fastdl']")
+          .first();
+      }
+      if (!btn.length) {
+        btn = nextP.find(".dwd-button, .btn-outline").first().parent();
+      }
+      if (!btn.length || !btn.attr("href")) {
+        btn = nextP.find("a[href]").first();
+      }
+
+      const btnHref = btn.attr("href") || "";
+      if (!btnHref || btnHref === "/" || btnHref === "#") return;
 
       if (
         links.some(
