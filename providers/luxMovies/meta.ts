@@ -222,21 +222,47 @@ export const getMeta = async ({
 
       if (!nextP.length || nextP.is("hr")) return;
 
-      // Pick V-Cloud first, then G-Direct / FastDL, then download button, then first link
-      let btn = nextP
-        .find("a:contains('V-Cloud'), a:contains('vcloud'), a[href*='vcloud']")
-        .first();
-      if (!btn.length) {
+      let btn;
+      if (type === "series") {
+        // For series: ONLY V-Cloud links are valid episode links. Never pick Batch/Zip!
         btn = nextP
-          .find("a:contains('G-Direct'), a:contains('Direct'), a[href*='fastdl']")
+          .find("a:contains('V-Cloud'), a:contains('vcloud'), a[href*='vcloud']")
           .first();
+        if (!btn.length) {
+          // Fallback to other episode anchors ONLY if they are not Batch/Zip
+          btn = nextP
+            .find("a")
+            .filter((_, a) => {
+              const txt = $(a).text().toLowerCase();
+              const href = ($(a).attr("href") || "").toLowerCase();
+              return (
+                !txt.includes("zip") &&
+                !txt.includes("batch") &&
+                !href.includes("zip") &&
+                !href.includes("batch")
+              );
+            })
+            .first();
+        }
+      } else {
+        // For movies: V-Cloud first, then G-Direct, then others
+        btn = nextP
+          .find("a:contains('V-Cloud'), a:contains('vcloud'), a[href*='vcloud']")
+          .first();
+        if (!btn.length) {
+          btn = nextP
+            .find("a:contains('G-Direct'), a:contains('Direct'), a[href*='fastdl']")
+            .first();
+        }
+        if (!btn.length) {
+          btn = nextP.find(".dwd-button, .btn-outline").first().parent();
+        }
+        if (!btn.length || !btn.attr("href")) {
+          btn = nextP.find("a[href]").first();
+        }
       }
-      if (!btn.length) {
-        btn = nextP.find(".dwd-button, .btn-outline").first().parent();
-      }
-      if (!btn.length || !btn.attr("href")) {
-        btn = nextP.find("a[href]").first();
-      }
+
+      if (!btn || !btn.length) return;
 
       const btnHref = btn.attr("href") || "";
       if (!btnHref || btnHref === "/" || btnHref === "#") return;
