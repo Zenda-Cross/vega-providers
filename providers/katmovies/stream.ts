@@ -29,7 +29,7 @@ async function getWithWAF(
           ...mergedHeaders,
           Cookie:
             (mergedHeaders.Cookie ? mergedHeaders.Cookie + "; " : "") +
-            wafResult.cookies,
+            (wafResult.cookies || wafResult.cookie),
         },
       });
     }
@@ -41,17 +41,50 @@ async function extractKmhdLink(
   katlink: string,
   providerContext: ProviderContext,
 ) {
+  const fileIdMatch = katlink.match(/[\w]+_[a-f0-9]{8}/);
+  if (fileIdMatch) {
+    const fileId = fileIdMatch[0];
+    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTgwNzQ4NDIzMywiaWF0IjoxNzA3NDg0MjMzfQ.7u5bF9PcMhvClSDZgsd6EU-CQnp1Ec--wsezkDEgiZo";
+    try {
+      const res = await providerContext.axios.get(
+        `https://api.dandndn.one/api/v1/file/${fileId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...providerContext.commonHeaders,
+            Origin: "https://links.kmhd.eu",
+            Referer: "https://links.kmhd.eu/",
+          },
+        }
+      );
+      const hubId = res.data?.upload_links?.hubdrive_res;
+      if (hubId && hubId !== "None") {
+        return `https://hubcloud.cx/drive/${hubId}`;
+      }
+      const gdId = res.data?.upload_links?.gdflix_res;
+      if (gdId && gdId !== "None") {
+        return `https://gd.kmhd.eu/file/${gdId}`;
+      }
+    } catch (e) {
+      console.log("api.dandndn.one error, trying fallback...", e);
+    }
+  }
+
   const { axios, openWebView, commonHeaders } = providerContext;
   const res = await getWithWAF(katlink, axios, openWebView, commonHeaders, {
     Cookie: "unlocked=true",
   });
   const data = res.data;
-  const hubDriveRes = data.match(/hubdrive_res:\s*"([^"]+)"/)[1];
+  const hubDriveRes = data.match(/hubdrive_res:\s*"([^"]+)"/)?.[1];
   const hubDriveLink = data.match(
     /hubdrive_res\s*:\s*{[^}]*?link\s*:\s*"([^"]+)"/,
-  )[1];
-  return hubDriveLink + hubDriveRes;
+  )?.[1]?.replace("hubcloud.foo", "hubcloud.cx");
+  if (hubDriveLink && hubDriveRes) {
+    return hubDriveLink + hubDriveRes;
+  }
+  return katlink;
 }
+
 export const getStream = async function ({
   link,
   type,
@@ -66,7 +99,6 @@ export const getStream = async function ({
   isDownload?: boolean;
 }): Promise<Stream[]> {
   const { axios, cheerio, commonHeaders, openWebView } = providerContext;
-  const streamLinks: Stream[] = [];
   console.log("katGetStream", link);
   try {
     if (link.includes("gdflix")) {
@@ -79,8 +111,18 @@ export const getStream = async function ({
         providerContext,
       );
     }
-    if (link.includes("kmhd")) {
+    if (link.includes("kmhd") || link.includes("kmphotos")) {
       const hubcloudLink = await extractKmhdLink(link, providerContext);
+      if (hubcloudLink.includes("gdflix")) {
+        return await gdflixExtractor(
+          hubcloudLink,
+          signal,
+          axios,
+          cheerio,
+          commonHeaders,
+          providerContext,
+        );
+      }
       return await hubcloudExtractor(
         hubcloudLink,
         signal,
@@ -92,72 +134,21 @@ export const getStream = async function ({
         "katmovies",
       );
     }
-    if (link.includes("gdflix")) {
-      // resume link
-      try {
-        const resumeDrive = link.replace("/file", "/zfile");
-        //   console.log('resumeDrive', resumeDrive);
-        const resumeDriveRes = await getWithWAF(
-          resumeDrive,
-          axios,
-          openWebView,
-          commonHeaders,
-        );
-        const resumeDriveHtml = resumeDriveRes.data;
-        const $resumeDrive = cheerio.load(resumeDriveHtml);
-        const resumeLink = $resumeDrive(".btn-success").attr("href");
-        console.log("resumeLink", resumeLink);
-        if (resumeLink) {
-          streamLinks.push({
-            server: "ResumeCloud",
-            link: resumeLink,
-            type: "mkv",
-          });
-        }
-      } catch (err) {
-        console.log("Resume link not found");
-      }
-      //instant link
-      try {
-        const driveres = await getWithWAF(
-          link,
-          axios,
-          openWebView,
-          commonHeaders,
-        );
-        const $drive = cheerio.load(driveres.data);
-        const seed = $drive(".btn-danger").attr("href") || "";
-        const instantToken = seed.split("=")[1];
-        //   console.log('InstantToken', instantToken);
-        const InstantFromData = new FormData();
-        InstantFromData.append("keys", instantToken);
-        const videoSeedUrl = seed.split("/").slice(0, 3).join("/") + "/api";
-        //   console.log('videoSeedUrl', videoSeedUrl);
-        const instantLinkRes = await fetch(videoSeedUrl, {
-          method: "POST",
-          body: InstantFromData,
-          headers: {
-            "x-token": videoSeedUrl,
-          },
-        });
-        const instantLinkData = await instantLinkRes.json();
-        console.log("instantLinkData", instantLinkData);
-        if (instantLinkData.error === false) {
-          const instantLink = instantLinkData.url;
-          streamLinks.push({
-            server: "Gdrive-Instant",
-            link: instantLink,
-            type: "mkv",
-          });
-        } else {
-          console.log("Instant link not found", instantLinkData);
-        }
-      } catch (err) {
-        console.log("Instant link not found", err);
-      }
-      return streamLinks;
+    if (link.includes("hubcloud")) {
+      return await hubcloudExtractor(
+        link,
+        signal,
+        axios,
+        cheerio,
+        commonHeaders,
+        providerContext,
+        isDownload,
+        "katmovies",
+      );
     }
-    const stereams = await hubcloudExtractor(
+
+    // Default to hubcloud extractor
+    return await hubcloudExtractor(
       link,
       signal,
       axios,
@@ -167,8 +158,7 @@ export const getStream = async function ({
       isDownload,
       "katmovies",
     );
-    return stereams;
-  } catch (error: any) {
-    throwProviderError("KatMovies", "stream", error);
+  } catch (err) {
+    throwProviderError("KatMovies", "stream", err);
   }
 };
