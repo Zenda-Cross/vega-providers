@@ -137,9 +137,13 @@ class ProviderTester {
         throw new Error("Catalog module not found");
       }
 
-      const catalog = catalogModule.catalog || [];
-      // const genres = catalogModule.genres || [];
-      const allFilters = [...catalog];
+      const rawCatalog = catalogModule.catalog;
+      const catalog =
+        typeof rawCatalog === "function" ? await rawCatalog() : rawCatalog || [];
+      const rawGenres = catalogModule.genres;
+      const genres =
+        typeof rawGenres === "function" ? await rawGenres() : rawGenres || [];
+      const allFilters = [...catalog, ...genres];
 
       if (allFilters.length === 0) {
         throw new Error("No filters found in catalog");
