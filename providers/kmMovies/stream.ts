@@ -288,21 +288,48 @@ async function resolveSkyDrop(
         },
       });
 
-      // Step 4: POST /fetch/ to get direct download stream
-      const fetchRes = await axios.post(
-        `${origin}/fetch/`,
-        {},
-        {
-          headers: {
-            ...reqHeaders,
-            Referer: readyUrl,
-          },
-          maxRedirects: 0,
-          validateStatus: (status: number) => status >= 200 && status < 400,
-        },
-      );
+      // Step 4: Extract location without downloading the file body
+      let finalLocation = "";
 
-      const finalLocation = fetchRes.headers?.location;
+      // 1. Try fetch with redirect: 'manual' (never downloads the body payload)
+      if (typeof fetch !== "undefined") {
+        try {
+          const fRes = await fetch(`${origin}/fetch/`, {
+            method: "POST",
+            headers: {
+              ...reqHeaders,
+              Referer: readyUrl,
+            },
+            redirect: "manual",
+          });
+          const loc = fRes.headers.get("location");
+          if (loc) {
+            finalLocation = loc;
+          } else if (fRes.url && fRes.url !== `${origin}/fetch/`) {
+            finalLocation = fRes.url;
+          }
+        } catch {}
+      }
+
+      // 2. Fallback to axios with maxRedirects: 0
+      if (!finalLocation) {
+        try {
+          const fetchRes = await axios.post(
+            `${origin}/fetch/`,
+            {},
+            {
+              headers: {
+                ...reqHeaders,
+                Referer: readyUrl,
+              },
+              maxRedirects: 0,
+              validateStatus: (status: number) => status >= 200 && status < 400,
+            },
+          );
+          finalLocation = fetchRes.headers?.location || "";
+        } catch {}
+      }
+
       if (finalLocation) {
         return {
           server: "G-Drive (download only)",
@@ -319,9 +346,13 @@ async function resolveSkyDrop(
         headers: reqHeaders,
       });
       if (legacyApi.data?.success && legacyApi.data?.link) {
-        return { server: "G-Drive (download only)", link: legacyApi.data.link, type: "mkv" };
+        return {
+          server: "G-Drive (download only)",
+          link: legacyApi.data.link,
+          type: "mkv",
+        };
       }
-    } catch { }
+    } catch {}
   } catch (err: any) {
     console.log("resolveSkyDrop error:", err?.message || err);
   }
