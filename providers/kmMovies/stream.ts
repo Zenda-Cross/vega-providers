@@ -263,9 +263,8 @@ async function resolveSkyDrop(
     // Step 1: Initial GET to download.php to capture session cookies
     const getRes = await axios.get(link, { headers: reqHeaders });
     const setCookie = getRes.headers?.["set-cookie"];
-    let cookieHeader = "";
     if (setCookie) {
-      cookieHeader = (Array.isArray(setCookie) ? setCookie : [setCookie])
+      const cookieHeader = (Array.isArray(setCookie) ? setCookie : [setCookie])
         .map((c: string) => c.split(";")[0])
         .join("; ");
       reqHeaders["Cookie"] = cookieHeader;
@@ -281,18 +280,47 @@ async function resolveSkyDrop(
       const readyUrl = new URL(resolveRes.data.ready_url, origin).href;
 
       // Step 3: GET the ready_url to establish download state
-      await axios.get(readyUrl, {
+      const readyRes = await axios.get(readyUrl, {
         headers: {
           ...reqHeaders,
           Referer: link,
         },
       });
+      if (readyRes.headers?.["set-cookie"]) {
+        const extraCookie = (
+          Array.isArray(readyRes.headers["set-cookie"])
+            ? readyRes.headers["set-cookie"]
+            : [readyRes.headers["set-cookie"]]
+        )
+          .map((c: string) => c.split(";")[0])
+          .join("; ");
+        reqHeaders["Cookie"] = (reqHeaders["Cookie"] ? reqHeaders["Cookie"] + "; " : "") + extraCookie;
+      }
 
-      // Step 4: Extract location without downloading the file body
       let finalLocation = "";
 
-      // 1. Try fetch with redirect: 'manual' (never downloads the body payload)
-      if (typeof fetch !== "undefined") {
+      // 1. Try axios with maxRedirects: 0 (Instant redirect read for Node/Desktop)
+      try {
+        const fetchRes = await axios.post(
+          `${origin}/fetch/`,
+          {},
+          {
+            headers: {
+              ...reqHeaders,
+              Referer: readyUrl,
+            },
+            maxRedirects: 0,
+            validateStatus: (status: number) => status >= 200 && status < 400,
+          },
+        );
+        if (fetchRes.headers?.location) {
+          finalLocation = fetchRes.headers.location;
+        }
+      } catch {}
+
+      // 2. Fallback to fetch with instant AbortController (Zero body download for React Native/Mobile)
+      if (!finalLocation && typeof fetch !== "undefined") {
+        const controller = new AbortController();
         try {
           const fRes = await fetch(`${origin}/fetch/`, {
             method: "POST",
@@ -300,34 +328,16 @@ async function resolveSkyDrop(
               ...reqHeaders,
               Referer: readyUrl,
             },
-            redirect: "manual",
+            signal: controller.signal,
           });
-          const loc = fRes.headers.get("location");
-          if (loc) {
-            finalLocation = loc;
-          } else if (fRes.url && fRes.url !== `${origin}/fetch/`) {
+          if (fRes.url && fRes.url.includes("googleusercontent")) {
             finalLocation = fRes.url;
+          } else if (fRes.headers.get("location")) {
+            finalLocation = fRes.headers.get("location") || "";
           }
-        } catch {}
-      }
-
-      // 2. Fallback to axios with maxRedirects: 0
-      if (!finalLocation) {
-        try {
-          const fetchRes = await axios.post(
-            `${origin}/fetch/`,
-            {},
-            {
-              headers: {
-                ...reqHeaders,
-                Referer: readyUrl,
-              },
-              maxRedirects: 0,
-              validateStatus: (status: number) => status >= 200 && status < 400,
-            },
-          );
-          finalLocation = fetchRes.headers?.location || "";
-        } catch {}
+        } catch {} finally {
+          controller.abort();
+        }
       }
 
       if (finalLocation) {
@@ -338,21 +348,6 @@ async function resolveSkyDrop(
         };
       }
     }
-
-    // Fallback: Check legacy api.php if resolve/ was not used
-    try {
-      const legacyApi = await axios.get(`${origin}/api.php`, {
-        params: { id },
-        headers: reqHeaders,
-      });
-      if (legacyApi.data?.success && legacyApi.data?.link) {
-        return {
-          server: "G-Drive (download only)",
-          link: legacyApi.data.link,
-          type: "mkv",
-        };
-      }
-    } catch {}
   } catch (err: any) {
     console.log("resolveSkyDrop error:", err?.message || err);
   }
@@ -398,13 +393,24 @@ async function resolveHubcloud(
     cheerio,
     {
       ...headers,
+      Referer: link,
       ...commonHeaders,
     },
     providerContext,
-    isDownload,
-    "kmMovies",
   );
-  return streams.find((stream: Stream) => stream?.link) || null;
+  if (!streams?.length) return null;
+
+  if (isDownload) {
+    streams.sort((a, b) => {
+      const aIsDownload = a.server.toLowerCase().includes("download");
+      const bIsDownload = b.server.toLowerCase().includes("download");
+      if (aIsDownload && !bIsDownload) return -1;
+      if (!aIsDownload && bIsDownload) return 1;
+      return 0;
+    });
+  }
+
+  return streams[0];
 }
 
 export async function getStream({

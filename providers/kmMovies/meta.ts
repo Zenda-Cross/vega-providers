@@ -10,7 +10,7 @@ import {
 
 const kmmHeaders = {
   "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "Accept-Language": "en-US,en;q=0.9",
   Pragma: "no-cache",
@@ -164,10 +164,11 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { axios, cheerio, openWebView } = providerContext;
+    const { axios, cheerio, openWebView, commonHeaders } = providerContext;
+    const reqHeaders = { ...kmmHeaders, ...(commonHeaders || {}) };
     const baseUrl = await getBaseUrl("kmmovies");
     const pageUrl = resolvePostUrl(link, baseUrl);
-    const res = await getWithWAF(pageUrl, axios, openWebView, kmmHeaders);
+    const res = await getWithWAF(pageUrl, axios, openWebView, reqHeaders);
     const html = String(res.data || "");
     const $ = cheerio.load(html);
     const overview = $("#movie-overview");
