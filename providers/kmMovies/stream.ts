@@ -5,7 +5,7 @@ import { throwProviderError } from "../providerErrors";
 
 const headers = {
   "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "Accept-Language": "en-US,en;q=0.9",
   Pragma: "no-cache",
@@ -20,7 +20,7 @@ const browserHeaders = {
   DNT: "1",
   Priority: "u=0, i",
   "Sec-CH-UA":
-    '"Not;A=Brand";v="8", "Chromium";v="150", "Microsoft Edge";v="150"',
+    '"Not;A=Brand";v="8", "Chromium";v="131", "Microsoft Edge";v="131"',
   "Sec-CH-UA-Mobile": "?0",
   "Sec-CH-UA-Platform": '"Windows"',
   "Sec-Fetch-Dest": "document",
@@ -119,7 +119,11 @@ async function getWithWAF(
         waitForCookie: "cf_clearance",
       });
       return await axios.get(url, {
-        headers: { ...headers, Referer: baseUrl, Cookie: wafResult.cookies },
+        headers: {
+          ...headers,
+          Referer: baseUrl,
+          Cookie: wafResult.cookies || wafResult.cookie,
+        },
         responseType: "text",
       });
     }
@@ -243,16 +247,85 @@ async function resolveSkyDrop(
   link: string,
   axios: any,
 ): Promise<Stream | null> {
-  const skyDropUrl = new URL(link);
-  const id = skyDropUrl.searchParams.get("id");
-  if (!id) return null;
+  try {
+    const skyDropUrl = new URL(link);
+    const origin = skyDropUrl.origin;
+    const id = skyDropUrl.searchParams.get("id");
+    if (!id) return null;
 
-  const response = await axios.get(`${skyDropUrl.origin}/api.php`, {
-    params: { id },
-    headers,
-  });
-  if (!response.data?.success || !response.data.link) return null;
-  return { server: "SkyDrop", link: response.data.link, type: "mkv" };
+    const reqHeaders: Record<string, string> = {
+      ...headers,
+      Referer: link,
+      Origin: origin,
+      "X-Requested-With": "XMLHttpRequest",
+    };
+
+    // Step 1: Initial GET to download.php to capture session cookies
+    const getRes = await axios.get(link, { headers: reqHeaders });
+    const setCookie = getRes.headers?.["set-cookie"];
+    let cookieHeader = "";
+    if (setCookie) {
+      cookieHeader = (Array.isArray(setCookie) ? setCookie : [setCookie])
+        .map((c: string) => c.split(";")[0])
+        .join("; ");
+      reqHeaders["Cookie"] = cookieHeader;
+    }
+
+    // Step 2: POST /resolve/
+    const resolveRes = await axios.post(
+      `${origin}/resolve/`,
+      {},
+      { headers: reqHeaders },
+    );
+    if (resolveRes.data?.success && resolveRes.data?.ready_url) {
+      const readyUrl = new URL(resolveRes.data.ready_url, origin).href;
+
+      // Step 3: GET the ready_url to establish download state
+      await axios.get(readyUrl, {
+        headers: {
+          ...reqHeaders,
+          Referer: link,
+        },
+      });
+
+      // Step 4: POST /fetch/ to get direct download stream
+      const fetchRes = await axios.post(
+        `${origin}/fetch/`,
+        {},
+        {
+          headers: {
+            ...reqHeaders,
+            Referer: readyUrl,
+          },
+          maxRedirects: 0,
+          validateStatus: (status: number) => status >= 200 && status < 400,
+        },
+      );
+
+      const finalLocation = fetchRes.headers?.location;
+      if (finalLocation) {
+        return {
+          server: "G-Drive (download only)",
+          link: finalLocation,
+          type: "mkv",
+        };
+      }
+    }
+
+    // Fallback: Check legacy api.php if resolve/ was not used
+    try {
+      const legacyApi = await axios.get(`${origin}/api.php`, {
+        params: { id },
+        headers: reqHeaders,
+      });
+      if (legacyApi.data?.success && legacyApi.data?.link) {
+        return { server: "G-Drive (download only)", link: legacyApi.data.link, type: "mkv" };
+      }
+    } catch { }
+  } catch (err: any) {
+    console.log("resolveSkyDrop error:", err?.message || err);
+  }
+  return null;
 }
 
 async function resolveGofile(
@@ -319,10 +392,6 @@ export async function getStream({
   const { axios, cheerio, openWebView, commonHeaders } = providerContext;
 
   try {
-    const res = await getWithWAF(link, axios, openWebView);
-    const $ = cheerio.load(res.data);
-    const downloadLinks = extractDownloadLinks($);
-
     const resolvers: Record<
       ServerName,
       (link: string) => Promise<Stream | null>
@@ -344,6 +413,19 @@ export async function getStream({
         ),
     };
 
+    // 1. Check if the link itself is already a direct server link
+    for (const [server, matches] of Object.entries(SERVER_PATTERNS)) {
+      if (matches(server, link)) {
+        const stream = await resolvers[server as ServerName](link);
+        if (stream) return [stream];
+      }
+    }
+
+    // 2. Otherwise fetch the page and extract all server buttons
+    const res = await getWithWAF(link, axios, openWebView);
+    const $ = cheerio.load(res.data);
+    const downloadLinks = extractDownloadLinks($);
+
     const streams: Stream[] = [];
     const seen = new Set<string>();
     const resolverFailures: string[] = [];
@@ -355,9 +437,11 @@ export async function getStream({
       "GOFILE",
       "HUBCLOUD",
     ] as ServerName[]) {
-      for (const { link } of downloadLinks.filter((d) => d.server === server)) {
+      for (const { link: dlLink } of downloadLinks.filter(
+        (d) => d.server === server,
+      )) {
         try {
-          const stream = await resolvers[server](link);
+          const stream = await resolvers[server](dlLink);
           if (stream && !seen.has(stream.link)) {
             seen.add(stream.link);
             streams.push(stream);
