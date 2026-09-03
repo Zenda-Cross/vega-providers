@@ -273,7 +273,12 @@ async function resolveSkyDrop(
 
     // Step 1: Initial GET to download.php to capture session cookies
     const getRes = await axios.get(link, { headers: reqHeaders });
-    const setCookie = getRes.headers?.["set-cookie"];
+    const setCookie =
+      getRes.headers?.["set-cookie"] ||
+      getRes.headers?.["Set-Cookie"] ||
+      (typeof getRes.headers?.get === "function"
+        ? getRes.headers.get("set-cookie")
+        : "");
     if (setCookie) {
       const cookieHeader = (Array.isArray(setCookie) ? setCookie : [setCookie])
         .map((c: string) => c.split(";")[0])
@@ -297,20 +302,25 @@ async function resolveSkyDrop(
           Referer: link,
         },
       });
-      if (readyRes.headers?.["set-cookie"]) {
+      const extraCookieRaw =
+        readyRes.headers?.["set-cookie"] ||
+        readyRes.headers?.["Set-Cookie"] ||
+        (typeof readyRes.headers?.get === "function"
+          ? readyRes.headers.get("set-cookie")
+          : "");
+      if (extraCookieRaw) {
         const extraCookie = (
-          Array.isArray(readyRes.headers["set-cookie"])
-            ? readyRes.headers["set-cookie"]
-            : [readyRes.headers["set-cookie"]]
+          Array.isArray(extraCookieRaw) ? extraCookieRaw : [extraCookieRaw]
         )
           .map((c: string) => c.split(";")[0])
           .join("; ");
-        reqHeaders["Cookie"] = (reqHeaders["Cookie"] ? reqHeaders["Cookie"] + "; " : "") + extraCookie;
+        reqHeaders["Cookie"] =
+          (reqHeaders["Cookie"] ? reqHeaders["Cookie"] + "; " : "") + extraCookie;
       }
 
       let finalLocation = "";
 
-      // 1. Try axios with maxRedirects: 0 (Instant redirect read for Node/Desktop)
+      // 1. Try axios with maxRedirects: 0
       try {
         const fetchRes = await axios.post(
           `${origin}/fetch/`,
@@ -324,12 +334,28 @@ async function resolveSkyDrop(
             validateStatus: (status: number) => status >= 200 && status < 400,
           },
         );
-        if (fetchRes.headers?.location) {
-          finalLocation = fetchRes.headers.location;
+        const loc =
+          fetchRes.headers?.location ||
+          fetchRes.headers?.["location"] ||
+          (typeof fetchRes.headers?.get === "function"
+            ? fetchRes.headers.get("location")
+            : "") ||
+          fetchRes.request?.responseURL ||
+          "";
+        if (loc && (loc.includes("http") || loc.startsWith("/"))) {
+          finalLocation = new URL(loc, origin).href;
         }
-      } catch {}
+      } catch (err: any) {
+        const loc =
+          err.response?.headers?.location ||
+          err.response?.headers?.["location"] ||
+          err.request?.responseURL;
+        if (loc && (loc.includes("http") || loc.startsWith("/"))) {
+          finalLocation = new URL(loc, origin).href;
+        }
+      }
 
-      // 2. Fallback to fetch with instant AbortController (Zero body download for React Native/Mobile)
+      // 2. Fallback to fetch if needed
       if (!finalLocation && typeof fetch !== "undefined") {
         const controller = new AbortController();
         try {
@@ -351,13 +377,24 @@ async function resolveSkyDrop(
         }
       }
 
-      if (finalLocation) {
+      if (finalLocation && finalLocation.includes("googleusercontent")) {
         return {
           server: "G-Drive (download only)",
           link: finalLocation,
           type: "mkv",
         };
       }
+
+      return {
+        server: finalLocation ? "G-Drive (download only)" : "SkyDrop (download only)",
+        link: finalLocation || `${origin}/fetch/`,
+        type: "mkv",
+        headers: {
+          Referer: readyUrl,
+          ...(reqHeaders["Cookie"] ? { Cookie: reqHeaders["Cookie"] } : {}),
+          "User-Agent": headers["User-Agent"],
+        },
+      };
     }
   } catch (err: any) {
     console.log("resolveSkyDrop error:", err?.message || err);
