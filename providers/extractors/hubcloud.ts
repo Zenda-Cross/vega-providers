@@ -1,4 +1,5 @@
 import { throwProviderError } from "../providerErrors";
+import { ProviderContext } from "../types";
 import { gofileExtractor } from "./gofile";
 
 const hubcloudDecode = function (value: string) {
@@ -79,7 +80,7 @@ export async function hubcloudExtractor(
   axios: any,
   cheerio: any,
   headers: Record<string, string>,
-  providerContext?: any,
+  providerContext?: ProviderContext,
   isDownload?: boolean,
   providerValue?: string,
 ) {
@@ -104,11 +105,7 @@ export async function hubcloudExtractor(
             `hubcloudExtractor: WAF detected (403) for ${link}, using solver...`,
           );
           const cleanHeaders = { ...headers, Referer: baseUrl };
-          delete cleanHeaders["User-Agent"];
-          delete cleanHeaders["sec-ch-ua"];
-          delete cleanHeaders["sec-ch-ua-mobile"];
-          delete cleanHeaders["sec-ch-ua-platform"];
-          delete cleanHeaders["Cookie"];
+
 
           const wafResult = await openWebView(baseUrl, {
             title: "Solve the captcha below and click done",
@@ -178,11 +175,7 @@ export async function hubcloudExtractor(
           );
           const vcloudBaseUrl = vcloudLink.split("/").slice(0, 3).join("/");
           const cleanHeaders2 = { ...headers, Referer: vcloudBaseUrl };
-          delete cleanHeaders2["User-Agent"];
-          delete cleanHeaders2["sec-ch-ua"];
-          delete cleanHeaders2["sec-ch-ua-mobile"];
-          delete cleanHeaders2["sec-ch-ua-platform"];
-          delete cleanHeaders2["Cookie"];
+
 
           const wafResult = await openWebView(vcloudBaseUrl, {
             title: "Solve the captcha below and click done",
@@ -255,7 +248,7 @@ export async function hubcloudExtractor(
                   newLink = fRes.url;
                 }
               }
-            } catch {}
+            } catch { }
 
             // 2. Fallback to axios with maxRedirects: 0 (for Node/desktop)
             if (!newLink.includes("googleusercontent")) {
@@ -283,7 +276,7 @@ export async function hubcloudExtractor(
                     newLink = loc2.includes("?link=") ? loc2.split("?link=")[1] : loc2;
                   }
                 }
-              } catch {}
+              } catch { }
             }
 
             if (newLink.includes("?link=")) {
@@ -350,7 +343,7 @@ export async function hubcloudExtractor(
       )
         .toLowerCase()
         .trim();
-    } catch {}
+    } catch { }
 
     const getPriority = (serverName: string = "") => {
       const s = serverName.toLowerCase();

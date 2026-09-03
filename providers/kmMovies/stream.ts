@@ -45,7 +45,8 @@ const SERVER_PATTERNS: Record<
   SKYDROP: (name, href) =>
     name.includes("SKYDROP") || href.includes("skydrop.sbs/"),
   GOFILE: (name, href) =>
-    name.includes("GOFILE") || href.includes("gofile.io/"),
+    href.includes("gofile.io/") ||
+    (name.includes("GOFILE") && !href.includes(".php")),
   HUBCLOUD: (name, href) =>
     name.includes("HUBCLOUD") || href.includes("hubcloud."),
 };
@@ -173,26 +174,31 @@ async function resolveZipZap(
   cheerio: any,
   commonHeaders: Record<string, string>,
 ): Promise<Stream | null> {
-  const downloadUrl = new URL(link);
-  const requestHeaders = {
-    ...headers,
-    ...commonHeaders,
-    Referer: downloadUrl.origin,
-  };
+  try {
+    const downloadUrl = new URL(link);
+    const requestHeaders = {
+      ...headers,
+      ...commonHeaders,
+      Referer: downloadUrl.origin,
+    };
 
-  const pageResponse = await axios.get(downloadUrl.href, {
-    headers: requestHeaders,
-  });
-  const $ = cheerio.load(pageResponse.data);
-  const r2Href = $("a[href*='dl=r2']").first().attr("href");
-  if (!r2Href) return null;
+    const pageResponse = await axios.get(downloadUrl.href, {
+      headers: requestHeaders,
+    });
+    const $ = cheerio.load(pageResponse.data);
+    const r2Href = $("a[href*='dl=r2']").first().attr("href");
+    if (!r2Href) return null;
 
-  const r2Url = new URL(r2Href, downloadUrl);
-  const rawUrl = await captureRedirect(r2Url.href, axios, {
-    ...requestHeaders,
-    Referer: downloadUrl.href,
-  });
-  return rawUrl ? { server: "ZIP-ZAP", link: rawUrl, type: "mkv" } : null;
+    const r2Url = new URL(r2Href, downloadUrl);
+    const rawUrl = await captureRedirect(r2Url.href, axios, {
+      ...requestHeaders,
+      Referer: downloadUrl.href,
+    });
+    return rawUrl ? { server: "ZIP-ZAP", link: rawUrl, type: "mkv" } : null;
+  } catch (err: any) {
+    console.log("resolveZipZap error:", err?.message || err);
+    return null;
+  }
 }
 
 async function resolveBuzzheavier(
@@ -201,46 +207,51 @@ async function resolveBuzzheavier(
   cheerio: any,
   commonHeaders: Record<string, string>,
 ): Promise<Stream | null> {
-  const origin = new URL(link).origin;
-  const requestHeaders = {
-    ...browserHeaders,
-    ...commonHeaders,
-    Referer: origin,
-  };
+  try {
+    const origin = new URL(link).origin;
+    const requestHeaders = {
+      ...browserHeaders,
+      ...commonHeaders,
+      Referer: origin,
+    };
 
-  const pageResponse = await axios.get(link, { headers: requestHeaders });
-  const $ = cheerio.load(pageResponse.data);
-  const downloadPath = $("a.download-btn").attr("hx-get");
-  if (!downloadPath) return null;
+    const pageResponse = await axios.get(link, { headers: requestHeaders });
+    const $ = cheerio.load(pageResponse.data);
+    const downloadPath = $("a.download-btn").attr("hx-get");
+    if (!downloadPath) return null;
 
-  const downloadUrl = new URL(downloadPath, origin).href;
-  const setCookie = pageResponse.headers?.["set-cookie"];
-  const cookie = (Array.isArray(setCookie) ? setCookie : [setCookie])
-    .filter(Boolean)
-    .map((value: string) => value.split(";", 1)[0])
-    .join("; ");
-  const downloadResponse = await axios.head(downloadUrl, {
-    headers: {
-      ...requestHeaders,
-      Referer: link,
-      "HX-Request": "true",
-      "HX-Current-URL": link,
-      ...(cookie ? { Cookie: cookie } : {}),
-    },
-    validateStatus: (status: number) => status >= 200 && status < 300,
-  });
-  const redirectUrl = downloadResponse.headers?.["hx-redirect"];
-  if (!redirectUrl) return null;
+    const downloadUrl = new URL(downloadPath, origin).href;
+    const setCookie = pageResponse.headers?.["set-cookie"];
+    const cookie = (Array.isArray(setCookie) ? setCookie : [setCookie])
+      .filter(Boolean)
+      .map((value: string) => value.split(";", 1)[0])
+      .join("; ");
+    const downloadResponse = await axios.head(downloadUrl, {
+      headers: {
+        ...requestHeaders,
+        Referer: link,
+        "HX-Request": "true",
+        "HX-Current-URL": link,
+        ...(cookie ? { Cookie: cookie } : {}),
+      },
+      validateStatus: (status: number) => status >= 200 && status < 300,
+    });
+    const redirectUrl = downloadResponse.headers?.["hx-redirect"];
+    if (!redirectUrl) return null;
 
-  return {
-    server: "BUZZHEAVIER",
-    link: new URL(redirectUrl, origin).href,
-    type: "mkv",
-    headers: {
-      Referer: link,
-      "User-Agent": requestHeaders["User-Agent"],
-    },
-  };
+    return {
+      server: "BUZZHEAVIER",
+      link: new URL(redirectUrl, origin).href,
+      type: "mkv",
+      headers: {
+        Referer: link,
+        "User-Agent": requestHeaders["User-Agent"],
+      },
+    };
+  } catch (err: any) {
+    console.log("resolveBuzzheavier error:", err?.message || err);
+    return null;
+  }
 }
 
 async function resolveSkyDrop(
@@ -359,22 +370,28 @@ async function resolveGofile(
   axios: any,
   providerContext?: any,
 ): Promise<Stream | null> {
-  const gofileUrl = new URL(link);
-  const id = gofileUrl.pathname.split("/").filter(Boolean).pop();
-  if (!id) return null;
+  try {
+    if (!link.includes("gofile.io")) return null;
+    const gofileUrl = new URL(link);
+    const id = gofileUrl.pathname.split("/").filter(Boolean).pop();
+    if (!id || id.endsWith(".php") || id.endsWith(".html")) return null;
 
-  const result = await gofileExtractor(id, axios, providerContext);
-  if (!result?.link || !result?.token) return null;
+    const result = await gofileExtractor(id, axios, providerContext);
+    if (!result?.link || !result?.token) return null;
 
-  return {
-    server: "Gofile",
-    link: result.link,
-    type: "mkv",
-    headers: {
-      Referer: "https://gofile.io/",
-      Cookie: `accountToken=${result.token}`,
-    },
-  };
+    return {
+      server: "Gofile",
+      link: result.link,
+      type: "mkv",
+      headers: {
+        Referer: "https://gofile.io/",
+        Cookie: `accountToken=${result.token}`,
+      },
+    };
+  } catch (err: any) {
+    console.log("resolveGofile error:", err?.message || err);
+    return null;
+  }
 }
 
 async function resolveHubcloud(
@@ -386,31 +403,36 @@ async function resolveHubcloud(
   providerContext?: ProviderContext,
   isDownload?: boolean,
 ): Promise<Stream | null> {
-  const streams = await hubcloudExtractor(
-    link,
-    signal,
-    axios,
-    cheerio,
-    {
-      ...headers,
-      Referer: link,
-      ...commonHeaders,
-    },
-    providerContext,
-  );
-  if (!streams?.length) return null;
+  try {
+    const streams = await hubcloudExtractor(
+      link,
+      signal,
+      axios,
+      cheerio,
+      {
+        ...headers,
+        Referer: link,
+        ...commonHeaders,
+      },
+      providerContext,
+    );
+    if (!streams?.length) return null;
 
-  if (isDownload) {
-    streams.sort((a, b) => {
-      const aIsDownload = a.server.toLowerCase().includes("download");
-      const bIsDownload = b.server.toLowerCase().includes("download");
-      if (aIsDownload && !bIsDownload) return -1;
-      if (!aIsDownload && bIsDownload) return 1;
-      return 0;
-    });
+    if (isDownload) {
+      streams.sort((a, b) => {
+        const aIsDownload = a.server.toLowerCase().includes("download");
+        const bIsDownload = b.server.toLowerCase().includes("download");
+        if (aIsDownload && !bIsDownload) return -1;
+        if (!aIsDownload && bIsDownload) return 1;
+        return 0;
+      });
+    }
+
+    return streams[0];
+  } catch (err: any) {
+    console.log("resolveHubcloud error:", err?.message || err);
+    return null;
   }
-
-  return streams[0];
 }
 
 export async function getStream({
@@ -450,11 +472,15 @@ export async function getStream({
         ),
     };
 
-    // 1. Check if the link itself is already a direct server link
+    // 1. Check if the link itself is already a direct server link (test URL only, empty name)
     for (const [server, matches] of Object.entries(SERVER_PATTERNS)) {
-      if (matches(server, link)) {
-        const stream = await resolvers[server as ServerName](link);
-        if (stream) return [stream];
+      if (matches("", link)) {
+        try {
+          const stream = await resolvers[server as ServerName](link);
+          if (stream) return [stream];
+        } catch (err: any) {
+          console.log(`Direct ${server} check failed:`, err?.message || err);
+        }
       }
     }
 
@@ -467,13 +493,11 @@ export async function getStream({
     const seen = new Set<string>();
     const resolverFailures: string[] = [];
 
-    for (const server of [
-      "ZIP-ZAP",
-      "BUZZHEAVIER",
-      "SKYDROP",
-      "GOFILE",
-      "HUBCLOUD",
-    ] as ServerName[]) {
+    const serverOrder: ServerName[] = isDownload
+      ? ["SKYDROP", "ZIP-ZAP", "BUZZHEAVIER", "GOFILE", "HUBCLOUD"]
+      : ["ZIP-ZAP", "BUZZHEAVIER", "GOFILE", "HUBCLOUD", "SKYDROP"];
+
+    for (const server of serverOrder) {
       for (const { link: dlLink } of downloadLinks.filter(
         (d) => d.server === server,
       )) {
@@ -485,8 +509,8 @@ export async function getStream({
             break;
           }
         } catch (error: any) {
-          console.log(`${server} failed:`, error.message);
-          resolverFailures.push(`${server}: ${error.message || String(error)}`);
+          console.log(`${server} failed:`, error?.message || error);
+          resolverFailures.push(`${server}: ${error?.message || String(error)}`);
         }
       }
     }
