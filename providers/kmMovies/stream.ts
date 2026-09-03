@@ -257,6 +257,7 @@ async function resolveBuzzheavier(
 async function resolveSkyDrop(
   link: string,
   axios: any,
+  providerContext?: any,
 ): Promise<Stream | null> {
   try {
     const skyDropUrl = new URL(link);
@@ -273,12 +274,27 @@ async function resolveSkyDrop(
 
     // Step 1: Initial GET to download.php to capture session cookies
     const getRes = await axios.get(link, { headers: reqHeaders });
-    const setCookie =
+    let setCookie =
       getRes.headers?.["set-cookie"] ||
       getRes.headers?.["Set-Cookie"] ||
+      getRes.headers?.["x-set-cookie"] ||
+      getRes.headers?.["X-Set-Cookie"] ||
       (typeof getRes.headers?.get === "function"
-        ? getRes.headers.get("set-cookie")
+        ? getRes.headers.get("x-set-cookie") || getRes.headers.get("set-cookie")
         : "");
+
+    if (!setCookie && providerContext?.openWebView) {
+      try {
+        const waf = await providerContext.openWebView(link, {
+          headers: reqHeaders,
+          waitForCookie: "skydrop_download",
+        });
+        if (waf?.cookies) {
+          setCookie = waf.cookies;
+        }
+      } catch {}
+    }
+
     if (setCookie) {
       const cookieHeader = (Array.isArray(setCookie) ? setCookie : [setCookie])
         .map((c: string) => c.split(";")[0])
@@ -495,7 +511,7 @@ export async function getStream({
       "ZIP-ZAP": (l) => resolveZipZap(l, axios, cheerio, commonHeaders || {}),
       BUZZHEAVIER: (l) =>
         resolveBuzzheavier(l, axios, cheerio, commonHeaders || {}),
-      SKYDROP: (l) => resolveSkyDrop(l, axios),
+      SKYDROP: (l) => resolveSkyDrop(l, axios, providerContext),
       GOFILE: (l) => resolveGofile(l, axios, providerContext),
       HUBCLOUD: (l) =>
         resolveHubcloud(
