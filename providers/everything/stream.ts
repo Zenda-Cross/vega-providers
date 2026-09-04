@@ -340,6 +340,12 @@ export const getStream = async function ({
       } catch {}
     }
 
+    // Helper to identify a111477 links
+    const isA111477 = (s: Stream) =>
+      /111477/i.test(s.server) ||
+      /111477/i.test(s.link) ||
+      Boolean(s.tags?.some((t) => /111477/i.test(t)));
+
     // Sort streams by resolution (2160p -> 1080p -> 720p -> 480p)
     const qualityWeight = (q?: string) => {
       switch (q) {
@@ -356,9 +362,21 @@ export const getStream = async function ({
       }
     };
 
-    streams.sort((a, b) => qualityWeight(b.quality) - qualityWeight(a.quality));
+    const regularStreams: Stream[] = [];
+    const a111477Streams: Stream[] = [];
 
-    return streams;
+    for (const stream of streams) {
+      if (isA111477(stream)) {
+        a111477Streams.push(stream);
+      } else {
+        regularStreams.push(stream);
+      }
+    }
+
+    regularStreams.sort((a, b) => qualityWeight(b.quality) - qualityWeight(a.quality));
+    a111477Streams.sort((a, b) => qualityWeight(b.quality) - qualityWeight(a.quality));
+
+    return [...regularStreams, ...a111477Streams];
   } catch (err) {
     console.error("Everything getStream error:", err);
     return [];
