@@ -3,6 +3,7 @@ import {
   CinemetaMeta,
   CinemetaVideo,
   enrichCinemetaEpisodes,
+  formatEpisodeTitle,
   getCinemetaMeta,
 } from "../getCinemetaMeta";
 import { enrichEpisodesWithSkipTimings } from "../theintrodb";
@@ -65,7 +66,7 @@ export const getMeta = async function ({
 
         const episodes = seasons.get(video.season) || [];
         episodes.push({
-          title: `Episode ${episode}`,
+          title: formatEpisodeTitle(episode, video.name),
           link: createPayload(imdbId, "series", meta, video),
         });
         seasons.set(video.season, episodes);

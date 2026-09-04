@@ -174,6 +174,33 @@ export function readCinemetaContext(url: string): {
   return { requestUrl: parsedUrl.href };
 }
 
+export function formatEpisodeTitle(
+  episode: number | string,
+  name?: string,
+): string {
+  const epNum = Number(episode);
+  if (!name || !name.trim()) {
+    return `Episode ${episode}`;
+  }
+  let cleanName = name.trim();
+  cleanName = cleanName.replace(/^(?:s\d+\s*e\d+|\d+x\d+)\s*[:.-]\s*/i, "");
+  cleanName = cleanName.replace(
+    new RegExp(`^episodes?\\s*0*${epNum}\\s*[:.-]\\s*`, "i"),
+    "",
+  );
+
+  if (new RegExp(`^0*${epNum}\\s*\\.\\s*`, "i").test(cleanName)) {
+    return cleanName;
+  }
+  if (new RegExp(`^0*${epNum}\\s*[:.-]\\s*`, "i").test(cleanName)) {
+    return `${epNum}. ${cleanName.replace(new RegExp(`^0*${epNum}\\s*[:.-]\\s*`, "i"), "")}`;
+  }
+  if (new RegExp(`^episodes?\\s*0*${epNum}$`, "i").test(cleanName)) {
+    return `Episode ${epNum}`;
+  }
+  return `${epNum}. ${cleanName}`;
+}
+
 export function getEpisodeNumber(title: string, season: number): number | undefined {
   if (
     /\b(?:e\d+|episodes?\s*:?\s*\d+)\s*(?:[-–,&/]|\band\b)\s*(?:e|episodes?\s*:?\s*)?\d+/i.test(
@@ -194,6 +221,7 @@ export function getEpisodeNumber(title: string, season: number): number | undefi
     ...title.matchAll(/\bepisodes?\s*:?\s*(\d{1,3})\b/gi),
     ...title.matchAll(/\bep\s*\.?:?\s*(\d{1,3})\b/gi),
     ...title.matchAll(/\be(\d{1,3})\b/gi),
+    ...title.matchAll(/^\s*(\d{1,3})\s*[.:-]\s*/gi),
   ].map((match) => Number(match[1]));
   const episodes = [...new Set(matches.filter((episode) => episode > 0))];
   return episodes.length === 1 ? episodes[0] : undefined;

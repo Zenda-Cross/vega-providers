@@ -1,3 +1,4 @@
+import { formatEpisodeTitle } from "../getCinemetaMeta";
 import { EpisodeLink, Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 
@@ -58,7 +59,7 @@ export const getMeta = async function ({
           season.set(video?.season, []);
         }
         season.get(video?.season).push({
-          title: "Episode " + video?.episode,
+          title: formatEpisodeTitle(video?.episode, video?.name),
           link: "",
         });
       });
