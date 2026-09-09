@@ -14,13 +14,15 @@ async function getWithWAF(
   } catch (error: any) {
     if (error.response?.status === 403 && openWebView) {
       console.log(`WAF detected (403) for ${url}, using solver...`);
-      const wafResult = await openWebView(baseUrl, {
+      const wafResult = await openWebView(url, {
         title: "Solve the captcha below and click done",
         description: "Required to bypass anti-bot protection.",
         headers: { ...headers, Referer: baseUrl },
         waitForCookie: "cf_clearance",
-        force: true,
       });
+      if (wafResult.data && wafResult.data.trim().length > 50) {
+        return { data: wafResult.data };
+      }
       return await axios.get(url, {
         headers: {
           ...headers,
