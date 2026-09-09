@@ -27,9 +27,27 @@ function rc4(key: string, input: string): string {
   return out;
 }
 
+function encodeBase64(str: string): string {
+  if (typeof btoa === "function") {
+    try {
+      return btoa(str);
+    } catch {
+      // fallback
+    }
+  }
+  if (typeof Buffer !== "undefined") {
+    try {
+      return Buffer.from(str, "binary").toString("base64");
+    } catch {
+      // fallback
+    }
+  }
+  return "";
+}
+
 function encodeVrf(animeId: string): string {
   const encrypted = rc4("simple-hash", animeId);
-  return btoa(encrypted);
+  return encodeBase64(encrypted);
 }
 
 export const getMeta = async function ({
@@ -177,6 +195,7 @@ export const getMeta = async function ({
               hasDub: false,
               title,
             }),
+            type: type as "movie" | "series",
           },
         ],
       });

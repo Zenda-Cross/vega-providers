@@ -9,6 +9,42 @@ const defaultHeaders = {
   Accept: "*/*",
 };
 
+function decodeBase64(str: string): string {
+  if (typeof atob === "function") {
+    try {
+      return atob(str);
+    } catch {
+      // fallback
+    }
+  }
+  if (typeof Buffer !== "undefined") {
+    try {
+      return Buffer.from(str, "base64").toString("binary");
+    } catch {
+      // fallback
+    }
+  }
+  return "";
+}
+
+function encodeBase64(str: string): string {
+  if (typeof btoa === "function") {
+    try {
+      return btoa(str);
+    } catch {
+      // fallback
+    }
+  }
+  if (typeof Buffer !== "undefined") {
+    try {
+      return Buffer.from(str, "binary").toString("base64");
+    } catch {
+      // fallback
+    }
+  }
+  return "";
+}
+
 function rc4(key: string, input: string): string {
   const s = Array.from({ length: 256 }, (_, i) => i);
   let a = 0;
@@ -35,16 +71,17 @@ function rc4(key: string, input: string): string {
 
 function encodeVrf(animeId: string): string {
   const encrypted = rc4("simple-hash", animeId);
-  return btoa(encrypted);
+  return encodeBase64(encrypted);
 }
 
 function inferLang(label: string): string {
   const l = (label || "").toLowerCase();
   if (l.includes("english") || l.includes("eng")) return "en";
-  if (l.includes("spanish") || l.includes("spa")) return "es";
-  if (l.includes("french") || l.includes("fra")) return "fr";
-  if (l.includes("german") || l.includes("deu")) return "de";
+  if (l.includes("spanish") || l.includes("spa") || l.includes("es-")) return "es";
+  if (l.includes("french") || l.includes("fra") || l.includes("fre")) return "fr";
+  if (l.includes("german") || l.includes("deu") || l.includes("ger")) return "de";
   if (l.includes("portuguese") || l.includes("por")) return "pt";
+  if (l.includes("italian") || l.includes("ita")) return "it";
   if (l.includes("japanese") || l.includes("jpn")) return "ja";
   if (l.includes("chinese") || l.includes("chi") || l.includes("zho")) return "zh";
   if (l.includes("indonesian") || l.includes("ind")) return "id";
@@ -52,6 +89,8 @@ function inferLang(label: string): string {
   if (l.includes("vietnamese") || l.includes("vie")) return "vi";
   if (l.includes("arabic") || l.includes("ara")) return "ar";
   if (l.includes("hindi") || l.includes("hin")) return "hi";
+  if (l.includes("korean") || l.includes("kor")) return "ko";
+  if (l.includes("russian") || l.includes("rus")) return "ru";
   return "und";
 }
 
@@ -74,7 +113,25 @@ export const getStream = async function ({
       }
     })();
 
-    let { slug, epNum, dataIds } = payload;
+    let slug: string = payload.slug || "";
+    let epNum: string = String(payload.epNum || "1");
+    let dataIds: string = payload.dataIds || "";
+
+    if (!slug && typeof link === "string") {
+      slug = link;
+    }
+
+    if (slug.includes("/watch/")) {
+      const match = slug.match(/\/watch\/([^/]+)(?:\/ep-(\d+))?/);
+      if (match) {
+        slug = match[1];
+        if (match[2]) epNum = match[2];
+      }
+    } else if (slug.startsWith("http")) {
+      const parts = slug.replace(/\/+$/, "").split("/");
+      slug = parts[parts.length - 1];
+    }
+
     if (!slug) return [];
 
     const watchUrl = `${BASE_URL}/watch/${slug}/ep-${epNum || 1}`;
@@ -120,7 +177,7 @@ export const getStream = async function ({
       return [];
     }
 
-    const serverListUrl = `${BASE_URL}/ajax/server/list?servers=${dataIds}`;
+    const serverListUrl = `${BASE_URL}/ajax/server/list?servers=${encodeURIComponent(dataIds)}`;
     const srvRes = await axios.get(serverListUrl, {
       headers: {
         ...headers,
@@ -137,12 +194,12 @@ export const getStream = async function ({
     const tasks: { dataType: string; serverName: string; linkId: string }[] = [];
     const seenLinkIds = new Set<string>();
 
-    $s("div.type, .server-type, div.types > div.type").each((_, typeEl) => {
+    $s("div.type, .server-type, div.types > div.type, div.servers > div.type").each((_, typeEl) => {
       const dataType = $s(typeEl).attr("data-type") || "sub";
       $s(typeEl)
-        .find("[data-link-id]")
+        .find("[data-link-id], [data-id], .item")
         .each((_, sEl) => {
-          const linkId = $s(sEl).attr("data-link-id") || "";
+          const linkId = $s(sEl).attr("data-link-id") || $s(sEl).attr("data-id") || "";
           const serverName = $s(sEl).text().trim() || "Server";
           if (linkId && !seenLinkIds.has(linkId)) {
             seenLinkIds.add(linkId);
@@ -152,7 +209,6 @@ export const getStream = async function ({
     });
 
     const streams: Stream[] = [];
-    const seenIframeUrls = new Set<string>();
     const seenStreamLinks = new Set<string>();
 
     const addStream = (stream: Stream) => {
@@ -160,6 +216,10 @@ export const getStream = async function ({
       seenStreamLinks.add(stream.link);
       streams.push(stream);
     };
+
+    const skipTimings =
+      await providerContext.kvStore?.get<boolean>("anikoto_skipTimings");
+    const skipTimingsEnabled = skipTimings ?? true;
 
     await Promise.all(
       tasks.map(async (task) => {
@@ -179,11 +239,7 @@ export const getStream = async function ({
           const iframeUrl = getRes.data?.result?.url;
           if (!iframeUrl) return;
 
-          const skipTimings =
-            await providerContext.kvStore?.get<boolean>("anikoto_skipTimings");
-          const skipTimingsEnabled = skipTimings ?? true;
           let skipIntervals: SkipInterval[] | undefined = undefined;
-
           if (skipTimingsEnabled) {
             const skipData = getRes.data?.result?.skip_data;
             if (skipData && typeof skipData === "object") {
@@ -208,11 +264,6 @@ export const getStream = async function ({
             }
           }
 
-          // Deduplicate iframe URLs (e.g. ignore duplicate CDN query parameters for same video)
-          const baseIframe = iframeUrl.split("?")[0] + "#" + task.dataType;
-          if (seenIframeUrls.has(baseIframe)) return;
-          seenIframeUrls.add(baseIframe);
-
           let host = "";
           try {
             host = new URL(iframeUrl).host;
@@ -221,11 +272,69 @@ export const getStream = async function ({
           }
           const audioLabel = task.dataType.toUpperCase();
 
-          if (
-            host.includes("vidtube") ||
-            host.includes("megaplay") ||
-            host.includes("vidwish")
-          ) {
+          // Flow 1: Kiwi / VibePlayer (iframe URL containing base64 #fragment)
+          if (iframeUrl.includes("#")) {
+            const fragment = iframeUrl.substring(iframeUrl.indexOf("#") + 1);
+            if (fragment) {
+              try {
+                const decoded = decodeBase64(fragment);
+                if (decoded && decoded.startsWith("http")) {
+                  const kiwiHeaders = {
+                    Referer: "https://vibeplayer.site/",
+                    Origin: "https://vibeplayer.site",
+                    "User-Agent": defaultHeaders["User-Agent"],
+                  };
+
+                  addStream({
+                    server: `${task.serverName} (${audioLabel})`,
+                    link: decoded,
+                    type: "m3u8",
+                    quality: "auto",
+                    headers: kiwiHeaders,
+                    skip: skipIntervals,
+                  });
+
+                  try {
+                    const m3u8Res = await axios.get(decoded, {
+                      headers: kiwiHeaders,
+                      timeout: 6000,
+                    });
+                    const lines: string[] = m3u8Res.data.split("\n");
+                    const baseUrl = decoded.substring(0, decoded.lastIndexOf("/") + 1);
+
+                    for (let i = 0; i < lines.length; i++) {
+                      const line = lines[i].trim();
+                      if (line.startsWith("#EXT-X-STREAM-INF")) {
+                        const resMatch = line.match(/RESOLUTION=\d+x(\d+)/);
+                        const quality = resMatch ? `${resMatch[1]}p` : "unknown";
+                        const nextLine = lines[i + 1]?.trim();
+                        if (nextLine && !nextLine.startsWith("#")) {
+                          const streamUrl = nextLine.startsWith("http")
+                            ? nextLine
+                            : baseUrl + nextLine;
+                          addStream({
+                            server: `${task.serverName} (${audioLabel}) ${quality}`,
+                            link: streamUrl,
+                            type: "m3u8",
+                            quality,
+                            headers: kiwiHeaders,
+                            skip: skipIntervals,
+                          });
+                        }
+                      }
+                    }
+                  } catch {
+                    // master already added
+                  }
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+
+          // Flow 2: VidTube / MegaPlay / VidWish / Mewstream
+          try {
             const pageRes = await axios.get(iframeUrl, {
               headers: {
                 ...headers,
@@ -234,31 +343,66 @@ export const getStream = async function ({
               },
               timeout: 8000,
             });
-            const matchId = pageRes.data.match(/data-id="(\d+)"/);
+
+            const matchId = pageRes.data.match(/data-id="([^"]+)"/);
             if (matchId) {
               const vidtubeDataId = matchId[1];
-              const srcUrl = `https://${host}/stream/getSources?id=${vidtubeDataId}&type=${task.dataType}`;
-              const srcRes = await axios.get(srcUrl, {
-                headers: {
-                  ...headers,
-                  "X-Requested-With": "XMLHttpRequest",
-                  Referer: `https://${host}/`,
-                  Origin: `https://${host}`,
-                },
-                timeout: 8000,
-              });
+              const apiHeaders = {
+                ...headers,
+                "X-Requested-With": "XMLHttpRequest",
+                Referer: iframeUrl,
+                Origin: `https://${host}`,
+              };
 
-              const srcData = srcRes.data;
-              if (srcData?.sources?.file) {
-                const masterUrl = srcData.sources.file;
+              let srcData: any = null;
+              let masterUrl = "";
+
+              // Tries both getSourcesNew and getSources (with duplicate parameters as expected by VidTube API)
+              const candidates = [
+                `https://${host}/stream/getSourcesNew?id=${vidtubeDataId}&id=${vidtubeDataId}&type=${task.dataType}&type=${task.dataType}`,
+                `https://${host}/stream/getSources?id=${vidtubeDataId}&id=${vidtubeDataId}&type=${task.dataType}&type=${task.dataType}`,
+                `https://${host}/stream/getSourcesNew?id=${vidtubeDataId}&type=${task.dataType}`,
+                `https://${host}/stream/getSources?id=${vidtubeDataId}&type=${task.dataType}`,
+              ];
+
+              for (const endpoint of candidates) {
+                try {
+                  const srcRes = await axios.get(endpoint, {
+                    headers: apiHeaders,
+                    timeout: 8000,
+                  });
+                  const data = srcRes.data;
+                  if (data) {
+                    let candidate = "";
+                    if (typeof data.sources === "string" && data.sources.startsWith("http")) {
+                      candidate = data.sources;
+                    } else if (typeof data.sources?.file === "string" && data.sources.file.startsWith("http")) {
+                      candidate = data.sources.file;
+                    } else if (Array.isArray(data.sources) && data.sources.length > 0) {
+                      const first = data.sources[0];
+                      candidate = typeof first === "string" ? first : first?.file || "";
+                    }
+
+                    if (candidate && candidate.startsWith("http")) {
+                      masterUrl = candidate;
+                      srcData = data;
+                      break;
+                    }
+                  }
+                } catch {
+                  // try next endpoint
+                }
+              }
+
+              if (masterUrl) {
                 const streamHeaders = {
                   Referer: `https://${host}/`,
                   Origin: `https://${host}`,
                   "User-Agent": defaultHeaders["User-Agent"],
                 };
 
-                const subtitles: TextTracks = (srcData.tracks || [])
-                  .filter((t: any) => t.file && t.label)
+                const subtitles: TextTracks = (srcData?.tracks || [])
+                  .filter((t: any) => t.file && t.label && typeof t.file === "string" && t.file.startsWith("http"))
                   .map((t: any) => ({
                     title: t.label,
                     language: inferLang(t.label),
@@ -268,7 +412,7 @@ export const getStream = async function ({
                     )}&headers=${encodeURIComponent(JSON.stringify(streamHeaders))}`,
                   }));
 
-                // Add Auto Master stream
+                // Add Master stream
                 addStream({
                   server: `${task.serverName} (${audioLabel})`,
                   link: masterUrl,
@@ -296,8 +440,8 @@ export const getStream = async function ({
                       const nextLine = lines[i + 1]?.trim();
                       if (nextLine && !nextLine.startsWith("#")) {
                         const streamUrl = nextLine.startsWith("http")
-                            ? nextLine
-                            : baseUrl + nextLine;
+                          ? nextLine
+                          : baseUrl + nextLine;
                         addStream({
                           server: `${task.serverName} (${audioLabel}) ${quality}`,
                           link: streamUrl,
@@ -311,35 +455,15 @@ export const getStream = async function ({
                     }
                   }
                 } catch {
-                  // Master stream is already added
+                  // Master stream already added
                 }
               }
             }
-          } else if (iframeUrl.includes("#")) {
-            const fragment = iframeUrl.substring(iframeUrl.indexOf("#") + 1);
-            if (fragment) {
-              try {
-                const decoded = atob(fragment);
-                if (decoded.startsWith("http")) {
-                  addStream({
-                    server: `${task.serverName} (${audioLabel})`,
-                    link: decoded,
-                    type: "m3u8",
-                    headers: {
-                      Referer: "https://vibeplayer.site/",
-                      Origin: "https://vibeplayer.site",
-                      "User-Agent": defaultHeaders["User-Agent"],
-                    },
-                    skip: skipIntervals,
-                  });
-                }
-              } catch {
-                // ignore
-              }
-            }
+          } catch {
+            // ignore individual iframe page error
           }
         } catch {
-          // ignore individual server errors
+          // ignore individual server task error
         }
       })
     );
