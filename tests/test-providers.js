@@ -1,14 +1,91 @@
 const fs = require("fs");
 const path = require("path");
+const { z } = require("zod");
 const { providerContext } = require("./provider-test-context");
 const rootDir = path.join(__dirname, "..");
 
-/**
- * Helper to pick random items from array
- */
-function pickRandom(arr, count = 1) {
-  const shuffled = [...arr].sort(() => Math.random() - 0.5);
-  return count === 1 ? shuffled[0] : shuffled.slice(0, count);
+// Zod schemas for response validation
+const PostSchema = z.object({
+  title: z.string().min(1, "Title cannot be empty"),
+  link: z.string().min(1, "Link cannot be empty"),
+  image: z.string().min(1, "Image cannot be empty"),
+  tag: z.string().optional(),
+  rating: z.string().optional(),
+  provider: z.string().optional(),
+  aspectRatio: z.number().optional(),
+});
+
+const StreamSchema = z.object({
+  server: z.string().min(1, "Server name cannot be empty"),
+  link: z.string().min(1, "Stream link cannot be empty"),
+  type: z.string().min(1, "Type cannot be empty"),
+  quality: z.string().optional(),
+  subtitles: z
+    .array(
+      z.object({
+        title: z.string().optional(),
+        language: z.string().optional(),
+        type: z.string().optional(),
+        uri: z.string().optional(),
+      }),
+    )
+    .optional(),
+  headers: z.any().optional(),
+  tags: z.array(z.string()).optional(),
+  tag: z.string().optional(),
+});
+
+const DirectLinkItemSchema = z.object({
+  title: z.string().min(1, "Direct link title cannot be empty"),
+  link: z.string().min(1, "Direct link cannot be empty"),
+  type: z.enum(["movie", "series"]).optional(),
+  image: z.string().optional(),
+  description: z.string().optional(),
+  skip: z.array(z.any()).optional(),
+});
+
+const LinkSchema = z.object({
+  title: z.string().min(1, "Link title cannot be empty"),
+  quality: z.string().optional(),
+  episodesLink: z.string().optional(),
+  directLinks: z.array(DirectLinkItemSchema).optional(),
+});
+
+const InfoSchema = z.object({
+  title: z.string().min(1, "Title cannot be empty"),
+  image: z.string().optional(),
+  synopsis: z.string().optional(),
+  imdbId: z.string().optional(),
+  tmdbId: z.string().optional(),
+  type: z.string().min(1, "Type cannot be empty"),
+  tags: z.array(z.string()).optional(),
+  cast: z.array(z.string()).optional(),
+  rating: z.string().optional(),
+  linkList: z.array(LinkSchema),
+});
+
+const EpisodeLinkSchema = z.object({
+  title: z.string().min(1, "Episode title cannot be empty"),
+  link: z.string().min(1, "Episode link cannot be empty"),
+  image: z.string().optional(),
+  description: z.string().optional(),
+  skip: z.array(z.any()).optional(),
+});
+
+function validateSchema(schema, data, label) {
+  try {
+    schema.parse(data);
+    return { valid: true };
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const issues = err.issues.map((i) => {
+        const p = i.path.join(".");
+        return `${p ? `[${p}] ` : ""}${i.message}`;
+      });
+      return { valid: false, error: issues.join(", ") };
+    }
+    return { valid: false, error: err.message };
+  }
 }
 
 /**
@@ -24,8 +101,6 @@ function sleep(ms) {
 class ProviderTester {
   constructor(options = {}) {
     this.timeout = options.timeout || 30000;
-    this.postsToTest = options.postsToTest || 2;
-    this.linksToTest = options.linksToTest || 2;
     this.signal = new AbortController().signal;
     this.results = {};
   }
@@ -41,7 +116,6 @@ class ProviderTester {
         providerName,
         `${moduleName}.js`,
       );
-      // Clear cache to get fresh module
       delete require.cache[require.resolve(modulePath)];
       return require(modulePath);
     } catch (error) {
@@ -56,13 +130,10 @@ class ProviderTester {
     try {
       const manifestPath = path.join(rootDir, "manifest.json");
       if (!fs.existsSync(manifestPath)) {
-        console.log("⚠️  manifest.json not found");
         return [];
       }
-      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-      return manifest;
+      return JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
     } catch (error) {
-      console.log("⚠️  Failed to load manifest:", error.message);
       return [];
     }
   }
@@ -77,50 +148,40 @@ class ProviderTester {
       return [];
     }
 
-    // Load manifest to check for disabled providers
     const manifest = this.loadManifest();
     const disabledProviders = manifest
       .filter((p) => p.disabled === true)
       .map((p) => p.value);
 
-    if (disabledProviders.length > 0) {
-      console.log(
-        `\n⏭️  Skipping disabled providers: ${disabledProviders.join(", ")}`,
-      );
-    }
-
-    const providers = fs
+    return fs
       .readdirSync(distPath, { withFileTypes: true })
       .filter((dirent) => dirent.isDirectory())
       .map((dirent) => dirent.name)
       .filter((name) => {
-        // Skip disabled providers
         if (disabledProviders.includes(name)) {
           return false;
         }
-        // Check if it has required modules
-        const hasRequired = [
-          "catalog.js",
-          "posts.js",
-          "meta.js",
-          "stream.js",
-        ].every((file) => fs.existsSync(path.join(distPath, name, file)));
-        return hasRequired;
+        return ["catalog.js", "posts.js", "meta.js", "stream.js"].every(
+          (file) => fs.existsSync(path.join(distPath, name, file)),
+        );
       });
-
-    return providers;
   }
 
   /**
-   * Test a single provider with full flow
+   * Test a single provider with full flow and show returned output of each function
    */
   async testProvider(providerName) {
+    const available = this.getAvailableProviders();
+    const resolvedName =
+      available.find((p) => p.toLowerCase() === providerName.toLowerCase()) ||
+      providerName;
+
     console.log(`\n${"=".repeat(60)}`);
-    console.log(`🧪 Testing Provider: ${providerName}`);
+    console.log(`🧪 Testing Provider: ${resolvedName}`);
     console.log("=".repeat(60));
 
     const result = {
-      provider: providerName,
+      provider: resolvedName,
       catalog: { success: false, data: null, error: null },
       posts: { success: false, data: null, error: null },
       meta: { success: false, data: null, error: null },
@@ -130,11 +191,17 @@ class ProviderTester {
     };
 
     try {
-      // Step 1: Load and test catalog
-      console.log("\n📂 Step 1: Loading Catalog...");
-      const catalogModule = this.loadModule(providerName, "catalog");
+      // -------------------------------------------------------------
+      // Step 1: catalog.ts
+      // -------------------------------------------------------------
+      console.log("\n📂 [1/4] catalog.ts: catalog & genres");
+      console.log("-".repeat(60));
+
+      const catalogModule = this.loadModule(resolvedName, "catalog");
       if (!catalogModule) {
-        throw new Error("Catalog module not found");
+        throw new Error(
+          `catalog.js module not found for '${resolvedName}'. Make sure to run 'npm run build' first.`,
+        );
       }
 
       const rawCatalog = catalogModule.catalog;
@@ -143,322 +210,280 @@ class ProviderTester {
       const rawGenres = catalogModule.genres;
       const genres =
         typeof rawGenres === "function" ? await rawGenres() : rawGenres || [];
-      const allFilters = [...catalog, ...genres];
 
+      const catalogOutput = {
+        catalog,
+        ...(genres && genres.length > 0 ? { genres } : {}),
+      };
+
+      console.log("Result (catalog.ts):");
+      console.log(JSON.stringify(catalogOutput, null, 2));
+
+      const allFilters = [...catalog, ...genres];
       if (allFilters.length === 0) {
-        throw new Error("No filters found in catalog");
+        throw new Error("No catalog items or genres found in catalog.ts");
       }
 
       result.catalog.success = true;
-      result.catalog.data = {
-        catalogCount: catalog.length,
-      };
-      console.log(`   ✅ Found ${catalog.length} catalog items`);
-
-      // Pick a random filter
-      const randomFilter = pickRandom(allFilters);
+      result.catalog.data = { count: allFilters.length };
       console.log(
-        `   🎲 Selected random filter: "${randomFilter.title}" (${randomFilter.filter})`,
+        `\n✅ catalog.ts: ${catalog.length} catalog items${
+          genres.length > 0 ? `, ${genres.length} genres` : ""
+        }`,
       );
 
-      // Step 2: Test getPosts with random filter
-      console.log("\n📝 Step 2: Testing getPosts...");
-      const postsModule = this.loadModule(providerName, "posts");
+      // -------------------------------------------------------------
+      // Step 2: posts.ts (getPosts)
+      // -------------------------------------------------------------
+      console.log("\n📝 [2/4] posts.ts: getPosts");
+      console.log("-".repeat(60));
+
+      const postsModule = this.loadModule(resolvedName, "posts");
       if (!postsModule || !postsModule.getPosts) {
-        throw new Error("getPosts function not found");
+        throw new Error("getPosts function not found in posts.ts");
       }
 
-      const posts = await postsModule.getPosts({
-        filter: randomFilter.filter,
+      const filterToUse = allFilters[0].filter;
+      const postsParams = {
+        filter: filterToUse,
         page: 1,
-        providerValue: providerName,
+        providerValue: resolvedName,
+      };
+
+      console.log("Parameters:");
+      console.log(JSON.stringify(postsParams, null, 2));
+
+      const posts = await postsModule.getPosts({
+        ...postsParams,
         signal: this.signal,
         providerContext,
       });
+
+      console.log(
+        `\nResult (getPosts - ${Array.isArray(posts) ? posts.length : 0} items):`,
+      );
+      console.log(JSON.stringify(posts, null, 2));
 
       if (!Array.isArray(posts) || posts.length === 0) {
         throw new Error("getPosts returned empty or invalid result");
       }
 
+      const postsVal = validateSchema(z.array(PostSchema), posts, "getPosts");
+      if (!postsVal.valid) {
+        console.log(`\n⚠️  Schema Warning (getPosts): ${postsVal.error}`);
+      } else {
+        console.log(`\n✅ getPosts: ${posts.length} post(s) returned`);
+      }
+
       result.posts.success = true;
       result.posts.data = { count: posts.length };
-      console.log(`   ✅ Got ${posts.length} posts`);
 
-      // Pick random posts to test
-      const postsToTest = pickRandom(
-        posts,
-        Math.min(this.postsToTest, posts.length),
-      );
-      console.log(
-        `   🎲 Selected ${postsToTest.length} random posts for meta testing`,
-      );
+      // -------------------------------------------------------------
+      // Step 3: meta.ts (getMeta)
+      // -------------------------------------------------------------
+      console.log("\n📋 [3/4] meta.ts: getMeta");
+      console.log("-".repeat(60));
 
-      // Step 3: Test getMeta with random posts
-      console.log("\n📋 Step 3: Testing getMeta...");
-      const metaModule = this.loadModule(providerName, "meta");
+      const metaModule = this.loadModule(resolvedName, "meta");
       if (!metaModule || !metaModule.getMeta) {
-        throw new Error("getMeta function not found");
+        throw new Error("getMeta function not found in meta.ts");
       }
 
-      const metaResults = [];
-      for (const post of postsToTest) {
-        console.log(`\n   📌 Testing: "${post.title.substring(0, 50)}..."`);
-        console.log(`      Link: ${post.link}`);
+      const targetPost = posts[0];
+      const metaParams = { link: targetPost.link };
 
-        try {
-          await sleep(500); // Small delay between requests
-          const meta = await metaModule.getMeta({
-            link: post.link,
-            providerContext,
-          });
+      console.log("Parameters:");
+      console.log(JSON.stringify(metaParams, null, 2));
 
-          if (!meta || !meta.linkList) {
-            console.log(
-              `      ⚠️  Meta returned but linkList is empty/missing`,
-            );
-            continue;
-          }
+      await sleep(300);
+      const meta = await metaModule.getMeta({
+        link: targetPost.link,
+        providerContext,
+      });
 
-          metaResults.push({ post, meta });
-          console.log(
-            `      ✅ Got meta: type=${meta.type}, links=${meta.linkList.length}`,
-          );
+      console.log("\nResult (getMeta):");
+      console.log(JSON.stringify(meta, null, 2));
 
-          // Show link structure
-          meta.linkList.forEach((link, i) => {
-            const hasEpisodes = !!link.episodesLink;
-            const hasDirectLinks =
-              link.directLinks && link.directLinks.length > 0;
-            console.log(
-              `         [${i + 1}] ${link.title.substring(0, 30)} - ${
-                hasEpisodes ? "📺 Episodes" : ""
-              }${hasDirectLinks ? "🎬 Direct" : ""}`,
-            );
-          });
-        } catch (err) {
-          console.log(`      ❌ Error: ${err.message}`);
-        }
+      if (
+        !meta ||
+        !meta.linkList ||
+        !Array.isArray(meta.linkList) ||
+        meta.linkList.length === 0
+      ) {
+        throw new Error("getMeta returned missing or empty linkList");
       }
 
-      if (metaResults.length === 0) {
-        throw new Error("No valid meta data retrieved");
+      const metaVal = validateSchema(InfoSchema, meta, "getMeta");
+      if (!metaVal.valid) {
+        console.log(`\n⚠️  Schema Warning (getMeta): ${metaVal.error}`);
+      } else {
+        console.log(
+          `\n✅ getMeta: type=${meta.type}, linkList=${meta.linkList.length} entry/entries`,
+        );
       }
 
       result.meta.success = true;
-      result.meta.data = { testedCount: metaResults.length };
+      result.meta.data = {
+        type: meta.type,
+        linkListCount: meta.linkList.length,
+      };
 
-      // Step 4: Test episodes OR stream based on meta content
-      console.log("\n🔗 Step 4: Testing Episodes/Stream...");
+      // -------------------------------------------------------------
+      // Check linkList for episodesLink vs directLinks
+      // -------------------------------------------------------------
+      let episodeLinkTarget = null;
+      let directLinkTarget = null;
 
-      // Find links with episodes
-      const episodeLinks = [];
-      const directLinks = [];
-
-      for (const { meta } of metaResults) {
-        for (const link of meta.linkList) {
-          if (link.episodesLink) {
-            episodeLinks.push({ meta, link });
-          }
-          if (link.directLinks && link.directLinks.length > 0) {
-            directLinks.push({ meta, link });
-          }
+      for (const linkGroup of meta.linkList) {
+        if (linkGroup.episodesLink && !episodeLinkTarget) {
+          episodeLinkTarget = {
+            title: linkGroup.title,
+            url: linkGroup.episodesLink,
+          };
+        }
+        if (
+          linkGroup.directLinks &&
+          linkGroup.directLinks.length > 0 &&
+          !directLinkTarget
+        ) {
+          directLinkTarget = linkGroup.directLinks[0];
         }
       }
 
-      // Test episodes if available
-      if (episodeLinks.length > 0) {
-        console.log(`\n   📺 Found ${episodeLinks.length} episode links`);
-        const episodesModule = this.loadModule(providerName, "episodes");
+      let streamLink = null;
+      let streamType = meta.type || "movie";
 
-        if (episodesModule && episodesModule.getEpisodes) {
-          const testEpisodeLink = pickRandom(episodeLinks);
-          console.log(
-            `   🎲 Testing episodes from: ${testEpisodeLink.link.title}`,
+      // -------------------------------------------------------------
+      // Step 4: episodes.ts (getEpisodes - if episodesLink present)
+      // -------------------------------------------------------------
+      if (episodeLinkTarget) {
+        console.log("\n📺 [4/5] episodes.ts: getEpisodes");
+        console.log("-".repeat(60));
+
+        const episodesModule = this.loadModule(resolvedName, "episodes");
+        if (!episodesModule || !episodesModule.getEpisodes) {
+          throw new Error(
+            "episodesLink present in meta.linkList, but getEpisodes function not found in episodes.ts",
           );
-          console.log(`      URL: ${testEpisodeLink.link.episodesLink}`);
-
-          try {
-            const episodes = await episodesModule.getEpisodes({
-              url: testEpisodeLink.link.episodesLink,
-              providerContext,
-            });
-
-            if (Array.isArray(episodes) && episodes.length > 0) {
-              result.episodes.success = true;
-              result.episodes.data = { count: episodes.length };
-              console.log(`      ✅ Got ${episodes.length} episodes`);
-
-              // Show first few episodes
-              episodes.slice(0, 3).forEach((ep, i) => {
-                console.log(`         [${i + 1}] ${ep.title}`);
-              });
-
-              // Test stream with random episode
-              console.log(`\n   🎬 Testing stream with random episode...`);
-              const randomEpisode = pickRandom(episodes);
-              console.log(`      Episode: ${randomEpisode.title}`);
-
-              try {
-                const streamModule = this.loadModule(providerName, "stream");
-                if (streamModule && streamModule.getStream) {
-                  const streams = await streamModule.getStream({
-                    link: randomEpisode.link,
-                    type: "series",
-                    signal: this.signal,
-                    providerContext,
-                  });
-
-                  if (Array.isArray(streams) && streams.length > 0) {
-                    result.stream.success = true;
-                    result.stream.data = {
-                      count: streams.length,
-                      type: "series",
-                    };
-                    console.log(`      ✅ Got ${streams.length} stream(s)`);
-                    streams.forEach((s, i) => {
-                      console.log(
-                        `         [${i + 1}] ${s.server} - ${
-                          s.quality || "unknown"
-                        } quality`,
-                      );
-                    });
-                  } else {
-                    console.log(`      ⚠️  No streams returned`);
-                    result.stream.error = "No streams returned";
-                  }
-                }
-              } catch (err) {
-                console.log(`      ❌ Stream error: ${err.message}`);
-                result.stream.error = err.message;
-              }
-            } else {
-              console.log(`      ⚠️  No episodes returned`);
-              result.episodes.error = "No episodes returned";
-            }
-          } catch (err) {
-            console.log(`      ❌ Episodes error: ${err.message}`);
-            result.episodes.error = err.message;
-          }
-        } else {
-          console.log(`   ⚠️  getEpisodes function not found`);
-          result.episodes.skipped = true;
-          result.episodes.error = "Function not available";
         }
-      } else if (directLinks.length === 0) {
-        result.episodes.skipped = true;
+
+        const episodesParams = { url: episodeLinkTarget.url };
+        console.log("Parameters:");
+        console.log(JSON.stringify(episodesParams, null, 2));
+
+        await sleep(300);
+        const episodes = await episodesModule.getEpisodes({
+          url: episodeLinkTarget.url,
+          providerContext,
+        });
+
         console.log(
-          `   ℹ️  No episode links or direct links found, skipping episodes test`,
+          `\nResult (getEpisodes - ${
+            Array.isArray(episodes) ? episodes.length : 0
+          } items):`,
         );
+        console.log(JSON.stringify(episodes, null, 2));
+
+        if (!Array.isArray(episodes) || episodes.length === 0) {
+          throw new Error("getEpisodes returned empty or invalid array");
+        }
+
+        const epVal = validateSchema(
+          z.array(EpisodeLinkSchema),
+          episodes,
+          "getEpisodes",
+        );
+        if (!epVal.valid) {
+          console.log(`\n⚠️  Schema Warning (getEpisodes): ${epVal.error}`);
+        } else {
+          console.log(`\n✅ getEpisodes: ${episodes.length} episode(s) returned`);
+        }
+
+        result.episodes.success = true;
+        result.episodes.data = { count: episodes.length };
+
+        streamLink = episodes[0].link;
+        streamType = "series";
       } else {
-        console.log(
-          `   ℹ️  No episode links found; will test stream via direct links instead`,
-        );
-      }
-
-      // Test direct links/stream if episodes not tested or no episode links
-      if (directLinks.length > 0 && !result.stream.success) {
-        console.log(`\n   🎬 Found ${directLinks.length} direct link entries`);
-
-        const testDirectLink = pickRandom(directLinks);
-        const linksToTest = pickRandom(
-          testDirectLink.link.directLinks,
-          Math.min(this.linksToTest, testDirectLink.link.directLinks.length),
-        );
-
-        console.log(
-          `   🎲 Testing ${linksToTest.length} random direct link(s)`,
-        );
-
-        const streamModule = this.loadModule(providerName, "stream");
-        if (streamModule && streamModule.getStream) {
-          let lastEmptyMessage = null;
-          for (const directLink of Array.isArray(linksToTest)
-            ? linksToTest
-            : [linksToTest]) {
-            console.log(`\n      Testing: ${directLink.title}`);
-            console.log(`      Link: ${directLink.link}`);
-
-            try {
-              await sleep(500);
-              const streams = await streamModule.getStream({
-                link: directLink.link,
-                type: directLink.type || "movie",
-                signal: this.signal,
-                providerContext,
-              });
-
-              if (Array.isArray(streams) && streams.length > 0) {
-                result.stream.success = true;
-                result.stream.error = null;
-                result.stream.data = {
-                  count: streams.length,
-                  type: directLink.type || "movie",
-                };
-                console.log(`      ✅ Got ${streams.length} stream(s)`);
-                streams.forEach((s, i) => {
-                  console.log(
-                    `         [${i + 1}] ${s.server} - ${
-                      s.quality || "unknown"
-                    } quality`,
-                  );
-                });
-                break; // One success is enough
-              } else {
-                console.log(`      ⚠️  No streams returned`);
-                lastEmptyMessage = "No streams returned";
-              }
-            } catch (err) {
-              console.log(`      ❌ Stream error: ${err.message}`);
-              result.stream.error = err.message;
-            }
-          }
-          if (
-            !result.stream.success &&
-            !result.stream.error &&
-            lastEmptyMessage
-          ) {
-            result.stream.error = lastEmptyMessage;
-          }
-        } else {
-          console.log(`   ❌ getStream function not found`);
-          result.stream.error = "Function not available";
+        result.episodes.skipped = true;
+        if (directLinkTarget) {
+          streamLink = directLinkTarget.link;
+          streamType = directLinkTarget.type || meta.type || "movie";
         }
-      } else if (
-        !result.stream.success &&
-        directLinks.length === 0 &&
-        episodeLinks.length === 0
-      ) {
-        result.stream.error =
-          "No links to test stream with - meta must return at least one episode link or direct link";
-        console.log(
-          `   ❌ No links to test stream with - meta.getMeta must return at least one episode link or direct link`,
+      }
+
+      // -------------------------------------------------------------
+      // Step 5: stream.ts (getStream)
+      // -------------------------------------------------------------
+      const streamStepNum = episodeLinkTarget ? "5/5" : "4/4";
+      console.log(`\n🎬 [${streamStepNum}] stream.ts: getStream`);
+      console.log("-".repeat(60));
+
+      if (!streamLink) {
+        throw new Error(
+          "No media link found to test getStream (meta.linkList has neither episodesLink nor directLinks)",
         );
       }
 
-      // Stream is mandatory: if it was never successfully tested and no error
-      // was recorded (e.g. episodes failed before stream could run), fail it.
-      if (
-        !result.stream.success &&
-        !result.stream.error &&
-        !result.stream.skipped
-      ) {
-        result.stream.error = "Stream could not be tested";
-        console.log(`   ❌ Stream could not be tested`);
+      const streamModule = this.loadModule(resolvedName, "stream");
+      if (!streamModule || !streamModule.getStream) {
+        throw new Error("getStream function not found in stream.ts");
       }
-    } catch (error) {
-      console.log(`\n❌ Test failed: ${error.message}`);
 
-      // Determine which step failed
+      const streamParams = {
+        link: streamLink,
+        type: streamType,
+      };
+
+      console.log("Parameters:");
+      console.log(JSON.stringify(streamParams, null, 2));
+
+      await sleep(300);
+      const streams = await streamModule.getStream({
+        link: streamLink,
+        type: streamType,
+        signal: this.signal,
+        providerContext,
+      });
+
+      console.log(
+        `\nResult (getStream - ${Array.isArray(streams) ? streams.length : 0} items):`,
+      );
+      console.log(JSON.stringify(streams, null, 2));
+
+      if (!Array.isArray(streams) || streams.length === 0) {
+        throw new Error("getStream returned empty or invalid array");
+      }
+
+      const streamVal = validateSchema(
+        z.array(StreamSchema),
+        streams,
+        "getStream",
+      );
+      if (!streamVal.valid) {
+        console.log(`\n⚠️  Schema Warning (getStream): ${streamVal.error}`);
+      } else {
+        console.log(`\n✅ getStream: ${streams.length} stream(s) returned`);
+      }
+
+      result.stream.success = true;
+      result.stream.data = { count: streams.length };
+    } catch (error) {
+      console.log(`\n❌ Error: ${error.message}`);
       if (!result.catalog.success) {
         result.catalog.error = error.message;
       } else if (!result.posts.success) {
         result.posts.error = error.message;
       } else if (!result.meta.success) {
         result.meta.error = error.message;
+      } else if (!result.episodes.success && !result.episodes.skipped) {
+        result.episodes.error = error.message;
+      } else if (!result.stream.success) {
+        result.stream.error = error.message;
       }
     }
 
-    // Calculate summary
+    // Summary calculation
     const steps = ["catalog", "posts", "meta", "episodes", "stream"];
     for (const step of steps) {
       if (result[step].success) {
@@ -470,34 +495,50 @@ class ProviderTester {
       }
     }
 
-    // Print summary
+    const isPassed = result.summary.failed === 0;
+
     console.log(`\n${"─".repeat(60)}`);
-    console.log(`📊 Provider Summary: ${providerName}`);
+    console.log(`📊 Provider Summary: ${resolvedName}`);
     console.log("─".repeat(60));
-    console.log(`   ✅ Passed:  ${result.summary.passed}`);
-    console.log(`   ❌ Failed:  ${result.summary.failed}`);
-    console.log(`   ⏭️  Skipped: ${result.summary.skipped}`);
-
-    // List which steps passed/failed/skipped
-    console.log("\n   Step Results:");
-    for (const step of steps) {
-      if (result[step].success) {
-        console.log(`      ✅ ${step}`);
-      } else if (result[step].skipped) {
-        console.log(`      ⏭️  ${step} (skipped)`);
-      } else if (result[step].error) {
-        console.log(`      ❌ ${step}: ${result[step].error}`);
-      } else {
-        console.log(`      ⚪ ${step} (not tested)`);
-      }
-    }
-
-    const statusIcon = result.summary.failed === 0 ? "✅" : "❌";
     console.log(
-      `\n   ${statusIcon} Overall: ${
-        result.summary.failed === 0 ? "PASSED" : "FAILED"
+      `   catalog:     ${
+        result.catalog.success
+          ? `✅ (${result.catalog.data.count} items)`
+          : `❌ ${result.catalog.error}`
       }`,
     );
+    console.log(
+      `   getPosts:    ${
+        result.posts.success
+          ? `✅ (${result.posts.data.count} posts)`
+          : `❌ ${result.posts.error}`
+      }`,
+    );
+    console.log(
+      `   getMeta:     ${
+        result.meta.success
+          ? `✅ (type: ${result.meta.data.type}, ${result.meta.data.linkListCount} linkList entries)`
+          : `❌ ${result.meta.error}`
+      }`,
+    );
+    if (result.episodes.success) {
+      console.log(`   getEpisodes: ✅ (${result.episodes.data.count} episodes)`);
+    } else if (result.episodes.skipped) {
+      console.log(`   getEpisodes: ⚪ (not applicable - direct links used)`);
+    } else if (result.episodes.error) {
+      console.log(`   getEpisodes: ❌ ${result.episodes.error}`);
+    }
+    console.log(
+      `   getStream:   ${
+        result.stream.success
+          ? `✅ (${result.stream.data.count} stream(s))`
+          : `❌ ${result.stream.error}`
+      }`,
+    );
+    console.log(
+      `\n   ${isPassed ? "✅" : "❌"} Overall: ${isPassed ? "PASSED" : "FAILED"}`,
+    );
+    console.log("─".repeat(60));
 
     return result;
   }
@@ -542,8 +583,7 @@ class ProviderTester {
         results[provider] = { error: error.message };
       }
 
-      // Small delay between providers
-      await sleep(1000);
+      await sleep(500);
     }
 
     // Final summary
@@ -554,19 +594,14 @@ class ProviderTester {
     console.log(`   ✅ Passed: ${passed}`);
     console.log(`   ❌ Failed: ${failed}`);
 
-    // List failed providers with details
     if (failed > 0) {
       console.log(`\n${"─".repeat(60)}`);
       console.log("❌ FAILED PROVIDERS:");
       console.log("─".repeat(60));
-
       for (const [name, result] of Object.entries(results)) {
         if (result.error) {
-          // Critical error
-          console.log(`\n   ❌ ${name}`);
-          console.log(`      Error: ${result.error}`);
+          console.log(`\n   ❌ ${name}: ${result.error}`);
         } else if (result.summary?.failed > 0) {
-          // Step failures
           console.log(`\n   ❌ ${name}`);
           const steps = ["catalog", "posts", "meta", "episodes", "stream"];
           for (const step of steps) {
@@ -578,7 +613,6 @@ class ProviderTester {
       }
     }
 
-    // List passed providers
     if (passed > 0) {
       console.log(`\n${"─".repeat(60)}`);
       console.log("✅ PASSED PROVIDERS:");
@@ -590,7 +624,6 @@ class ProviderTester {
     }
 
     console.log(`\n${"═".repeat(60)}`);
-
     return results;
   }
 }
@@ -600,49 +633,31 @@ class ProviderTester {
  */
 async function main() {
   const args = process.argv.slice(2);
-  const providerName = args[0];
+  const providerName = args.find((a) => !a.startsWith("-"));
 
-  // Check for options
-  const postsToTest =
-    parseInt(args.find((a) => a.startsWith("--posts="))?.split("=")[1]) || 2;
-  const linksToTest =
-    parseInt(args.find((a) => a.startsWith("--links="))?.split("=")[1]) || 2;
-
-  const tester = new ProviderTester({ postsToTest, linksToTest });
+  const tester = new ProviderTester();
 
   if (args.includes("--help") || args.includes("-h")) {
     console.log(`
 🎯 Vega Providers Integration Tester
 =====================================
 
-Usage: npm test -- [provider] [options]
+Usage: npm test -- [provider]
 
 Arguments:
   provider          Name of specific provider to test (optional)
                     If not provided, tests all providers
 
-Options:
-  --posts=N         Number of random posts to test (default: 2)
-  --links=N         Number of random direct links to test (default: 2)
-  --help, -h        Show this help message
-
-Test Flow:
-  1. Load catalog → pick random filter
-  2. Call getPosts with filter
-  3. Pick random posts → call getMeta
-  4. If episodesLink → call getEpisodes → getStream
-  5. If directLinks → call getStream
-
 Examples:
   npm test                                  # Test all providers
-  npm test -- vega                          # Test only vega provider
-  npm test -- mod --posts=3                 # Test mod with 3 random posts
-  npm test -- --posts=1 --links=1           # Quick test all providers
+  npm test -- kickAssAnime                  # Test kickAssAnime
+  npm test -- kickassanime                  # Case-insensitive
+  npm test -- everything                    # Test everything provider
     `);
     return;
   }
 
-  if (providerName && !providerName.startsWith("--")) {
+  if (providerName) {
     await tester.testProvider(providerName);
   } else {
     await tester.testAllProviders();
