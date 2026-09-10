@@ -130,9 +130,18 @@ export const getStream = async function ({
                 const varQuality = resMatch ? resMatch[1] : "auto";
                 const nextLine = lines[i + 1]?.trim();
                 if (nextLine && !nextLine.startsWith("#")) {
-                  const varUrl = nextLine.startsWith("http")
-                    ? nextLine
-                    : new URL(nextLine, videoUrl).href;
+                  let varUrl = nextLine;
+                  if (!varUrl.startsWith("http")) {
+                    try {
+                      varUrl = new URL(nextLine, videoUrl).href;
+                    } catch {
+                      const base = videoUrl.substring(
+                        0,
+                        videoUrl.lastIndexOf("/") + 1
+                      );
+                      varUrl = base + nextLine;
+                    }
+                  }
                   streamLinks.push({
                     server: `KissKH (${varQuality}p)`,
                     link: varUrl,
