@@ -71,7 +71,9 @@ async function buildProvider(providerName) {
           .split(",")
           .map((entry) => {
             const match = entry.trim().match(/(\w+):\s*\(\)\s*=>\s*(\w+)/);
-            return match ? match[1] : null;
+            return match
+              ? { exportName: match[1], localName: match[2] }
+              : null;
           })
           .filter(Boolean);
 
@@ -83,7 +85,10 @@ async function buildProvider(providerName) {
 
         // Add direct exports assignments at the end
         const directExports = exportEntries
-          .map((name) => `exports.${name} = ${name};`)
+          .map(
+            ({ exportName, localName }) =>
+              `exports.${exportName} = ${localName};`,
+          )
           .join("\n");
 
         // Add the exports before the final comment
