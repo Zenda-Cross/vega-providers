@@ -102,6 +102,8 @@ class ProviderTester {
   constructor(options = {}) {
     this.timeout = options.timeout || 30000;
     this.signal = new AbortController().signal;
+    this.useFirst = options.useFirst || false;
+    this.postIndex = options.postIndex;
     this.results = {};
   }
 
@@ -280,8 +282,24 @@ class ProviderTester {
 
       // -------------------------------------------------------------
       // Step 3: meta.ts (getMeta)
-      // -------------------------------------------------------------
-      console.log("\n📋 [3/4] meta.ts: getMeta");
+      let targetPost;
+      if (
+        typeof this.postIndex === "number" &&
+        this.postIndex >= 0 &&
+        this.postIndex < posts.length
+      ) {
+        targetPost = posts[this.postIndex];
+      } else if (this.useFirst) {
+        targetPost = posts[0];
+      } else {
+        const randomIndex = Math.floor(Math.random() * posts.length);
+        targetPost = posts[randomIndex];
+      }
+
+      const postIdx = posts.indexOf(targetPost);
+      console.log(
+        `\n📋 [3/4] meta.ts: getMeta (post [${postIdx + 1}/${posts.length}]: "${targetPost.title}")`,
+      );
       console.log("-".repeat(60));
 
       const metaModule = this.loadModule(resolvedName, "meta");
@@ -289,7 +307,6 @@ class ProviderTester {
         throw new Error("getMeta function not found in meta.ts");
       }
 
-      const targetPost = posts[0];
       const metaParams = { link: targetPost.link };
 
       console.log("Parameters:");
@@ -334,20 +351,27 @@ class ProviderTester {
       let episodeLinkTarget = null;
       let directLinkTarget = null;
 
-      for (const linkGroup of meta.linkList) {
-        if (linkGroup.episodesLink && !episodeLinkTarget) {
-          episodeLinkTarget = {
-            title: linkGroup.title,
-            url: linkGroup.episodesLink,
-          };
-        }
-        if (
-          linkGroup.directLinks &&
-          linkGroup.directLinks.length > 0 &&
-          !directLinkTarget
-        ) {
-          directLinkTarget = linkGroup.directLinks[0];
-        }
+      const episodeGroups = meta.linkList.filter((g) => g.episodesLink);
+      const directGroups = meta.linkList.filter(
+        (g) => g.directLinks && g.directLinks.length > 0,
+      );
+
+      if (episodeGroups.length > 0) {
+        const group = this.useFirst
+          ? episodeGroups[0]
+          : episodeGroups[Math.floor(Math.random() * episodeGroups.length)];
+        episodeLinkTarget = {
+          title: group.title,
+          url: group.episodesLink,
+        };
+      } else if (directGroups.length > 0) {
+        const group = this.useFirst
+          ? directGroups[0]
+          : directGroups[Math.floor(Math.random() * directGroups.length)];
+        const links = group.directLinks;
+        directLinkTarget = this.useFirst
+          ? links[0]
+          : links[Math.floor(Math.random() * links.length)];
       }
 
       let streamLink = null;
@@ -402,7 +426,10 @@ class ProviderTester {
         result.episodes.success = true;
         result.episodes.data = { count: episodes.length };
 
-        streamLink = episodes[0].link;
+        const epToUse = this.useFirst
+          ? episodes[0]
+          : episodes[Math.floor(Math.random() * episodes.length)];
+        streamLink = epToUse.link;
         streamType = "series";
       } else {
         result.episodes.skipped = true;
@@ -634,25 +661,39 @@ class ProviderTester {
 async function main() {
   const args = process.argv.slice(2);
   const providerName = args.find((a) => !a.startsWith("-"));
+  const useFirst = args.includes("--first");
+  const postIndexArg = args.find((a) => a.startsWith("--index="));
+  const postIndex = postIndexArg
+    ? parseInt(postIndexArg.split("=")[1], 10)
+    : undefined;
 
-  const tester = new ProviderTester();
+  const tester = new ProviderTester({ useFirst, postIndex });
 
   if (args.includes("--help") || args.includes("-h")) {
     console.log(`
 🎯 Vega Providers Integration Tester
 =====================================
 
-Usage: npm test -- [provider]
+Usage: npm test -- [provider] [options]
 
 Arguments:
   provider          Name of specific provider to test (optional)
                     If not provided, tests all providers
 
+Options:
+  --first           Always test the first post/link (deterministic)
+  --index=N         Test a specific 0-based post index from results
+  --help, -h        Show this help message
+
+Default behavior:
+  Picks a random post and link/episode to ensure diverse content testing.
+
 Examples:
   npm test                                  # Test all providers
+  npm test -- hdhub4u                       # Test random movie/show from hdhub4u
+  npm test -- hdhub4u --first               # Always test first post (e.g. pinned/latest)
+  npm test -- hdhub4u --index=2             # Test 3rd post
   npm test -- kickAssAnime                  # Test kickAssAnime
-  npm test -- kickassanime                  # Case-insensitive
-  npm test -- everything                    # Test everything provider
     `);
     return;
   }
