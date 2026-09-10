@@ -23,11 +23,16 @@ export const getPosts = async function ({
       const title = element.title;
       const link = baseUrl + `/api/DramaList/Drama/${element?.id}?isq=false`;
       const image = element.thumbnail;
+      const tag =
+        element?.label?.trim() ||
+        (element?.episodesCount ? `${element.episodesCount} Ep` : undefined);
       if (title && link && image) {
         catalog.push({
-          title: title,
-          link: link,
-          image: image,
+          title,
+          link,
+          image,
+          aspectRatio: 16 / 9,
+          ...(tag ? { tag } : {}),
         });
       }
     });
@@ -60,11 +65,16 @@ export const getSearchPosts = async function ({
       const title = element.title;
       const link = baseUrl + `/api/DramaList/Drama/${element?.id}?isq=false`;
       const image = element.thumbnail;
+      const tag =
+        element?.label?.trim() ||
+        (element?.episodesCount ? `${element.episodesCount} Ep` : undefined);
       if (title && link && image) {
         catalog.push({
-          title: title,
-          link: link,
-          image: image,
+          title,
+          link,
+          image,
+          aspectRatio: 16 / 9,
+          ...(tag ? { tag } : {}),
         });
       }
     });
