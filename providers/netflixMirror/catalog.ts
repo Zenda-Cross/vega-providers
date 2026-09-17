@@ -1,15 +1,15 @@
 export const catalog = [
   {
-    title: "Home",
-    filter: "/mobile/home?app=1",
+    title: "Trending / Top Searches",
+    filter: "popular",
   },
   {
     title: "Series",
-    filter: "/mobile/series",
+    filter: "series",
   },
   {
     title: "Movies",
-    filter: "/mobile/movies",
+    filter: "movies",
   },
 ];
 
