@@ -1,6 +1,6 @@
 export const catalog = [
   {
-    title: "Disney+ Originals & Trending",
+    title: "Disney+ HotStar / Trending",
     filter: "disney",
   },
   {
@@ -9,11 +9,23 @@ export const catalog = [
   },
   {
     title: "Star Wars",
-    filter: "star",
+    filter: "star wars",
   },
   {
     title: "Pixar & Animation",
-    filter: "anime",
+    filter: "animation",
+  },
+  {
+    title: "Live Action Movies",
+    filter: "movie",
+  },
+  {
+    title: "Disney Channel Series",
+    filter: "series",
+  },
+  {
+    title: "Princesses & Fairy Tales",
+    filter: "princess",
   },
 ];
 

@@ -1,15 +1,39 @@
 export const catalog = [
   {
-    title: "Popular Movies & TV",
+    title: "Top Movies",
+    filter: "movie",
+  },
+  {
+    title: "Featured Originals: Series",
+    filter: "series",
+  },
+  {
+    title: "Action Films",
+    filter: "Action",
+  },
+  {
+    title: "TV Shows To Love",
     filter: "the",
   },
   {
-    title: "Trending Series",
-    filter: "boys",
+    title: "Drama Series",
+    filter: "Drama",
   },
   {
-    title: "Action & Drama",
-    filter: "reacher",
+    title: "Sci-Fi & Fantasy",
+    filter: "Sci-Fi",
+  },
+  {
+    title: "Mystery & Thriller",
+    filter: "Thriller",
+  },
+  {
+    title: "Horror Films",
+    filter: "Horror",
+  },
+  {
+    title: "Kids & Family",
+    filter: "Family",
   },
 ];
 
