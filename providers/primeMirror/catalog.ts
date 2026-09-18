@@ -1,39 +1,63 @@
 export const catalog = [
   {
-    title: "Top Movies",
-    filter: "movie",
+    title: "Trending & Top Searches",
+    filter: "top",
   },
   {
     title: "Featured Originals: Series",
-    filter: "series",
+    filter: "Featured Originals: Series",
+  },
+  {
+    title: "Featured Originals: Movies",
+    filter: "Featured Originals: Movies",
+  },
+  {
+    title: "Recently Added Movies",
+    filter: "Recently Added Movies",
   },
   {
     title: "Action Films",
-    filter: "Action",
-  },
-  {
-    title: "TV Shows To Love",
-    filter: "the",
+    filter: "Action Films",
   },
   {
     title: "Drama Series",
-    filter: "Drama",
+    filter: "Drama Series",
   },
   {
-    title: "Sci-Fi & Fantasy",
-    filter: "Sci-Fi",
+    title: "Comedy Movies",
+    filter: "Comedy Movies",
   },
   {
-    title: "Mystery & Thriller",
-    filter: "Thriller",
+    title: "Mystery & Thriller Movies",
+    filter: "Mystery And Thriller Movies",
   },
   {
-    title: "Horror Films",
-    filter: "Horror",
+    title: "Romance Movies",
+    filter: "Romance Movies",
   },
   {
-    title: "Kids & Family",
-    filter: "Family",
+    title: "Your Next Obsession",
+    filter: "Your Next Obsession",
+  },
+  {
+    title: "TV Shows To Love",
+    filter: "TV Shows To Love",
+  },
+  {
+    title: "Recently Added In Hindi",
+    filter: "Recently Added In Hindi",
+  },
+  {
+    title: "Kids And Family Movies",
+    filter: "Kids And Family Movies",
+  },
+  {
+    title: "Drama Movies",
+    filter: "Drama Movies",
+  },
+  {
+    title: "TV Finds",
+    filter: "TV Finds",
   },
 ];
 

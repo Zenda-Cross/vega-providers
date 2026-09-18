@@ -3,6 +3,7 @@ import { netMirrorGetStream } from "../netMirrorCommon";
 
 export const getStream = async ({
   link: id,
+  type,
   signal,
   providerContext,
   isDownload,
@@ -15,6 +16,7 @@ export const getStream = async ({
 }): Promise<Stream[]> => {
   return netMirrorGetStream({
     id,
+    type,
     prefix: "",
     signal,
     providerContext,

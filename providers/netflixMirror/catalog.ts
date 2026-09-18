@@ -17,27 +17,47 @@ export const catalog = [
   },
   {
     title: "Action & Adventure",
-    filter: "Action",
-  },
-  {
-    title: "Comedy",
-    filter: "Comedy",
+    filter: "Get In on the Action",
   },
   {
     title: "TV Dramas",
-    filter: "Drama",
+    filter: "TV Dramas",
   },
   {
-    title: "Anime & Animation",
-    filter: "Anime",
+    title: "TV Thrillers & Mysteries",
+    filter: "TV Thrillers & Mysteries",
   },
   {
-    title: "Bollywood Movies",
-    filter: "Bollywood",
+    title: "TV Sci-Fi & Fantasy",
+    filter: "TV Sci-Fi & Fantasy",
   },
   {
-    title: "Sci-Fi & Fantasy",
-    filter: "Sci-Fi",
+    title: "Teen TV Shows",
+    filter: "Teen TV Shows",
+  },
+  {
+    title: "Children & Family TV",
+    filter: "Children & Family TV",
+  },
+  {
+    title: "Asian Movies & TV",
+    filter: "Asian Movies & TV",
+  },
+  {
+    title: "Exciting Movies",
+    filter: "Exciting Movies",
+  },
+  {
+    title: "Your Next Watch",
+    filter: "Your Next Watch",
+  },
+  {
+    title: "Gems for You",
+    filter: "Gems for You",
+  },
+  {
+    title: "International TV Shows",
+    filter: "International TV Shows",
   },
 ];
 
