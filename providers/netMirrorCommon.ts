@@ -14,7 +14,12 @@ export type NetMirrorOtt = "" | "pv" | "hs";
 export const getNetMirrorBaseUrl = async (): Promise<string> => {
   try {
     const url = await getBaseUrl("nfMirror");
-    if (url && !url.includes("net22.cc")) {
+    if (
+      url &&
+      !url.includes("net22.cc") &&
+      !url.includes("net77.cc") &&
+      !url.includes("net50.cc")
+    ) {
       return url.replace(/\/+$/, "");
     }
   } catch (err) {
@@ -64,13 +69,13 @@ export const getNetMirrorCookie = async (
       });
 
       const verifyRes = await axios.post(
-        `${baseUrl}/verify.php`,
+        "https://net52.cc/verify.php",
         `g-recaptcha-response=${uuid}`,
         {
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            Origin: baseUrl,
-            Referer: `${baseUrl}/verify2`,
+            Origin: "https://net52.cc",
+            Referer: "https://net52.cc/verify2",
             "User-Agent":
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
             "Upgrade-Insecure-Requests": "1",
@@ -260,10 +265,19 @@ export const getCachedHomeTrays = async (
     const { axios, cheerio } = providerContext;
     const baseUrl = await getNetMirrorBaseUrl();
     const cookies = await getNetMirrorCookie(providerContext, prefix);
-    const url = `${baseUrl}/mobile/home.php`;
+    const url = `${baseUrl}/mobile/home?app=1`;
+
+    const homeHeaders = {
+      ...getNetMirrorMobileHeaders(baseUrl, cookies),
+      Accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+      "Accept-Language": "en-IN,en-US;q=0.9,en;q=0.8",
+      "X-Requested-With": "XMLHttpRequest",
+      Referer: `${baseUrl}/mobile/home?app=1`,
+    };
 
     const res = await axios.get(url, {
-      headers: getNetMirrorMobileHeaders(baseUrl, cookies),
+      headers: homeHeaders,
       timeout: 10000,
     });
 
@@ -295,11 +309,31 @@ export const getCachedHomeTrays = async (
       }
     });
 
+    $("#top10, .top10").each((_i: number, el: any) => {
+      const title = $(el).find("span").first().text().trim() || "Top 10 Today";
+      const items: HomeTrayItem[] = [];
+      $(el).find(".top10-post, article").each((_j: number, art: any) => {
+        const a = $(art).find("a[data-post]").first();
+        const id = a.attr("data-post") || $(art).attr("data-post");
+        const img =
+          $(art).find("img").attr("data-src") || $(art).find("img").attr("src");
+        if (id) {
+          items.push({ id, image: img || "", alt: "" });
+        }
+      });
+      if (title && items.length > 0 && !trays.some((t) => t.title.toLowerCase() === title.toLowerCase())) {
+        trays.push({ title, items });
+      }
+    });
+
     if (prefix === "hs") {
       try {
         const hsCookies = cookies.replace("ott=dp", "ott=hs").replace("ott=nf", "ott=hs");
         const hsRes = await axios.get(url, {
-          headers: getNetMirrorMobileHeaders(baseUrl, hsCookies),
+          headers: {
+            ...homeHeaders,
+            Cookie: hsCookies,
+          },
           timeout: 10000,
         });
         if (hsRes.data && typeof hsRes.data === "string") {
@@ -402,22 +436,31 @@ export const netMirrorGetPosts = async ({
 
     // Map common aliases to tray names
     const aliasMap: Record<string, string> = {
-      "us tv shows": "international tv shows dubbed in hindi",
-      "us & international tv shows": "international tv shows dubbed in hindi",
-      "action": prefix === "pv" ? "action films" : "get in on the action",
-      "action & adventure": prefix === "pv" ? "action films" : "get in on the action",
+      "us tv shows": "us tv shows",
+      "us & international tv shows": "us tv shows dubbed in hindi",
+      "action": prefix === "pv" ? "action films" : "blockbuster movies",
+      "action & adventure": prefix === "pv" ? "action films" : "blockbuster movies",
+      "get in on the action": prefix === "pv" ? "action films" : "blockbuster movies",
       "action films": "action films",
-      "drama": prefix === "pv" ? "drama series" : "tv dramas",
-      "tv dramas": "tv dramas",
-      "sci-fi": prefix === "pv" ? "sci-fi films" : "tv sci-fi & fantasy",
-      "sci-fi & fantasy": prefix === "pv" ? "sci-fi films" : "tv sci-fi & fantasy",
-      "mystery & thriller": prefix === "pv" ? "mystery and thriller movies" : "tv thrillers & mysteries",
-      "suspense & thriller": prefix === "pv" ? "suspense series" : "tv thrillers & mysteries",
-      "comedy": "comedy movies",
+      "drama": prefix === "pv" ? "drama series" : "emotional tv shows",
+      "tv dramas": prefix === "pv" ? "drama series" : "emotional tv shows",
+      "drama series": "drama series",
+      "sci-fi": prefix === "pv" ? "science fiction movies" : "exciting tv shows",
+      "sci-fi & fantasy": prefix === "pv" ? "science fiction movies" : "exciting tv shows",
+      "tv sci-fi & fantasy": prefix === "pv" ? "science fiction movies" : "exciting tv shows",
+      "mystery & thriller": prefix === "pv" ? "mystery and thriller movies" : "crime tv shows",
+      "tv thrillers & mysteries": prefix === "pv" ? "mystery and thriller movies" : "crime tv shows",
+      "suspense & thriller": prefix === "pv" ? "mystery and thriller movies" : "crime tv shows",
+      "comedy": prefix === "pv" ? "comedy movies" : "casual viewing",
       "comedy movies": "comedy movies",
-      "kids & family": prefix === "pv" ? "kids and family movies" : "children & family tv",
+      "kids & family": prefix === "pv" ? "kids and family movies" : "teen tv shows",
       "kids & family movies": "kids and family movies",
-      "children & family tv": "children & family tv",
+      "children & family tv": prefix === "pv" ? "kids and family movies" : "teen tv shows",
+      "asian movies & tv": "hindi movies & tv",
+      "exciting movies": "exciting tv shows",
+      "your next watch": "crowd pleasers",
+      "gems for you": "gems for you",
+      "international tv shows": "us tv shows dubbed in hindi",
       "korean": "korean",
       "korean dramas": "korean",
       "hotstar specials": "hotstar specials",
@@ -427,7 +470,7 @@ export const netMirrorGetPosts = async ({
       "horror stories": "horror stories",
       "only on netflix": "only on netflix",
       "new on netflix": "new on netflix",
-      "top movies": "top movies",
+      "top movies": "top 10 movies in netflix today",
       "featured originals: series": "featured originals: series",
       "featured originals: movies": "featured originals: movies",
       "latest movies": "latest movies",
@@ -522,6 +565,33 @@ export const netMirrorGetPosts = async ({
         tag: item?.y || (item?.r && item.r !== "Series" ? item.r : undefined),
         aspectRatio: prefix === "pv" ? 16 / 9 : undefined,
       });
+    }
+
+    // Ultimate fallback if search returned 0 results: query top searches so getPosts never returns empty
+    if (catalog.length === 0) {
+      const topUrl = `${baseUrl}/mobile/search.php?t=${t}`;
+      const topRes = await axios.get(topUrl, {
+        signal,
+        headers: getNetMirrorMobileHeaders(baseUrl, cookies),
+      });
+      const topResults = topRes.data?.searchResult || [];
+      for (const item of topResults) {
+        const id = item?.id;
+        const title = item?.t || "";
+        if (!id) continue;
+
+        titleCache.set(String(id), title);
+        const image = getPosterUrl(id, prefix);
+        const link = `${id}|${prefix}|${encodeURIComponent(title)}`;
+
+        catalog.push({
+          title,
+          link,
+          image,
+          tag: item?.y || (item?.r && item.r !== "Series" ? item.r : undefined),
+          aspectRatio: prefix === "pv" ? 16 / 9 : undefined,
+        });
+      }
     }
 
     return catalog;
@@ -640,28 +710,7 @@ export const netMirrorGetMeta = async ({
     console.error(`netMirrorGetMeta post.php error [${prefix}]:`, err);
   }
 
-  // Fallback to Cinemeta for synopsis if missing
-  if (!synopsis && title) {
-    try {
-      const cleanTitle = title.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const cmRes = await axios.get(
-        `https://v3-cinemeta.strem.io/catalog/${type === "series" ? "series" : "movie"}/top/search=${encodeURIComponent(title)}.json`,
-        { timeout: 3500 }
-      );
-      const cmMeta =
-        cmRes.data?.metas?.find(
-          (m: any) =>
-            (m.name || "").toLowerCase().replace(/[^a-z0-9]/g, "") ===
-            cleanTitle
-        ) || cmRes.data?.metas?.[0];
 
-      if (cmMeta) {
-        imdbId = imdbId || cmMeta.imdb_id || "";
-        synopsis = synopsis || cmMeta.description || "";
-        if (!image) image = cmMeta.poster || "";
-      }
-    } catch {}
-  }
 
   if (linkList.length === 0) {
     linkList.push({
@@ -861,171 +910,115 @@ export const netMirrorGetStream = async ({
     prefix === "hs" ? "Disney+" : prefix === "pv" ? "Prime Video" : "Netflix";
   const streamLinks: Stream[] = [];
 
-  // 1. Primary: NetMirror TMDB Direct Stream Flow (net27.cc)
-  if (title) {
-    try {
-      const tmdbUrl = `https://api.themoviedb.org/3/search/multi?api_key=cfe422613b250f702980a3bbf9e90716&query=${encodeURIComponent(title)}`;
-      const tmdbRes = await axios.get(tmdbUrl, { timeout: 4000 });
-      const candidate = tmdbRes.data?.results?.[0];
-      if (candidate && candidate.id) {
-        const isTv =
-          candidate.media_type === "tv" ||
-          type === "series" ||
-          (seasonNum !== undefined && episodeNum !== undefined);
-        const embedUrl = isTv
-          ? `https://net27.cc/api/embed-tmdb/${candidate.id}?type=tv&s=${seasonNum || 1}&e=${episodeNum || 1}`
-          : `https://net27.cc/api/embed-tmdb/${candidate.id}`;
 
-        const nRes = await axios.get(embedUrl, {
-          signal,
-          headers: {
-            Accept: "application/json",
-            Referer: "https://videodownloader.site/",
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          },
-          timeout: 4000,
-          validateStatus: (status: number) => status >= 200 && status < 400,
-        });
-
-        const nData = nRes.data;
-        if (nData?.ok && Array.isArray(nData.streams)) {
-          const subtitles: TextTracks = [];
-          if (Array.isArray(nData.captions)) {
-            nData.captions.forEach((cap: any) => {
-              if (cap.url && cap.name) {
-                subtitles.push({
-                  title: cap.name,
-                  language: cap.name,
-                  type: "text/vtt",
-                  uri: cap.url,
-                });
-              }
-            });
-          }
-
-          for (const s of nData.streams) {
-            if (!s.url) continue;
-            const resStr = String(s.resolution || "1080");
-            const qualityVal = (resStr === "1080" ||
-            resStr === "720" ||
-            resStr === "480" ||
-            resStr === "360"
-              ? resStr
-              : "1080") as Stream["quality"];
-
-            streamLinks.push({
-              server: `${serverName} Direct (${resStr}p)`,
-              link: s.url,
-              type: "mp4",
-              quality: qualityVal,
-              subtitles: subtitles.length > 0 ? subtitles : undefined,
-              headers: {
-                Referer: "https://videodownloader.site/",
-                "User-Agent":
-                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-              },
-            });
-          }
-        }
-      }
-    } catch (err: any) {
-      console.log(`net27 embed TMDB notice for ${title}:`, err?.message || "unavailable");
-    }
-  }
-
-  // 2. Native NetMirror play.php -> playlist.php handshake with the SAME token (t_hash_t)
   try {
     const cookies = await getNetMirrorCookie(providerContext, prefix);
-    const nativeHost = "https://net77.cc";
-    const playRes = await axios.post(
-      `${nativeHost}/play.php`,
-      `id=${id}`,
-      {
-        signal,
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          Origin: nativeHost,
-          Referer: `${nativeHost}/home`,
-          Cookie: cookies,
-          "X-Requested-With": "XMLHttpRequest",
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
-        },
-        timeout: 5000,
-      }
-    );
+    const tm = Math.round(Date.now() / 1000);
 
-    const playData = playRes.data;
-    if (playData && playData.h) {
-      const tm = Math.round(Date.now() / 1000);
-      const playlistUrl = `${nativeHost}/playlist.php?id=${id}&t=${encodeURIComponent(
+    // 1. Primary Native Mobile App Playlist flow (/mobile/playlist.php)
+    let plData: any = null;
+    try {
+      const mobilePlUrl = `${baseUrl}/mobile/playlist.php?id=${id}&t=${encodeURIComponent(
         title || "Title"
-      )}&tm=${tm}&h=${encodeURIComponent(playData.h)}`;
-
-      const plRes = await axios.get(playlistUrl, {
+      )}&tm=${tm}`;
+      const mPlRes = await axios.get(mobilePlUrl, {
         signal,
-        headers: {
-          Accept: "application/json, text/javascript, */*; q=0.01",
-          Referer: `${nativeHost}/home`,
-          Origin: nativeHost,
-          Cookie: cookies,
-          "X-Requested-With": "XMLHttpRequest",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
+        headers: getNetMirrorMobileHeaders(baseUrl, cookies),
         timeout: 5000,
       });
+      plData = Array.isArray(mPlRes.data) ? mPlRes.data[0] : mPlRes.data;
+    } catch {}
 
-      const plData = Array.isArray(plRes.data) ? plRes.data[0] : plRes.data;
-      if (plData && Array.isArray(plData.sources)) {
-        const subtitles: TextTracks = [];
-        if (Array.isArray(plData.tracks)) {
-          plData.tracks.forEach((track: any) => {
-            let uri = track.file || "";
-            if (uri.startsWith("//")) uri = "https:" + uri;
-            if (!uri) return;
-
-            const isVtt = uri.endsWith(".vtt");
-            subtitles.push({
-              title: track.label || "Subtitle",
-              language: track.label || "English",
-              type: isVtt ? "text/vtt" : "application/x-subrip",
-              uri,
-            });
-          });
-        }
-
-        plData.sources.forEach((source: any) => {
-          let fileUrl = source.file || "";
-          if (!fileUrl || fileUrl.includes("220884")) return;
-          if (!fileUrl.startsWith("http")) {
-            fileUrl = `${nativeHost}${fileUrl}`;
-          }
-
-          let quality: Stream["quality"] = "1080";
-          const label = (source.label || "").toLowerCase();
-          if (label.includes("full hd") || fileUrl.includes("1080p")) quality = "1080";
-          else if (label.includes("mid hd") || fileUrl.includes("720p")) quality = "720";
-          else if (label.includes("low hd") || fileUrl.includes("480p")) quality = "480";
-          else if (label.includes("360p")) quality = "360";
-
-          streamLinks.push({
-            server: `${serverName} ${source.label || "HLS"}`,
-            link: fileUrl,
-            type: "m3u8",
-            quality,
-            subtitles: subtitles.length > 0 ? subtitles : undefined,
+    // 2. Secondary Native play.php -> playlist.php flow on net77.cc
+    if (!plData || !Array.isArray(plData.sources)) {
+      try {
+        const nativeHost = "https://net77.cc";
+        const playRes = await axios.post(
+          `${nativeHost}/play.php`,
+          `id=${id}`,
+          {
+            signal,
             headers: {
+              "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+              Origin: nativeHost,
+              Referer: `${nativeHost}/home`,
+              Cookie: cookies,
+              "X-Requested-With": "XMLHttpRequest",
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+            },
+            timeout: 5000,
+          }
+        );
+
+        const playData = playRes.data;
+        if (playData && playData.h) {
+          const playlistUrl = `${nativeHost}/playlist.php?id=${id}&t=${encodeURIComponent(
+            title || "Title"
+          )}&tm=${tm}&h=${encodeURIComponent(playData.h)}`;
+
+          const plRes = await axios.get(playlistUrl, {
+            signal,
+            headers: {
+              Accept: "application/json, text/javascript, */*; q=0.01",
               Referer: `${nativeHost}/home`,
               Origin: nativeHost,
               Cookie: cookies,
+              "X-Requested-With": "XMLHttpRequest",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             },
+            timeout: 5000,
+          });
+
+          plData = Array.isArray(plRes.data) ? plRes.data[0] : plRes.data;
+        }
+      } catch {}
+    }
+
+    if (plData && Array.isArray(plData.sources)) {
+      const subtitles: TextTracks = [];
+      if (Array.isArray(plData.tracks)) {
+        plData.tracks.forEach((track: any) => {
+          let uri = track.file || "";
+          if (uri.startsWith("//")) uri = "https:" + uri;
+          if (!uri) return;
+
+          const isVtt = uri.endsWith(".vtt");
+          subtitles.push({
+            title: track.label || "Subtitle",
+            language: track.label || "English",
+            type: isVtt ? "text/vtt" : "application/x-subrip",
+            uri,
           });
         });
       }
+
+      plData.sources.forEach((source: any) => {
+        let fileUrl = source.file || "";
+        if (!fileUrl) return;
+        if (!fileUrl.startsWith("http")) {
+          fileUrl = `${baseUrl}${fileUrl}`;
+        }
+
+        let quality: Stream["quality"] = "1080";
+        const label = (source.label || "").toLowerCase();
+        if (label.includes("full hd") || fileUrl.includes("1080p")) quality = "1080";
+        else if (label.includes("mid hd") || fileUrl.includes("720p")) quality = "720";
+        else if (label.includes("low hd") || fileUrl.includes("480p")) quality = "480";
+        else if (label.includes("360p")) quality = "360";
+
+        streamLinks.push({
+          server: `${serverName} ${source.label || "HLS"}`,
+          link: fileUrl,
+          type: "m3u8",
+          quality,
+          subtitles: subtitles.length > 0 ? subtitles : undefined,
+          headers: getNetMirrorMobileHeaders(baseUrl, cookies),
+        });
+      });
     }
   } catch (err) {
-    console.log(`Native NetMirror play.php flow for ${id}:`, err);
+    console.log(`Native NetMirror playlist flow for ${id}:`, err);
   }
 
   // 3. Official NewTV Player API (only if needed, strictly rejecting status otp / 220884)

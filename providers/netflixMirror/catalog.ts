@@ -12,52 +12,56 @@ export const catalog = [
     filter: "New on Netflix",
   },
   {
+    title: "Blockbuster Movies",
+    filter: "Blockbuster Movies",
+  },
+  {
     title: "US TV Shows",
     filter: "US TV Shows",
   },
   {
-    title: "Action & Adventure",
-    filter: "Get In on the Action",
+    title: "US TV Shows Dubbed in Hindi",
+    filter: "US TV Shows Dubbed in Hindi",
   },
   {
-    title: "TV Dramas",
-    filter: "TV Dramas",
+    title: "Exciting TV Shows",
+    filter: "Exciting TV Shows",
   },
   {
-    title: "TV Thrillers & Mysteries",
-    filter: "TV Thrillers & Mysteries",
+    title: "Crime TV Shows",
+    filter: "Crime TV Shows",
   },
   {
-    title: "TV Sci-Fi & Fantasy",
-    filter: "TV Sci-Fi & Fantasy",
+    title: "Emotional TV Shows",
+    filter: "Emotional TV Shows",
   },
   {
     title: "Teen TV Shows",
     filter: "Teen TV Shows",
   },
   {
-    title: "Children & Family TV",
-    filter: "Children & Family TV",
+    title: "Anime",
+    filter: "Anime",
   },
   {
-    title: "Asian Movies & TV",
-    filter: "Asian Movies & TV",
+    title: "Hindi Movies & TV",
+    filter: "Hindi Movies & TV",
   },
   {
-    title: "Exciting Movies",
-    filter: "Exciting Movies",
+    title: "Casual Viewing",
+    filter: "Casual Viewing",
   },
   {
-    title: "Your Next Watch",
-    filter: "Your Next Watch",
+    title: "Crowd Pleasers",
+    filter: "Crowd Pleasers",
   },
   {
     title: "Gems for You",
     filter: "Gems for You",
   },
   {
-    title: "International TV Shows",
-    filter: "International TV Shows",
+    title: "Competition Reality TV",
+    filter: "Competition Reality TV",
   },
 ];
 
