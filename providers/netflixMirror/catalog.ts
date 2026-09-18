@@ -1,9 +1,5 @@
 export const catalog = [
   {
-    title: "Trending & Top Searches",
-    filter: "top",
-  },
-  {
     title: "Only on Netflix",
     filter: "Only on Netflix",
   },
@@ -14,6 +10,10 @@ export const catalog = [
   {
     title: "Blockbuster Movies",
     filter: "Blockbuster Movies",
+  },
+  {
+    title: "US TV Shows Dubbed in Hindi",
+    filter: "US TV Shows Dubbed in Hindi",
   },
 ];
 

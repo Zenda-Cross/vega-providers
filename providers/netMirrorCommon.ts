@@ -285,10 +285,12 @@ export const resolveNewTvApiBase = async (
 
 export const getPosterUrl = (id: string, prefix: NetMirrorOtt): string => {
   if (prefix === "pv") {
-    return `https://imgcdn.kim/pv/341/${id}.jpg`;
+    return id.length > 10
+      ? `https://imgcdn.kim/pv/v/350/${id}.jpg`
+      : `https://imgcdn.kim/pv/341/${id}.jpg`;
   }
   if (prefix === "hs") {
-    return `https://imgcdn.kim/hs/v/${id}.jpg`;
+    return `https://imgcdn.kim/hs/v/166/${id}.jpg`;
   }
   return `https://imgcdn.kim/poster/v/${id}.jpg`;
 };
@@ -374,6 +376,81 @@ interface HomeTray {
 const homeTrayCache = new Map<string, { trays: HomeTray[]; timestamp: number }>();
 const titleCache = new Map<string, string>();
 
+const parseHtmlTrays = (html: string, cheerio: any): HomeTray[] => {
+  const trays: HomeTray[] = [];
+  if (!html || typeof html !== "string") return trays;
+
+  if (cheerio && typeof cheerio.load === "function") {
+    try {
+      const $ = cheerio.load(html);
+      $(".tray-container").each((_i: number, el: any) => {
+        const title = $(el).find("h2").first().text().trim();
+        const items: HomeTrayItem[] = [];
+
+        $(el).find("article").each((_j: number, art: any) => {
+          const a = $(art).find("a[data-post]").first();
+          const id = a.attr("data-post") || $(art).attr("data-post");
+          const img =
+            $(art).find("img").attr("data-src") || $(art).find("img").attr("src");
+          const alt = $(art).find("img").attr("alt") || "";
+          if (id) {
+            items.push({ id, image: img || "", alt });
+          }
+        });
+
+        if (title && items.length > 0) {
+          trays.push({ title, items });
+        }
+      });
+
+      $("#top10, .top10").each((_i: number, el: any) => {
+        const title = $(el).find("span").first().text().trim() || "Top 10 Today";
+        const items: HomeTrayItem[] = [];
+        $(el).find(".top10-post, article").each((_j: number, art: any) => {
+          const a = $(art).find("a[data-post]").first();
+          const id = a.attr("data-post") || $(art).attr("data-post");
+          const img =
+            $(art).find("img").attr("data-src") || $(art).find("img").attr("src");
+          if (id) {
+            items.push({ id, image: img || "", alt: "" });
+          }
+        });
+        if (title && items.length > 0 && !trays.some((t) => t.title.toLowerCase() === title.toLowerCase())) {
+          trays.push({ title, items });
+        }
+      });
+      if (trays.length > 0) return trays;
+    } catch {}
+  }
+
+  // Regex fallback
+  const traySections = html.split(/class="[^"]*tray-container[^"]*"/);
+  for (let i = 1; i < traySections.length; i++) {
+    const sec = traySections[i];
+    const h2Match = sec.match(/<h2[^>]*>([^<]+)<\/h2>/);
+    const title = h2Match ? h2Match[1].trim() : "";
+    const items: HomeTrayItem[] = [];
+    const artMatches = sec.match(/<article[\s\S]*?<\/article>/g) || [];
+    for (const art of artMatches) {
+      const idMatch = art.match(/data-post="([^"]+)"/);
+      const imgMatch = art.match(/data-src="([^"]+)"/) || art.match(/src="([^"]+)"/);
+      const altMatch = art.match(/alt="([^"]*)"/);
+      if (idMatch) {
+        items.push({
+          id: idMatch[1],
+          image: imgMatch ? imgMatch[1] : "",
+          alt: altMatch ? altMatch[1] : "",
+        });
+      }
+    }
+    if (title && items.length > 0 && !trays.some((t) => t.title.toLowerCase() === title.toLowerCase())) {
+      trays.push({ title, items });
+    }
+  }
+
+  return trays;
+};
+
 export const getCachedHomeTrays = async (
   providerContext: ProviderContext,
   prefix: NetMirrorOtt
@@ -403,50 +480,7 @@ export const getCachedHomeTrays = async (
       timeout: 10000,
     });
 
-    const html = res.data;
-    if (!html || typeof html !== "string") {
-      return cached ? cached.trays : [];
-    }
-
-    const $ = cheerio.load(html);
-    const trays: HomeTray[] = [];
-
-    $(".tray-container").each((_i: number, el: any) => {
-      const title = $(el).find("h2").first().text().trim();
-      const items: HomeTrayItem[] = [];
-
-      $(el).find("article").each((_j: number, art: any) => {
-        const a = $(art).find("a[data-post]").first();
-        const id = a.attr("data-post") || $(art).attr("data-post");
-        const img =
-          $(art).find("img").attr("data-src") || $(art).find("img").attr("src");
-        const alt = $(art).find("img").attr("alt") || "";
-        if (id) {
-          items.push({ id, image: img || "", alt });
-        }
-      });
-
-      if (title && items.length > 0) {
-        trays.push({ title, items });
-      }
-    });
-
-    $("#top10, .top10").each((_i: number, el: any) => {
-      const title = $(el).find("span").first().text().trim() || "Top 10 Today";
-      const items: HomeTrayItem[] = [];
-      $(el).find(".top10-post, article").each((_j: number, art: any) => {
-        const a = $(art).find("a[data-post]").first();
-        const id = a.attr("data-post") || $(art).attr("data-post");
-        const img =
-          $(art).find("img").attr("data-src") || $(art).find("img").attr("src");
-        if (id) {
-          items.push({ id, image: img || "", alt: "" });
-        }
-      });
-      if (title && items.length > 0 && !trays.some((t) => t.title.toLowerCase() === title.toLowerCase())) {
-        trays.push({ title, items });
-      }
-    });
+    let trays: HomeTray[] = parseHtmlTrays(res.data, cheerio);
 
     if (prefix === "hs") {
       try {
@@ -458,25 +492,11 @@ export const getCachedHomeTrays = async (
           },
           timeout: 10000,
         });
-        if (hsRes.data && typeof hsRes.data === "string") {
-          const $hs = cheerio.load(hsRes.data);
-          $hs(".tray-container").each((_i: number, el: any) => {
-            const title = $hs(el).find("h2").first().text().trim();
-            const items: HomeTrayItem[] = [];
-            $hs(el).find("article").each((_j: number, art: any) => {
-              const a = $hs(art).find("a[data-post]").first();
-              const id = a.attr("data-post") || $hs(art).attr("data-post");
-              const img =
-                $hs(art).find("img").attr("data-src") || $hs(art).find("img").attr("src");
-              const alt = $hs(art).find("img").attr("alt") || "";
-              if (id) {
-                items.push({ id, image: img || "", alt });
-              }
-            });
-            if (title && items.length > 0 && !trays.some((t) => t.title.toLowerCase() === title.toLowerCase())) {
-              trays.push({ title, items });
-            }
-          });
+        const hsTrays = parseHtmlTrays(hsRes.data, cheerio);
+        for (const ht of hsTrays) {
+          if (!trays.some((t) => t.title.toLowerCase() === ht.title.toLowerCase())) {
+            trays.push(ht);
+          }
         }
       } catch {}
     }
@@ -514,46 +534,7 @@ export const netMirrorGetPosts = async ({
     const t = Math.round(Date.now() / 1000);
     const cleanFilter = (filter || "").trim().toLowerCase();
 
-    // 1. Trending / Top Searches row
-    if (
-      !cleanFilter ||
-      cleanFilter === "popular" ||
-      cleanFilter === "top" ||
-      cleanFilter === "trending" ||
-      cleanFilter === "trending & top searches"
-    ) {
-      const cookies = await getNetMirrorCookie(providerContext, prefix);
-      const url = `${baseUrl}/mobile/search.php?t=${t}`;
-      const res = await axios.get(url, {
-        signal,
-        headers: getNetMirrorMobileHeaders(baseUrl, cookies),
-      });
-
-      const results = res.data?.searchResult || [];
-      const catalog: Post[] = [];
-
-      for (const item of results) {
-        const id = item?.id;
-        const title = item?.t || "";
-        if (!id) continue;
-
-        titleCache.set(String(id), title);
-        const image = getPosterUrl(id, prefix);
-        const link = `${id}|${prefix}|${encodeURIComponent(title)}`;
-
-        catalog.push({
-          title,
-          link,
-          image,
-          tag: item?.y || (item?.r && item.r !== "Series" ? item.r : undefined),
-          aspectRatio: prefix === "pv" ? 16 / 9 : undefined,
-        });
-      }
-
-      return catalog;
-    }
-
-    // 2. Check if filter matches a tray from mobile/home.php
+    // 1. Get OTT-specific trays from mobile/home
     const trays = await getCachedHomeTrays(providerContext, prefix);
 
     // Map common aliases to tray names
@@ -614,6 +595,11 @@ export const netMirrorGetPosts = async ({
         const trTitle = tr.title.toLowerCase();
         return trTitle.includes(cleanFilter) || cleanFilter.includes(trTitle);
       });
+    }
+
+    // Default to the first tray if no filter match, keeping it 100% OTT-specific
+    if (!matchedTray && trays.length > 0) {
+      matchedTray = trays[0];
     }
 
     if (matchedTray && matchedTray.items.length > 0) {
@@ -689,28 +675,16 @@ export const netMirrorGetPosts = async ({
       });
     }
 
-    // Ultimate fallback if search returned 0 results: query top searches so getPosts never returns empty
-    if (catalog.length === 0) {
-      const topUrl = `${baseUrl}/mobile/search.php?t=${t}`;
-      const topRes = await axios.get(topUrl, {
-        signal,
-        headers: getNetMirrorMobileHeaders(baseUrl, cookies),
-      });
-      const topResults = topRes.data?.searchResult || [];
-      for (const item of topResults) {
-        const id = item?.id;
-        const title = item?.t || "";
-        if (!id) continue;
-
-        titleCache.set(String(id), title);
-        const image = getPosterUrl(id, prefix);
-        const link = `${id}|${prefix}|${encodeURIComponent(title)}`;
-
+    // Ultimate fallback if search returned 0 results: use first OTT tray
+    if (catalog.length === 0 && trays.length > 0 && trays[0].items.length > 0) {
+      for (const it of trays[0].items) {
+        const title = titleCache.get(it.id) || it.alt?.trim() || `Item ${it.id}`;
+        const image = it.image || getPosterUrl(it.id, prefix);
+        const link = `${it.id}|${prefix}|${encodeURIComponent(title)}`;
         catalog.push({
           title,
           link,
           image,
-          tag: item?.y || (item?.r && item.r !== "Series" ? item.r : undefined),
           aspectRatio: prefix === "pv" ? 16 / 9 : undefined,
         });
       }
