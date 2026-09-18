@@ -11,7 +11,7 @@ export const getSettingsSchema = async function ({
       type: "text",
       label: "NetMirror Session Cookie (t_hash_t)",
       description:
-        "Optional: If video shows 'STOP Abuse', visit https://net52.cc/verify in your browser, complete the human verification once, and paste the t_hash_t cookie here.",
+        "Optional: Paste a verified t_hash_t session cookie if you already have one, or leave blank to auto-unlock via sponsor ad verification.",
       placeholder: "e.g. 4d82...::e19a...",
       defaultValue: "",
     },

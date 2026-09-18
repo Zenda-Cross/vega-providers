@@ -198,7 +198,7 @@
   {
     "display_name": "NetflixMirror",
     "value": "netflixMirror",
-    "version": "2.3",
+    "version": "2.4",
     "icon": "",
     "type": "global",
     "disabled": false,
@@ -207,7 +207,7 @@
   {
     "display_name": "PrimeMirror",
     "value": "primeMirror",
-    "version": "2.2",
+    "version": "2.3",
     "icon": "",
     "type": "global",
     "disabled": false,
@@ -216,7 +216,7 @@
   {
     "display_name": "DisneyMirror",
     "value": "disneyMirror",
-    "version": "1.4",
+    "version": "1.5",
     "icon": "",
     "type": "global",
     "disabled": false,

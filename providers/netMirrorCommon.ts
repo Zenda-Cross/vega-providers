@@ -53,11 +53,110 @@ export const getNetMirrorMobileHeaders = (baseUrl: string, cookieStr?: string) =
   return headers;
 };
 
+export const unlockNetMirrorMobileSession = async (
+  providerContext: ProviderContext,
+  baseUrl: string
+): Promise<string | undefined> => {
+  const { axios, kvStore } = providerContext;
+  try {
+    const appUa =
+      "Mozilla/5.0 (Linux; Android 13; Pixel 5 Build/TQ3A.230901.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.132 Safari/537.36 /OS.Gatu v3.0";
+
+    const homeRes = await axios.get(`${baseUrl}/mobile/home?app=1`, {
+      headers: {
+        "User-Agent": appUa,
+        "X-Requested-With": "com.netmirror.app",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      timeout: 8000,
+    });
+
+    const setCookies = homeRes.headers?.["set-cookie"] || [];
+    const cookiesArr = Array.isArray(setCookies) ? setCookies : [setCookies];
+    const initialCookie = cookiesArr.map((c: string) => c.split(";")[0]).join("; ");
+
+    const html = typeof homeRes.data === "string" ? homeRes.data : "";
+    const matchAddHash = html.match(/data-addhash=["']([^"']+)["']/);
+    const addhash = matchAddHash ? matchAddHash[1] : null;
+
+    if (!addhash) return undefined;
+
+    // Trigger the ad visit via userver
+    const hostDomain = baseUrl.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    const userverUrl = `https://userver.${hostDomain}/?hee5=${addhash}&a=y&t=${Math.random()}`;
+    await axios
+      .get(userverUrl, {
+        headers: {
+          "User-Agent": appUa,
+          Referer: `${baseUrl}/mobile/home?app=1`,
+          Cookie: initialCookie,
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        maxRedirects: 0,
+        validateStatus: () => true,
+        timeout: 5000,
+      })
+      .catch(() => {});
+
+    // Poll mobile/verify2.php until verified (server timer runs ~25-30 seconds)
+    const startTime = Date.now();
+    let verifiedToken: string | undefined;
+
+    while (Date.now() - startTime < 42000) {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      try {
+        const vRes = await axios.post(
+          `${baseUrl}/mobile/verify2.php`,
+          `verify=${addhash}`,
+          {
+            headers: {
+              "User-Agent": appUa,
+              "X-Requested-With": "XMLHttpRequest",
+              "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+              Referer: `${baseUrl}/mobile/home?app=1`,
+              Origin: baseUrl,
+              Cookie: initialCookie,
+            },
+            validateStatus: () => true,
+            timeout: 5000,
+          }
+        );
+
+        const vSetCookies = vRes.headers?.["set-cookie"] || [];
+        const vCookiesArr = Array.isArray(vSetCookies) ? vSetCookies : [vSetCookies];
+        for (const sc of vCookiesArr) {
+          if (sc.includes("t_hash_t=")) {
+            const tokenMatch = sc.match(/t_hash_t=([^;]+)/);
+            if (tokenMatch && !tokenMatch[1].includes("::99")) {
+              verifiedToken = decodeURIComponent(tokenMatch[1]);
+              break;
+            }
+          }
+        }
+
+        if (verifiedToken || vRes.data?.statusup === "All Done") {
+          break;
+        }
+      } catch {}
+    }
+
+    if (verifiedToken && kvStore) {
+      await kvStore.set("t_hash_t", verifiedToken);
+      await kvStore.set("t_hash_t_data", { token: verifiedToken, ts: Date.now() });
+    }
+
+    return verifiedToken;
+  } catch (err: any) {
+    console.log("Mobile ad verification notice:", err?.message || err);
+    return undefined;
+  }
+};
+
 export const getNetMirrorCookie = async (
   providerContext: ProviderContext,
   ott: NetMirrorOtt
 ): Promise<string> => {
-  const { axios, kvStore } = providerContext;
+  const { kvStore } = providerContext;
   const baseUrl = await getNetMirrorBaseUrl(providerContext);
   const ottCookie = ott === "hs" ? "dp" : ott === "pv" ? "pv" : "nf";
 
@@ -65,11 +164,16 @@ export const getNetMirrorCookie = async (
   try {
     if (kvStore) {
       const userToken = await kvStore.get<string>("t_hash_t");
-      if (userToken && userToken.trim()) {
+      if (userToken && userToken.trim() && !userToken.includes("::99")) {
         t_hash_t = userToken.trim();
       } else {
         const cached = await kvStore.get<{ token: string; ts: number }>("t_hash_t_data");
-        if (cached && cached.token && Date.now() - cached.ts < 43200000) {
+        if (
+          cached &&
+          cached.token &&
+          !cached.token.includes("::99") &&
+          Date.now() - cached.ts < 43200000
+        ) {
           t_hash_t = cached.token;
         }
       }
@@ -77,47 +181,7 @@ export const getNetMirrorCookie = async (
   } catch {}
 
   if (!t_hash_t) {
-    try {
-      const uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-        const r = (Math.random() * 16) | 0;
-        const v = c === "x" ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      });
-
-      const verifyRes = await axios.post(
-        `${baseUrl}/verify.php`,
-        `g-recaptcha-response=${uuid}`,
-        {
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            Origin: baseUrl,
-            Referer: `${baseUrl}/verify2`,
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
-            "Upgrade-Insecure-Requests": "1",
-          },
-          maxRedirects: 0,
-          validateStatus: (status: number) => status >= 200 && status < 400,
-        }
-      );
-
-      const setCookie = verifyRes.headers?.["set-cookie"];
-      if (setCookie) {
-        const cookiesArr = Array.isArray(setCookie) ? setCookie : [setCookie];
-        for (const sc of cookiesArr) {
-          if (sc.includes("t_hash_t=")) {
-            t_hash_t = sc.split("t_hash_t=")[1].split(";")[0];
-            break;
-          }
-        }
-      }
-
-      if (t_hash_t && kvStore) {
-        await kvStore.set("t_hash_t_data", { token: t_hash_t, ts: Date.now() });
-      }
-    } catch (err: any) {
-      console.log("NetMirror verify notice:", err?.message || "unavailable");
-    }
+    t_hash_t = await unlockNetMirrorMobileSession(providerContext, baseUrl);
   }
 
   return `t_hash_t=${t_hash_t || ""}; hd=on; ott=${ottCookie}`;
@@ -1042,49 +1106,72 @@ export const netMirrorGetStream = async ({
       }
 
       // If NetMirror returned the STOP Abuse screen due to unverified session:
-      // Trigger Vega's built-in openWebView dialog to solve the verification
-      if (hadAbuseVideo && validSources.length === 0 && providerContext.openWebView) {
-        try {
-          const wafResult = await providerContext.openWebView(`${baseUrl}/verify`, {
-            title: "NetMirror Human Verification",
-            description: "Please complete the verification once to unlock video playback.",
-            waitForCookie: "t_hash_t",
-            force: true,
-          });
+      // Trigger mobile ad verification flow
+      if (hadAbuseVideo && validSources.length === 0) {
+        if (providerContext.kvStore) {
+          try {
+            await providerContext.kvStore.delete("t_hash_t_data");
+          } catch {}
+        }
 
-          let newCookie = wafResult?.cookieMap?.["t_hash_t"];
-          if (!newCookie && wafResult?.cookies) {
-            const match = wafResult.cookies.match(/t_hash_t=([^;]+)/);
-            if (match) newCookie = match[1];
-          }
+        let newCookie: string | undefined;
 
-          if (newCookie && !newCookie.includes("::99")) {
-            if (providerContext.kvStore) {
-              await providerContext.kvStore.set("t_hash_t", newCookie);
-              await providerContext.kvStore.set("t_hash_t_data", { token: newCookie, ts: Date.now() });
-            }
-            cookies = `t_hash_t=${newCookie}; hd=on; ott=${ottHeader === "hs" ? "dp" : ottHeader}`;
-
-            // Re-fetch playlist with the newly verified session
-            const newMobilePlUrl = `${baseUrl}/mobile/playlist.php?id=${id}&t=${encodeURIComponent(
-              title || "Title"
-            )}&tm=${Math.round(Date.now() / 1000)}`;
-            const newMPlRes = await axios.get(newMobilePlUrl, {
-              signal,
-              headers: getNetMirrorMobileHeaders(baseUrl, cookies),
-              timeout: 5000,
-            });
-            const newPlData = Array.isArray(newMPlRes.data) ? newMPlRes.data[0] : newMPlRes.data;
-            if (newPlData && Array.isArray(newPlData.sources)) {
-              for (const s of newPlData.sources) {
-                let fUrl = s.file || "";
-                if (!fUrl.startsWith("http")) fUrl = `${baseUrl}${fUrl}`;
-                validSources.push({ ...s, file: fUrl });
+        if (providerContext.openWebView) {
+          try {
+            const wafResult = await providerContext.openWebView(
+              `${baseUrl}/mobile/home?app=1`,
+              {
+                title: "NetMirror Ad Verification",
+                description:
+                  "Tap 'Click Here' to open the sponsor ad, wait 20s, and return to unlock playback.",
+                waitForCookie: "t_hash_t",
+                force: true,
               }
+            );
+
+            newCookie = wafResult?.cookieMap?.["t_hash_t"];
+            if (!newCookie && wafResult?.cookies) {
+              const match = wafResult.cookies.match(/t_hash_t=([^;]+)/);
+              if (match) newCookie = match[1];
+            }
+          } catch (wafErr) {
+            console.log("NetMirror openWebView verification notice:", wafErr);
+          }
+        }
+
+        if (!newCookie || newCookie.includes("::99")) {
+          newCookie = await unlockNetMirrorMobileSession(providerContext, baseUrl);
+        }
+
+        if (newCookie && !newCookie.includes("::99")) {
+          if (providerContext.kvStore) {
+            await providerContext.kvStore.set("t_hash_t", newCookie);
+            await providerContext.kvStore.set("t_hash_t_data", {
+              token: newCookie,
+              ts: Date.now(),
+            });
+          }
+          cookies = `t_hash_t=${newCookie}; hd=on; ott=${ottHeader === "hs" ? "dp" : ottHeader}`;
+
+          // Re-fetch playlist with the newly verified session
+          const newMobilePlUrl = `${baseUrl}/mobile/playlist.php?id=${id}&t=${encodeURIComponent(
+            title || "Title"
+          )}&tm=${Math.round(Date.now() / 1000)}`;
+          const newMPlRes = await axios.get(newMobilePlUrl, {
+            signal,
+            headers: getNetMirrorMobileHeaders(baseUrl, cookies),
+            timeout: 5000,
+          });
+          const newPlData = Array.isArray(newMPlRes.data)
+            ? newMPlRes.data[0]
+            : newMPlRes.data;
+          if (newPlData && Array.isArray(newPlData.sources)) {
+            for (const s of newPlData.sources) {
+              let fUrl = s.file || "";
+              if (!fUrl.startsWith("http")) fUrl = `${baseUrl}${fUrl}`;
+              validSources.push({ ...s, file: fUrl });
             }
           }
-        } catch (wafErr) {
-          console.log("NetMirror openWebView verification failed or was cancelled:", wafErr);
         }
       }
 
@@ -1188,9 +1275,8 @@ export const netMirrorGetStream = async ({
       quality: "1080",
       headers: getNetMirrorMobileHeaders(baseUrl, cookies),
     });
-  } else if (cleanStreamLinks.length === 0) {
     throw new Error(
-      `NetMirror session unverified: Visit ${baseUrl}/verify or configure t_hash_t in Provider Settings.`
+      `NetMirror session unverified: Complete sponsor ad verification at ${baseUrl}/mobile/home?app=1 or configure t_hash_t in Provider Settings.`
     );
   }
 
