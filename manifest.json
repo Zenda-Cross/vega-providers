@@ -201,7 +201,8 @@
     "version": "2.3",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": false,
+    "hasSettings": true
   },
   {
     "display_name": "PrimeMirror",
@@ -209,7 +210,8 @@
     "version": "2.2",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": false,
+    "hasSettings": true
   },
   {
     "display_name": "DisneyMirror",
@@ -217,7 +219,8 @@
     "version": "1.4",
     "icon": "",
     "type": "global",
-    "disabled": false
+    "disabled": false,
+    "hasSettings": true
   },
   {
     "display_name": "HdHub4u",

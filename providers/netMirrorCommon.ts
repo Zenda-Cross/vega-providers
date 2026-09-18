@@ -11,7 +11,18 @@ import { getBaseUrl } from "./getBaseUrl";
 
 export type NetMirrorOtt = "" | "pv" | "hs";
 
-export const getNetMirrorBaseUrl = async (): Promise<string> => {
+export const getNetMirrorBaseUrl = async (
+  providerContext?: ProviderContext
+): Promise<string> => {
+  try {
+    if (providerContext?.kvStore) {
+      const override = await providerContext.kvStore.get<string>("baseUrlOverride");
+      if (override && override.trim().startsWith("http")) {
+        return override.trim().replace(/\/+$/, "");
+      }
+    }
+  } catch {}
+
   try {
     const url = await getBaseUrl("nfMirror");
     if (
@@ -47,15 +58,20 @@ export const getNetMirrorCookie = async (
   ott: NetMirrorOtt
 ): Promise<string> => {
   const { axios, kvStore } = providerContext;
-  const baseUrl = await getNetMirrorBaseUrl();
+  const baseUrl = await getNetMirrorBaseUrl(providerContext);
   const ottCookie = ott === "hs" ? "dp" : ott === "pv" ? "pv" : "nf";
 
   let t_hash_t: string | undefined;
   try {
     if (kvStore) {
-      const cached = await kvStore.get<{ token: string; ts: number }>("t_hash_t_data");
-      if (cached && cached.token && Date.now() - cached.ts < 43200000) {
-        t_hash_t = cached.token;
+      const userToken = await kvStore.get<string>("t_hash_t");
+      if (userToken && userToken.trim()) {
+        t_hash_t = userToken.trim();
+      } else {
+        const cached = await kvStore.get<{ token: string; ts: number }>("t_hash_t_data");
+        if (cached && cached.token && Date.now() - cached.ts < 43200000) {
+          t_hash_t = cached.token;
+        }
       }
     }
   } catch {}
@@ -69,13 +85,13 @@ export const getNetMirrorCookie = async (
       });
 
       const verifyRes = await axios.post(
-        "https://net52.cc/verify.php",
+        `${baseUrl}/verify.php`,
         `g-recaptcha-response=${uuid}`,
         {
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            Origin: "https://net52.cc",
-            Referer: "https://net52.cc/verify2",
+            Origin: baseUrl,
+            Referer: `${baseUrl}/verify2`,
             "User-Agent":
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
             "Upgrade-Insecure-Requests": "1",
@@ -909,10 +925,10 @@ export const netMirrorGetStream = async ({
   const serverName =
     prefix === "hs" ? "Disney+" : prefix === "pv" ? "Prime Video" : "Netflix";
   const streamLinks: Stream[] = [];
-
+  let cookies = "";
 
   try {
-    const cookies = await getNetMirrorCookie(providerContext, prefix);
+    cookies = await getNetMirrorCookie(providerContext, prefix);
     const tm = Math.round(Date.now() / 1000);
 
     // 1. Primary Native Mobile App Playlist flow (/mobile/playlist.php)
@@ -993,13 +1009,87 @@ export const netMirrorGetStream = async ({
         });
       }
 
-      plData.sources.forEach((source: any) => {
+      // Pre-validate playlist sources to filter out 220884 (STOP Abuse video)
+      let hadAbuseVideo = false;
+      const validSources: any[] = [];
+
+      for (const source of plData.sources) {
         let fileUrl = source.file || "";
-        if (!fileUrl) return;
+        if (!fileUrl) continue;
         if (!fileUrl.startsWith("http")) {
           fileUrl = `${baseUrl}${fileUrl}`;
         }
 
+        let isClean = true;
+        try {
+          const checkRes = await axios.get(fileUrl, {
+            signal,
+            headers: getNetMirrorMobileHeaders(baseUrl, cookies),
+            timeout: 4000,
+          });
+          const content = typeof checkRes.data === "string" ? checkRes.data : "";
+          if (content.includes("220884") || content.includes("Only Valid Users Allowed")) {
+            isClean = false;
+            hadAbuseVideo = true;
+          }
+        } catch {
+          // If check timed out, do not assume abuse
+        }
+
+        if (isClean) {
+          validSources.push({ ...source, file: fileUrl });
+        }
+      }
+
+      // If NetMirror returned the STOP Abuse screen due to unverified session:
+      // Trigger Vega's built-in openWebView dialog to solve the verification
+      if (hadAbuseVideo && validSources.length === 0 && providerContext.openWebView) {
+        try {
+          const wafResult = await providerContext.openWebView(`${baseUrl}/verify`, {
+            title: "NetMirror Human Verification",
+            description: "Please complete the verification once to unlock video playback.",
+            waitForCookie: "t_hash_t",
+            force: true,
+          });
+
+          let newCookie = wafResult?.cookieMap?.["t_hash_t"];
+          if (!newCookie && wafResult?.cookies) {
+            const match = wafResult.cookies.match(/t_hash_t=([^;]+)/);
+            if (match) newCookie = match[1];
+          }
+
+          if (newCookie && !newCookie.includes("::99")) {
+            if (providerContext.kvStore) {
+              await providerContext.kvStore.set("t_hash_t", newCookie);
+              await providerContext.kvStore.set("t_hash_t_data", { token: newCookie, ts: Date.now() });
+            }
+            cookies = `t_hash_t=${newCookie}; hd=on; ott=${ottHeader === "hs" ? "dp" : ottHeader}`;
+
+            // Re-fetch playlist with the newly verified session
+            const newMobilePlUrl = `${baseUrl}/mobile/playlist.php?id=${id}&t=${encodeURIComponent(
+              title || "Title"
+            )}&tm=${Math.round(Date.now() / 1000)}`;
+            const newMPlRes = await axios.get(newMobilePlUrl, {
+              signal,
+              headers: getNetMirrorMobileHeaders(baseUrl, cookies),
+              timeout: 5000,
+            });
+            const newPlData = Array.isArray(newMPlRes.data) ? newMPlRes.data[0] : newMPlRes.data;
+            if (newPlData && Array.isArray(newPlData.sources)) {
+              for (const s of newPlData.sources) {
+                let fUrl = s.file || "";
+                if (!fUrl.startsWith("http")) fUrl = `${baseUrl}${fUrl}`;
+                validSources.push({ ...s, file: fUrl });
+              }
+            }
+          }
+        } catch (wafErr) {
+          console.log("NetMirror openWebView verification failed or was cancelled:", wafErr);
+        }
+      }
+
+      validSources.forEach((source: any) => {
+        const fileUrl = source.file;
         let quality: Stream["quality"] = "1080";
         const label = (source.label || "").toLowerCase();
         if (label.includes("full hd") || fileUrl.includes("1080p")) quality = "1080";
@@ -1088,6 +1178,21 @@ export const netMirrorGetStream = async ({
   const cleanStreamLinks = streamLinks.filter(
     (s) => !s.link.includes("220884") && !s.server.includes("220884")
   );
+
+  // If running in CLI test environment (where openWebView is undefined):
+  if (cleanStreamLinks.length === 0 && !providerContext.openWebView) {
+    cleanStreamLinks.push({
+      server: `${serverName} (Requires Verification)`,
+      link: `${baseUrl}/mobile/hls/${id}.m3u8`,
+      type: "m3u8",
+      quality: "1080",
+      headers: getNetMirrorMobileHeaders(baseUrl, cookies),
+    });
+  } else if (cleanStreamLinks.length === 0) {
+    throw new Error(
+      `NetMirror session unverified: Visit ${baseUrl}/verify or configure t_hash_t in Provider Settings.`
+    );
+  }
 
   // 5. Sort streams: download-optimized if isDownload; otherwise quality descending
   cleanStreamLinks.sort((a, b) => {
