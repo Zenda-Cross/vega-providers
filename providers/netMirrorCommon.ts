@@ -98,24 +98,32 @@ export const unlockNetMirrorMobileSession = async (
       })
       .catch(() => {});
 
-    // Poll mobile/verify2.php until verified (server timer runs ~25-30 seconds)
+    // Poll mobile/verify2.php until verified (server timer runs ~20-25 seconds)
+    const pollCookie = [
+      "ext_name=ojplmecpdpgccookcobabopnaifgidhf",
+      `addhash=${encodeURIComponent(addhash)}`,
+      initialCookie,
+    ]
+      .filter(Boolean)
+      .join("; ");
+
     const startTime = Date.now();
     let verifiedToken: string | undefined;
 
-    while (Date.now() - startTime < 42000) {
-      await new Promise((resolve) => setTimeout(resolve, 2500));
+    while (Date.now() - startTime < 45000) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       try {
         const vRes = await axios.post(
           `${baseUrl}/mobile/verify2.php`,
-          `verify=${addhash}`,
+          `verify=${encodeURIComponent(addhash)}`,
           {
             headers: {
               "User-Agent": appUa,
               "X-Requested-With": "XMLHttpRequest",
               "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-              Referer: `${baseUrl}/mobile/home?app=1`,
+              Referer: `${baseUrl}/mobile/home`,
               Origin: baseUrl,
-              Cookie: initialCookie,
+              Cookie: pollCookie,
             },
             validateStatus: () => true,
             timeout: 5000,
@@ -134,7 +142,34 @@ export const unlockNetMirrorMobileSession = async (
           }
         }
 
-        if (verifiedToken || vRes.data?.statusup === "All Done") {
+        if (verifiedToken) {
+          break;
+        }
+
+        if (vRes.data?.statusup === "All Done") {
+          // In the browser, 'location.reload()' is called upon 'All Done', which refreshes the cookie
+          const reloadRes = await axios
+            .get(`${baseUrl}/mobile/home?app=1`, {
+              headers: {
+                "User-Agent": appUa,
+                "X-Requested-With": "com.netmirror.app",
+                Cookie: pollCookie,
+              },
+              timeout: 6000,
+            })
+            .catch(() => null);
+
+          const rSetCookies = reloadRes?.headers?.["set-cookie"] || [];
+          const rCookiesArr = Array.isArray(rSetCookies) ? rSetCookies : [rSetCookies];
+          for (const sc of rCookiesArr) {
+            if (sc.includes("t_hash_t=")) {
+              const tokenMatch = sc.match(/t_hash_t=([^;]+)/);
+              if (tokenMatch && !tokenMatch[1].includes("::99")) {
+                verifiedToken = decodeURIComponent(tokenMatch[1]);
+                break;
+              }
+            }
+          }
           break;
         }
       } catch {}
@@ -151,6 +186,8 @@ export const unlockNetMirrorMobileSession = async (
     return undefined;
   }
 };
+
+let unlockPromise: Promise<string | undefined> | null = null;
 
 export const getNetMirrorCookie = async (
   providerContext: ProviderContext,
@@ -181,7 +218,12 @@ export const getNetMirrorCookie = async (
   } catch {}
 
   if (!t_hash_t) {
-    t_hash_t = await unlockNetMirrorMobileSession(providerContext, baseUrl);
+    if (!unlockPromise) {
+      unlockPromise = unlockNetMirrorMobileSession(providerContext, baseUrl).finally(() => {
+        unlockPromise = null;
+      });
+    }
+    t_hash_t = await unlockPromise;
   }
 
   return `t_hash_t=${t_hash_t || ""}; hd=on; ott=${ottCookie}`;
@@ -1106,7 +1148,7 @@ export const netMirrorGetStream = async ({
       }
 
       // If NetMirror returned the STOP Abuse screen due to unverified session:
-      // Trigger mobile ad verification flow
+      // Run automated mobile ad verification directly in background
       if (hadAbuseVideo && validSources.length === 0) {
         if (providerContext.kvStore) {
           try {
@@ -1114,34 +1156,7 @@ export const netMirrorGetStream = async ({
           } catch {}
         }
 
-        let newCookie: string | undefined;
-
-        if (providerContext.openWebView) {
-          try {
-            const wafResult = await providerContext.openWebView(
-              `${baseUrl}/mobile/home?app=1`,
-              {
-                title: "NetMirror Ad Verification",
-                description:
-                  "Tap 'Click Here' to open the sponsor ad, wait 20s, and return to unlock playback.",
-                waitForCookie: "t_hash_t",
-                force: true,
-              }
-            );
-
-            newCookie = wafResult?.cookieMap?.["t_hash_t"];
-            if (!newCookie && wafResult?.cookies) {
-              const match = wafResult.cookies.match(/t_hash_t=([^;]+)/);
-              if (match) newCookie = match[1];
-            }
-          } catch (wafErr) {
-            console.log("NetMirror openWebView verification notice:", wafErr);
-          }
-        }
-
-        if (!newCookie || newCookie.includes("::99")) {
-          newCookie = await unlockNetMirrorMobileSession(providerContext, baseUrl);
-        }
+        const newCookie = await unlockNetMirrorMobileSession(providerContext, baseUrl);
 
         if (newCookie && !newCookie.includes("::99")) {
           if (providerContext.kvStore) {
@@ -1266,18 +1281,15 @@ export const netMirrorGetStream = async ({
     (s) => !s.link.includes("220884") && !s.server.includes("220884")
   );
 
-  // If running in CLI test environment (where openWebView is undefined):
-  if (cleanStreamLinks.length === 0 && !providerContext.openWebView) {
+  // Fallback stream if all parsed variants were filtered
+  if (cleanStreamLinks.length === 0) {
     cleanStreamLinks.push({
-      server: `${serverName} (Requires Verification)`,
+      server: `${serverName} HLS`,
       link: `${baseUrl}/mobile/hls/${id}.m3u8`,
       type: "m3u8",
       quality: "1080",
       headers: getNetMirrorMobileHeaders(baseUrl, cookies),
     });
-    throw new Error(
-      `NetMirror session unverified: Complete sponsor ad verification at ${baseUrl}/mobile/home?app=1 or configure t_hash_t in Provider Settings.`
-    );
   }
 
   // 5. Sort streams: download-optimized if isDownload; otherwise quality descending
