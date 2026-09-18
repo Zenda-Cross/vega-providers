@@ -1011,19 +1011,29 @@ export const netMirrorGetStream = async ({
     cookies = await getNetMirrorCookie(providerContext, prefix);
     const tm = Math.round(Date.now() / 1000);
 
-    // 1. Primary Native Mobile App Playlist flow (/mobile/playlist.php)
+    const prefixPath = prefix === "hs" ? "hs/" : prefix === "pv" ? "pv/" : "";
+
+    // 1. Primary Native Mobile App Playlist flow: try with prefixPath first, then generic fallback
     let plData: any = null;
-    try {
-      const mobilePlUrl = `${baseUrl}/mobile/playlist.php?id=${id}&t=${encodeURIComponent(
-        title || "Title"
-      )}&tm=${tm}`;
-      const mPlRes = await axios.get(mobilePlUrl, {
-        signal,
-        headers: getNetMirrorMobileHeaders(baseUrl, cookies),
-        timeout: 5000,
-      });
-      plData = Array.isArray(mPlRes.data) ? mPlRes.data[0] : mPlRes.data;
-    } catch {}
+    const plUrlsToTry = [
+      ...(prefixPath ? [`${baseUrl}/mobile/${prefixPath}playlist.php?id=${id}&t=${encodeURIComponent(title || "Title")}&tm=${tm}`] : []),
+      `${baseUrl}/mobile/playlist.php?id=${id}&t=${encodeURIComponent(title || "Title")}&tm=${tm}`,
+    ];
+
+    for (const plUrl of plUrlsToTry) {
+      try {
+        const mPlRes = await axios.get(plUrl, {
+          signal,
+          headers: getNetMirrorMobileHeaders(baseUrl, cookies),
+          timeout: 6000,
+        });
+        const resData = Array.isArray(mPlRes.data) ? mPlRes.data[0] : mPlRes.data;
+        if (resData && Array.isArray(resData.sources) && resData.sources.length > 0) {
+          plData = resData;
+          break;
+        }
+      } catch {}
+    }
 
     // 2. Secondary Native play.php -> playlist.php flow on net77.cc
     if (!plData || !Array.isArray(plData.sources)) {
@@ -1089,41 +1099,38 @@ export const netMirrorGetStream = async ({
         });
       }
 
-      // Pre-validate playlist sources to filter out 220884 (STOP Abuse video)
+      // Quick check of the first source to detect unverified session / 220884
       let hadAbuseVideo = false;
-      const validSources: any[] = [];
-
-      for (const source of plData.sources) {
-        let fileUrl = source.file || "";
-        if (!fileUrl) continue;
-        if (!fileUrl.startsWith("http")) {
-          fileUrl = `${baseUrl}${fileUrl}`;
-        }
-
-        let isClean = true;
+      const firstSource = plData.sources[0];
+      if (firstSource && firstSource.file) {
+        let testUrl = firstSource.file;
+        if (!testUrl.startsWith("http")) testUrl = `${baseUrl}${testUrl}`;
         try {
-          const checkRes = await axios.get(fileUrl, {
+          const checkRes = await axios.get(testUrl, {
             signal,
             headers: getNetMirrorMobileHeaders(baseUrl, cookies),
-            timeout: 4000,
+            timeout: 2500,
           });
           const content = typeof checkRes.data === "string" ? checkRes.data : "";
           if (content.includes("220884") || content.includes("Only Valid Users Allowed")) {
-            isClean = false;
             hadAbuseVideo = true;
           }
-        } catch {
-          // If check timed out, do not assume abuse
-        }
+        } catch {}
+      }
 
-        if (isClean) {
-          validSources.push({ ...source, file: fileUrl });
+      let validSources: any[] = [];
+      if (!hadAbuseVideo) {
+        for (const s of plData.sources) {
+          let fUrl = s.file || "";
+          if (!fUrl) continue;
+          if (!fUrl.startsWith("http")) fUrl = `${baseUrl}${fUrl}`;
+          validSources.push({ ...s, file: fUrl });
         }
       }
 
       // If NetMirror returned the STOP Abuse screen due to unverified session:
       // Run automated mobile ad verification directly in background
-      if (hadAbuseVideo && validSources.length === 0) {
+      if (hadAbuseVideo) {
         if (providerContext.kvStore) {
           try {
             await providerContext.kvStore.delete("t_hash_t_data");
@@ -1143,23 +1150,29 @@ export const netMirrorGetStream = async ({
           cookies = `t_hash_t=${newCookie}; hd=on; ott=${ottHeader === "hs" ? "dp" : ottHeader}`;
 
           // Re-fetch playlist with the newly verified session
-          const newMobilePlUrl = `${baseUrl}/mobile/playlist.php?id=${id}&t=${encodeURIComponent(
-            title || "Title"
-          )}&tm=${Math.round(Date.now() / 1000)}`;
-          const newMPlRes = await axios.get(newMobilePlUrl, {
-            signal,
-            headers: getNetMirrorMobileHeaders(baseUrl, cookies),
-            timeout: 5000,
-          });
-          const newPlData = Array.isArray(newMPlRes.data)
-            ? newMPlRes.data[0]
-            : newMPlRes.data;
-          if (newPlData && Array.isArray(newPlData.sources)) {
-            for (const s of newPlData.sources) {
-              let fUrl = s.file || "";
-              if (!fUrl.startsWith("http")) fUrl = `${baseUrl}${fUrl}`;
-              validSources.push({ ...s, file: fUrl });
-            }
+          const retryUrls = [
+            ...(prefixPath ? [`${baseUrl}/mobile/${prefixPath}playlist.php?id=${id}&t=${encodeURIComponent(title || "Title")}&tm=${Math.round(Date.now() / 1000)}`] : []),
+            `${baseUrl}/mobile/playlist.php?id=${id}&t=${encodeURIComponent(title || "Title")}&tm=${Math.round(Date.now() / 1000)}`,
+          ];
+          for (const rUrl of retryUrls) {
+            try {
+              const newMPlRes = await axios.get(rUrl, {
+                signal,
+                headers: getNetMirrorMobileHeaders(baseUrl, cookies),
+                timeout: 5000,
+              });
+              const newPlData = Array.isArray(newMPlRes.data) ? newMPlRes.data[0] : newMPlRes.data;
+              if (newPlData && Array.isArray(newPlData.sources) && newPlData.sources.length > 0) {
+                validSources = [];
+                for (const s of newPlData.sources) {
+                  let fUrl = s.file || "";
+                  if (!fUrl) continue;
+                  if (!fUrl.startsWith("http")) fUrl = `${baseUrl}${fUrl}`;
+                  validSources.push({ ...s, file: fUrl });
+                }
+                break;
+              }
+            } catch {}
           }
         }
       }
