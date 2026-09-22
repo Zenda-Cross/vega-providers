@@ -206,30 +206,37 @@ export const getMeta = async function ({
     const imdbId = result.imdbId;
     if (!imdbId) return result;
 
-    const cinemeta = await getCinemetaMeta(
-      imdbId,
-      result.type,
-      providerContext,
-    );
-    if (result.type === "series" && cinemeta.type === "series") {
-      result.linkList = result.linkList.map((item) => {
-        if (!item.episodesLink) return item;
-        const season =
-          getCinemetaSeason(item.title) ||
-          getCinemetaSeason(infoParagraph) ||
-          getCinemetaSeason(rawTitle);
-        if (!season) return item;
-        return {
-          ...item,
-          episodesLink: addCinemetaContext(
-            new URL(item.episodesLink, url).href,
-            imdbId,
-            season,
-          ),
-        };
-      });
+    try {
+      const cinemeta = await getCinemetaMeta(
+        imdbId,
+        result.type,
+        providerContext,
+      );
+      if (cinemeta) {
+        if (result.type === "series" && cinemeta.type === "series") {
+          result.linkList = result.linkList.map((item) => {
+            if (!item.episodesLink) return item;
+            const season =
+              getCinemetaSeason(item.title) ||
+              getCinemetaSeason(infoParagraph) ||
+              getCinemetaSeason(rawTitle);
+            if (!season) return item;
+            return {
+              ...item,
+              episodesLink: addCinemetaContext(
+                new URL(item.episodesLink, url).href,
+                imdbId,
+                season,
+              ),
+            };
+          });
+        }
+        return applyCinemetaMeta(result, cinemeta);
+      }
+    } catch (e) {
+      console.warn("Movies4u: Cinemeta lookup failed", e);
     }
-    return applyCinemetaMeta(result, cinemeta);
+    return result;
   } catch (err) {
     throwProviderError("Movies4u", "metadata", err);
   }

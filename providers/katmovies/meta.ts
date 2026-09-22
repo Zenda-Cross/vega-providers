@@ -194,50 +194,57 @@ export const getMeta = async function ({
 
     try {
       const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
-      if (type === "series" && cinemeta.type === "series") {
-        const skipTimings = await providerContext.kvStore?.get<boolean>("katmovies_skipTimings");
-        websiteInfo.linkList = await Promise.all(
-          websiteInfo.linkList.map(async (item) => {
-            const season =
-              getCinemetaSeason(item.title) || getCinemetaSeason(title);
-            if (!season) return item;
-            if (item.directLinks) {
-              let enriched = enrichCinemetaEpisodes(
-                item.directLinks,
-                cinemeta.videos || [],
-                season,
-              );
-              if (skipTimings ?? true) {
-                enriched = await enrichEpisodesWithSkipTimings(
-                  enriched,
-                  imdbId,
+      if (cinemeta) {
+        if (type === "series" && cinemeta.type === "series") {
+          const skipTimings = await providerContext.kvStore?.get<boolean>("katmovies_skipTimings");
+          websiteInfo.linkList = await Promise.all(
+            websiteInfo.linkList.map(async (item) => {
+              const season =
+                getCinemetaSeason(item.title) || getCinemetaSeason(title);
+              if (!season) return item;
+              if (item.directLinks) {
+                let enriched = enrichCinemetaEpisodes(
+                  item.directLinks,
+                  cinemeta.videos || [],
                   season,
-                  providerContext,
                 );
+                if (skipTimings ?? true) {
+                  try {
+                    enriched = await enrichEpisodesWithSkipTimings(
+                      enriched,
+                      imdbId,
+                      season,
+                      providerContext,
+                    );
+                  } catch (e) {
+                    console.warn("KatMovies: Skip timings failed", e);
+                  }
+                }
+                return {
+                  ...item,
+                  directLinks: enriched,
+                };
               }
-              return {
-                ...item,
-                directLinks: enriched,
-              };
-            }
-            if (item.episodesLink) {
-              return {
-                ...item,
-                episodesLink: addCinemetaContext(
-                  new URL(item.episodesLink, url).href,
-                  imdbId,
-                  season,
-                ),
-              };
-            }
-            return item;
-          }),
-        );
+              if (item.episodesLink) {
+                return {
+                  ...item,
+                  episodesLink: addCinemetaContext(
+                    new URL(item.episodesLink, url).href,
+                    imdbId,
+                    season,
+                  ),
+                };
+              }
+              return item;
+            }),
+          );
+        }
+        return applyCinemetaMeta(websiteInfo, cinemeta);
       }
-      return applyCinemetaMeta(websiteInfo, cinemeta);
     } catch {
       return websiteInfo;
     }
+    return websiteInfo;
   } catch (err) {
     throwProviderError("KatMovies", "metadata", err);
   }

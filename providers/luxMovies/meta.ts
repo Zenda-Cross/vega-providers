@@ -305,23 +305,30 @@ export const getMeta = async ({
     };
     if (!imdbId) return websiteInfo;
 
-    const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
-    if (type === "series" && cinemeta.type === "series") {
-      websiteInfo.linkList = websiteInfo.linkList.map((item) => {
-        if (!item.episodesLink) return item;
-        const season = getCinemetaSeason(item.title);
-        if (!season) return item;
-        return {
-          ...item,
-          episodesLink: addCinemetaContext(
-            new URL(item.episodesLink, url).href,
-            imdbId,
-            season,
-          ),
-        };
-      });
+    try {
+      const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
+      if (cinemeta) {
+        if (type === "series" && cinemeta.type === "series") {
+          websiteInfo.linkList = websiteInfo.linkList.map((item) => {
+            if (!item.episodesLink) return item;
+            const season = getCinemetaSeason(item.title);
+            if (!season) return item;
+            return {
+              ...item,
+              episodesLink: addCinemetaContext(
+                new URL(item.episodesLink, url).href,
+                imdbId,
+                season,
+              ),
+            };
+          });
+        }
+        return applyCinemetaMeta(websiteInfo, cinemeta);
+      }
+    } catch (e) {
+      console.warn("LuxMovies: Cinemeta lookup failed", e);
     }
-    return applyCinemetaMeta(websiteInfo, cinemeta);
+    return websiteInfo;
   } catch (error) {
     console.log("getInfo error");
     console.error(error);

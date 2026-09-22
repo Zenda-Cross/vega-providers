@@ -260,22 +260,25 @@ export const getMeta = async function ({
       );
       return result;
     }
-    if (result.type === "series" && cinemeta.type === "series") {
-      result.linkList = result.linkList.map((item) => {
-        if (!item.episodesLink) return item;
-        const season = getCinemetaSeason(item.title);
-        if (!season) return item;
-        return {
-          ...item,
-          episodesLink: addCinemetaContext(
-            new URL(item.episodesLink, url).href,
-            imdbId,
-            season,
-          ),
-        };
-      });
+    if (cinemeta) {
+      if (result.type === "series" && cinemeta.type === "series") {
+        result.linkList = result.linkList.map((item) => {
+          if (!item.episodesLink) return item;
+          const season = getCinemetaSeason(item.title);
+          if (!season) return item;
+          return {
+            ...item,
+            episodesLink: addCinemetaContext(
+              new URL(item.episodesLink, url).href,
+              imdbId,
+              season,
+            ),
+          };
+        });
+      }
+      return applyCinemetaMeta(result, cinemeta);
     }
-    return applyCinemetaMeta(result, cinemeta);
+    return result;
   } catch (err) {
     throwProviderError("1CineVood", "metadata", err);
   }

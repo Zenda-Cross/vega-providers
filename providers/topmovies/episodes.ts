@@ -56,24 +56,36 @@ export const getEpisodes = async function ({
     });
     if (!context.imdbId || !context.season) return episodeLinks;
 
-    const cinemeta = await getCinemetaMeta(
-      context.imdbId,
-      "series",
-      providerContext,
-    );
-    let enriched = enrichCinemetaEpisodes(
-      episodeLinks,
-      cinemeta.videos || [],
-      context.season,
-    );
-    const skipTimings = await providerContext.kvStore?.get<boolean>("topmovies_skipTimings");
-    if (skipTimings ?? true) {
-      enriched = await enrichEpisodesWithSkipTimings(
-        enriched,
+    let enriched = episodeLinks;
+    try {
+      const cinemeta = await getCinemetaMeta(
         context.imdbId,
-        context.season,
+        "series",
         providerContext,
       );
+      if (cinemeta) {
+        enriched = enrichCinemetaEpisodes(
+          episodeLinks,
+          cinemeta.videos || [],
+          context.season,
+        );
+      }
+    } catch (e) {
+      console.warn("TopMovies: Cinemeta episode lookup failed", e);
+    }
+
+    const skipTimings = await providerContext.kvStore?.get<boolean>("topmovies_skipTimings");
+    if (skipTimings ?? true) {
+      try {
+        enriched = await enrichEpisodesWithSkipTimings(
+          enriched,
+          context.imdbId,
+          context.season,
+          providerContext,
+        );
+      } catch (e) {
+        console.warn("TopMovies: Skip timings lookup failed", e);
+      }
     }
     return enriched;
   } catch (err) {

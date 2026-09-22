@@ -70,24 +70,31 @@ export const getMeta = async function ({
     meta.linkList = links;
     if (!imdbId) return meta;
 
-    const cinemeta = await getCinemetaMeta(imdbId, meta.type, providerContext);
-    if (meta.type === "series" && cinemeta.type === "series") {
-      meta.linkList = meta.linkList.map((item) => {
-        if (!item.episodesLink) return item;
-        const season =
-          getCinemetaSeason(item.title) || getCinemetaSeason(meta.title);
-        if (!season) return item;
-        return {
-          ...item,
-          episodesLink: addCinemetaContext(
-            new URL(item.episodesLink, url).href,
-            imdbId,
-            season,
-          ),
-        };
-      });
+    try {
+      const cinemeta = await getCinemetaMeta(imdbId, meta.type, providerContext);
+      if (cinemeta) {
+        if (meta.type === "series" && cinemeta.type === "series") {
+          meta.linkList = meta.linkList.map((item) => {
+            if (!item.episodesLink) return item;
+            const season =
+              getCinemetaSeason(item.title) || getCinemetaSeason(meta.title);
+            if (!season) return item;
+            return {
+              ...item,
+              episodesLink: addCinemetaContext(
+                new URL(item.episodesLink, url).href,
+                imdbId,
+                season,
+              ),
+            };
+          });
+        }
+        return applyCinemetaMeta(meta, cinemeta);
+      }
+    } catch (e) {
+      console.warn("TopMovies: Cinemeta lookup failed", e);
     }
-    return applyCinemetaMeta(meta, cinemeta);
+    return meta;
   } catch (err) {
     throwProviderError("TopMovies", "metadata", err);
   }

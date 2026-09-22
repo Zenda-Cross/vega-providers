@@ -174,36 +174,47 @@ export const getMeta = async function ({
     };
     if (!imdbId) return websiteInfo;
 
-    const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
-    if (type === "series" && cinemeta.type === "series") {
-      const skipTimings = await providerContext.kvStore?.get<boolean>("hdhub4u_skipTimings");
-      websiteInfo.linkList = await Promise.all(
-        websiteInfo.linkList.map(async (item) => {
-          if (!item.directLinks) return item;
-          const season =
-            getCinemetaSeason(item.title) || getCinemetaSeason(title);
-          if (!season) return item;
-          let enriched = enrichCinemetaEpisodes(
-            item.directLinks,
-            cinemeta.videos || [],
-            season,
+    try {
+      const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
+      if (cinemeta) {
+        if (type === "series" && cinemeta.type === "series") {
+          const skipTimings = await providerContext.kvStore?.get<boolean>("hdhub4u_skipTimings");
+          websiteInfo.linkList = await Promise.all(
+            websiteInfo.linkList.map(async (item) => {
+              if (!item.directLinks) return item;
+              const season =
+                getCinemetaSeason(item.title) || getCinemetaSeason(title);
+              if (!season) return item;
+              let enriched = enrichCinemetaEpisodes(
+                item.directLinks,
+                cinemeta.videos || [],
+                season,
+              );
+              if (skipTimings ?? true) {
+                try {
+                  enriched = await enrichEpisodesWithSkipTimings(
+                    enriched,
+                    imdbId,
+                    season,
+                    providerContext,
+                  );
+                } catch (e) {
+                  console.warn("HDHub4u: Skip timings failed", e);
+                }
+              }
+              return {
+                ...item,
+                directLinks: enriched,
+              };
+            }),
           );
-          if (skipTimings ?? true) {
-            enriched = await enrichEpisodesWithSkipTimings(
-              enriched,
-              imdbId,
-              season,
-              providerContext,
-            );
-          }
-          return {
-            ...item,
-            directLinks: enriched,
-          };
-        }),
-      );
+        }
+        return applyCinemetaMeta(websiteInfo, cinemeta);
+      }
+    } catch (e) {
+      console.warn("HDHub4u: Cinemeta lookup failed", e);
     }
-    return applyCinemetaMeta(websiteInfo, cinemeta);
+    return websiteInfo;
   } catch (err) {
     throwProviderError("HDHub4u", "metadata", err);
   }

@@ -46,6 +46,16 @@ export const getMeta = async function ({
   try {
     const { imdbId, type } = getRequest(link);
     const meta = await getCinemetaMeta(imdbId, type, providerContext);
+    if (!meta) {
+      return {
+        title: imdbId,
+        synopsis: "",
+        image: "",
+        imdbId,
+        type,
+        linkList: [],
+      };
+    }
     const linkList: Link[] = [];
 
     if (type === "series") {

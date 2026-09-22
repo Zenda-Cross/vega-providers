@@ -62,24 +62,31 @@ export const getEpisodes = async function ({
         }));
       }
       try {
+        let enriched = episodesLink;
         const cinemeta = await getCinemetaMeta(
           context.imdbId,
           "series",
           providerContext,
         );
-        let enriched = enrichCinemetaEpisodes(
-          episodesLink,
-          cinemeta.videos || [],
-          context.season,
-        );
+        if (cinemeta) {
+          enriched = enrichCinemetaEpisodes(
+            episodesLink,
+            cinemeta.videos || [],
+            context.season,
+          );
+        }
         const skipTimings = await providerContext.kvStore?.get<boolean>("katmovies_skipTimings");
         if (skipTimings ?? true) {
-          enriched = await enrichEpisodesWithSkipTimings(
-            enriched,
-            context.imdbId,
-            context.season,
-            providerContext,
-          );
+          try {
+            enriched = await enrichEpisodesWithSkipTimings(
+              enriched,
+              context.imdbId,
+              context.season,
+              providerContext,
+            );
+          } catch (e) {
+            console.warn("KatMovies: Skip timings failed", e);
+          }
         }
         return enriched.map((e) => ({
           ...e,

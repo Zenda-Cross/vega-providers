@@ -138,24 +138,36 @@ export const getEpisodes = async function ({
       }));
     }
 
-    const cinemeta = await getCinemetaMeta(
-      context.imdbId,
-      "series",
-      providerContext,
-    );
-    let enrichedEpisodes = enrichCinemetaEpisodes(
-      episodes,
-      cinemeta.videos || [],
-      context.season,
-    );
-    const skipTimings = await providerContext.kvStore?.get<boolean>("drive_skipTimings");
-    if (skipTimings ?? true) {
-      enrichedEpisodes = await enrichEpisodesWithSkipTimings(
-        enrichedEpisodes,
+    let enrichedEpisodes = episodes;
+    try {
+      const cinemeta = await getCinemetaMeta(
         context.imdbId,
-        context.season,
+        "series",
         providerContext,
       );
+      if (cinemeta) {
+        enrichedEpisodes = enrichCinemetaEpisodes(
+          episodes,
+          cinemeta.videos || [],
+          context.season,
+        );
+      }
+    } catch (e) {
+      console.warn("Drive: Cinemeta episode lookup failed", e);
+    }
+
+    const skipTimings = await providerContext.kvStore?.get<boolean>("drive_skipTimings");
+    if (skipTimings ?? true) {
+      try {
+        enrichedEpisodes = await enrichEpisodesWithSkipTimings(
+          enrichedEpisodes,
+          context.imdbId,
+          context.season,
+          providerContext,
+        );
+      } catch (e) {
+        console.warn("Drive: Skip timings lookup failed", e);
+      }
     }
     return enrichedEpisodes.map((e) => ({
       ...e,

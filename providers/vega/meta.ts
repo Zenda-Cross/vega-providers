@@ -24,7 +24,8 @@ const headers = {
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
 };
 
-function applyCinemeta(info: Info, meta: CinemetaMeta): Info {
+function applyCinemeta(info: Info, meta?: CinemetaMeta | null): Info {
+  if (!meta) return info;
   return {
     ...info,
     title: meta.name || info.title,
@@ -317,23 +318,30 @@ export const getMeta = async ({
     };
     if (!imdbId) return websiteInfo;
 
-    const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
-    if (type === "series" && cinemeta.type === "series") {
-      websiteInfo.linkList = websiteInfo.linkList.map((item) => {
-        if (!item.episodesLink) return item;
-        const season = getSeasonNumber(item.title);
-        if (!season) return item;
-        return {
-          ...item,
-          episodesLink: addEpisodeContext(
-            new URL(item.episodesLink, url).href,
-            imdbId,
-            season,
-          ),
-        };
-      });
+    try {
+      const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
+      if (cinemeta) {
+        if (type === "series" && cinemeta.type === "series") {
+          websiteInfo.linkList = websiteInfo.linkList.map((item) => {
+            if (!item.episodesLink) return item;
+            const season = getSeasonNumber(item.title);
+            if (!season) return item;
+            return {
+              ...item,
+              episodesLink: addEpisodeContext(
+                new URL(item.episodesLink, url).href,
+                imdbId,
+                season,
+              ),
+            };
+          });
+        }
+        return applyCinemeta(websiteInfo, cinemeta);
+      }
+    } catch (e) {
+      console.warn("Vega: Cinemeta lookup failed", e);
     }
-    return applyCinemeta(websiteInfo, cinemeta);
+    return websiteInfo;
   } catch (error) {
     console.log("getInfo error");
     console.error(error);

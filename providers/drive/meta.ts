@@ -152,25 +152,28 @@ export const getMeta = async function ({
 
     try {
       const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
-      if (type === "series" && cinemeta.type === "series") {
-        websiteInfo.linkList = websiteInfo.linkList.map((item) => {
-          if (!item.episodesLink) return item;
-          const season = getCinemetaSeason(item.title);
-          if (!season) return item;
-          return {
-            ...item,
-            episodesLink: addCinemetaContext(
-              new URL(item.episodesLink, url).href,
-              imdbId,
-              season,
-            ),
-          };
-        });
+      if (cinemeta) {
+        if (type === "series" && cinemeta.type === "series") {
+          websiteInfo.linkList = websiteInfo.linkList.map((item) => {
+            if (!item.episodesLink) return item;
+            const season = getCinemetaSeason(item.title);
+            if (!season) return item;
+            return {
+              ...item,
+              episodesLink: addCinemetaContext(
+                new URL(item.episodesLink, url).href,
+                imdbId,
+                season,
+              ),
+            };
+          });
+        }
+        return applyCinemetaMeta(websiteInfo, cinemeta);
       }
-      return applyCinemetaMeta(websiteInfo, cinemeta);
     } catch {
       return websiteInfo;
     }
+    return websiteInfo;
   } catch (err) {
     throwProviderError("Drive", "metadata", err);
   }

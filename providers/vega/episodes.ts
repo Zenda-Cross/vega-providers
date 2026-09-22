@@ -67,20 +67,31 @@ export const getEpisodes = async function ({
       }));
     }
 
-    const cinemeta = await getCinemetaMeta(
-      context.imdbId,
-      "series",
-      providerContext,
-    );
-    let enriched = enrichEpisodes(episodes, cinemeta.videos || [], context.season);
-
-    if (skipTimings ?? true) {
-      enriched = await enrichEpisodesWithSkipTimings(
-        enriched,
+    let enriched = episodes;
+    try {
+      const cinemeta = await getCinemetaMeta(
         context.imdbId,
-        context.season,
+        "series",
         providerContext,
       );
+      if (cinemeta) {
+        enriched = enrichEpisodes(episodes, cinemeta.videos || [], context.season);
+      }
+    } catch (e) {
+      console.warn("Vega: Cinemeta episode lookup failed", e);
+    }
+
+    if (skipTimings ?? true) {
+      try {
+        enriched = await enrichEpisodesWithSkipTimings(
+          enriched,
+          context.imdbId,
+          context.season,
+          providerContext,
+        );
+      } catch (e) {
+        console.warn("Vega: Skip timings lookup failed", e);
+      }
     }
 
     return enriched.map((e) => ({

@@ -2,7 +2,7 @@
   {
     "display_name": "VMovies",
     "value": "vega",
-    "version": "2.43",
+    "version": "2.44",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/vega.png",
     "type": "global",
     "disabled": false,
@@ -11,7 +11,7 @@
   {
     "display_name": "MultiStream",
     "value": "autoEmbed",
-    "version": "2.7",
+    "version": "2.8",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/autoEmbed.png",
     "type": "global",
     "disabled": false
@@ -19,7 +19,7 @@
   {
     "display_name": "MoviesDrive",
     "value": "drive",
-    "version": "2.28",
+    "version": "2.29",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/drive.png",
     "type": "global",
     "disabled": false,
@@ -45,7 +45,7 @@
   {
     "display_name": "Cinewood",
     "value": "1cinevood",
-    "version": "1.36",
+    "version": "1.37",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/1cinevood.png",
     "type": "global",
     "disabled": false,
@@ -62,7 +62,7 @@
   {
     "display_name": "KatMoviesHd",
     "value": "katmovies",
-    "version": "1.35",
+    "version": "1.36",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/katmovies.png",
     "type": "global",
     "disabled": false,
@@ -154,7 +154,7 @@
   {
     "display_name": "Movies4U",
     "value": "movies4u",
-    "version": "1.29",
+    "version": "1.30",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/movies4u.png",
     "type": "global",
     "disabled": false,
@@ -163,7 +163,7 @@
   {
     "display_name": "KmMovies",
     "value": "kmMovies",
-    "version": "2.33",
+    "version": "2.34",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/kmMovies.png",
     "type": "global",
     "disabled": false,
@@ -172,7 +172,7 @@
   {
     "display_name": "Zeefliz",
     "value": "zeefliz",
-    "version": "1.32",
+    "version": "1.33",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/zeefliz.jpg",
     "type": "global",
     "disabled": false,
@@ -225,7 +225,7 @@
   {
     "display_name": "HdHub4u",
     "value": "hdhub4u",
-    "version": "2.26",
+    "version": "2.27",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/hdhub4u.png",
     "type": "global",
     "disabled": false,
@@ -347,7 +347,7 @@
   {
     "display_name": "RogMovies",
     "value": "luxMovies",
-    "version": "2.34",
+    "version": "2.35",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/luxMovies.png",
     "type": "india",
     "disabled": false,
@@ -356,7 +356,7 @@
   {
     "display_name": "TopMovies",
     "value": "topmovies",
-    "version": "1.15",
+    "version": "1.16",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/topmovies.png",
     "type": "india",
     "disabled": false
@@ -398,7 +398,7 @@
   {
     "display_name": "Torrentio",
     "value": "torrentio",
-    "version": "1.18",
+    "version": "1.19",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/torrentio.png",
     "type": "global",
     "disabled": false,
@@ -407,7 +407,7 @@
   {
     "display_name": "CineFreak",
     "value": "cinefreak",
-    "version": "1.98",
+    "version": "1.99",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/cinefreak.png",
     "type": "global",
     "hasSettings": true,
@@ -432,7 +432,7 @@
   {
     "display_name": "Everything",
     "value": "everything",
-    "version": "1.2",
+    "version": "1.3",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/everything.png",
     "type": "global",
     "disabled": false

@@ -249,20 +249,27 @@ export const getMeta = async function ({
     };
     if (!imdbId) return websiteInfo;
 
-    const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
-    if (type === "series" && cinemeta.type === "series") {
-      websiteInfo.linkList = websiteInfo.linkList.map((item) => {
-        if (!item.episodesLink) return item;
-        const season =
-          getCinemetaSeason(item.title) || getCinemetaSeason(title);
-        if (!season) return item;
-        return {
-          ...item,
-          episodesLink: addCinemetaContext(item.episodesLink, imdbId, season),
-        };
-      });
+    try {
+      const cinemeta = await getCinemetaMeta(imdbId, type, providerContext);
+      if (cinemeta) {
+        if (type === "series" && cinemeta.type === "series") {
+          websiteInfo.linkList = websiteInfo.linkList.map((item) => {
+            if (!item.episodesLink) return item;
+            const season =
+              getCinemetaSeason(item.title) || getCinemetaSeason(title);
+            if (!season) return item;
+            return {
+              ...item,
+              episodesLink: addCinemetaContext(item.episodesLink, imdbId, season),
+            };
+          });
+        }
+        return applyCinemetaMeta(websiteInfo, cinemeta);
+      }
+    } catch (e) {
+      console.warn("KMMovies: Cinemeta lookup failed", e);
     }
-    return applyCinemetaMeta(websiteInfo, cinemeta);
+    return websiteInfo;
   } catch (err) {
     throwProviderError("KMMovies", "metadata", err);
   }

@@ -88,24 +88,36 @@ export const getEpisodes = async function ({
 
     const enrich = async (episodes: EpisodeLink[]): Promise<EpisodeLink[]> => {
       if (!context.imdbId || !context.season) return episodes;
-      const cinemeta = await getCinemetaMeta(
-        context.imdbId,
-        "series",
-        providerContext,
-      );
-      let enriched = enrichCinemetaEpisodes(
-        episodes,
-        cinemeta.videos || [],
-        context.season,
-      );
-      const skipTimings = await providerContext.kvStore?.get<boolean>("1cinevood_skipTimings");
-      if (skipTimings ?? true) {
-        enriched = await enrichEpisodesWithSkipTimings(
-          enriched,
+      let enriched = episodes;
+      try {
+        const cinemeta = await getCinemetaMeta(
           context.imdbId,
-          context.season,
+          "series",
           providerContext,
         );
+        if (cinemeta) {
+          enriched = enrichCinemetaEpisodes(
+            episodes,
+            cinemeta.videos || [],
+            context.season,
+          );
+        }
+      } catch (e) {
+        console.warn("1CineVood: Cinemeta episode lookup failed", e);
+      }
+
+      const skipTimings = await providerContext.kvStore?.get<boolean>("1cinevood_skipTimings");
+      if (skipTimings ?? true) {
+        try {
+          enriched = await enrichEpisodesWithSkipTimings(
+            enriched,
+            context.imdbId,
+            context.season,
+            providerContext,
+          );
+        } catch (e) {
+          console.warn("1CineVood: Skip timings lookup failed", e);
+        }
       }
       return enriched;
     };

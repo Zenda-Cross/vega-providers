@@ -30,7 +30,7 @@ export type CinemetaMeta = {
   videos?: CinemetaVideo[];
 };
 
-type CinemetaCache = Record<string, CinemetaMeta | Promise<CinemetaMeta>>;
+type CinemetaCache = Record<string, CinemetaMeta | Promise<CinemetaMeta | null>>;
 
 type CinemetaState = {
   __vegaCinemetaCache__?: CinemetaCache;
@@ -42,9 +42,9 @@ const CINEMETA_BASE_URL = "https://v3-cinemeta.strem.io/meta";
 const CONTEXT_KEY = "cinemetaMeta";
 
 function isCinemetaPromise(
-  value: CinemetaMeta | Promise<CinemetaMeta>,
-): value is Promise<CinemetaMeta> {
-  return typeof (value as Promise<CinemetaMeta>).then === "function";
+  value: CinemetaMeta | Promise<CinemetaMeta | null>,
+): value is Promise<CinemetaMeta | null> {
+  return typeof (value as Promise<CinemetaMeta | null>).then === "function";
 }
 
 function getCache(): CinemetaCache {
@@ -62,49 +62,88 @@ function getCache(): CinemetaCache {
   return state.__vegaCinemetaCache__;
 }
 
-export function getCinemetaMeta(
-  imdbId: string,
+async function resolveTmdbToImdb(
+  tmdbId: string,
   type: string,
   providerContext: ProviderContext,
-): Promise<CinemetaMeta> {
-  if (!/^tt\d+$/.test(imdbId)) {
-    return Promise.reject(new Error(`Invalid IMDb ID: ${imdbId}`));
+): Promise<string | null> {
+  try {
+    const tmdbType = type === "series" ? "tv" : "movie";
+    const res = await providerContext.axios.get(
+      `https://api.themoviedb.org/3/${tmdbType}/${tmdbId}/external_ids?api_key=cfe422613b250f702980a3bbf9e90716`,
+      { timeout: 5000 },
+    );
+    const imdb = res.data?.imdb_id;
+    if (typeof imdb === "string" && /^tt\d+$/.test(imdb)) {
+      return imdb;
+    }
+  } catch {
+    // Ignore TMDb resolution errors
+  }
+  return null;
+}
+
+export async function getCinemetaMeta(
+  id: string | undefined | null,
+  type: string,
+  providerContext: ProviderContext,
+): Promise<CinemetaMeta | null> {
+  if (!id || typeof id !== "string") {
+    return null;
+  }
+
+  let cleanImdbId = id.match(/tt\d+/)?.[0];
+
+  // If not an IMDb ID, check if it's a TMDb ID or TMDb URL
+  if (!cleanImdbId) {
+    const tmdbMatch =
+      id.match(/(?:themoviedb\.org\/(?:movie|tv)\/|tmdb:?)(\d+)/i) ||
+      id.match(/^(\d+)$/);
+    if (tmdbMatch) {
+      cleanImdbId = (await resolveTmdbToImdb(tmdbMatch[1], type, providerContext)) || undefined;
+    }
+  }
+
+  if (!cleanImdbId) {
+    return null;
   }
 
   const cache = getCache();
-  const cached = cache[imdbId];
+  const cached = cache[cleanImdbId];
   if (cached) {
     if (isCinemetaPromise(cached)) {
       return cached;
     }
-    if (cached.name && cached.imdb_id === imdbId) {
-      return Promise.resolve(cached);
+    if (cached.name && cached.imdb_id === cleanImdbId) {
+      return cached;
     }
-    delete cache[imdbId];
+    delete cache[cleanImdbId];
   }
 
   const mediaType = type === "series" ? "series" : "movie";
-  const url = `${CINEMETA_BASE_URL}/${mediaType}/${imdbId}.json`;
+  const url = `${CINEMETA_BASE_URL}/${mediaType}/${cleanImdbId}.json`;
   const request = providerContext.axios
-    .get(url)
+    .get(url, { timeout: 8000 })
     .then((response) => {
       const meta = response.data?.meta as CinemetaMeta | undefined;
-      if (!meta?.name || meta.imdb_id !== imdbId) {
-        throw new Error(`Cinemeta returned invalid metadata for ${imdbId}`);
+      if (!meta?.name || meta.imdb_id !== cleanImdbId) {
+        delete cache[cleanImdbId];
+        return null;
       }
-      cache[imdbId] = meta;
+      cache[cleanImdbId] = meta;
       return meta;
     })
-    .catch((error) => {
-      delete cache[imdbId];
-      throw error;
+    .catch(() => {
+      delete cache[cleanImdbId];
+      return null;
     });
 
-  cache[imdbId] = request;
+  cache[cleanImdbId] = request;
   return request;
 }
 
-export function applyCinemetaMeta(info: Info, meta: CinemetaMeta): Info {
+export function applyCinemetaMeta(info: Info, meta?: CinemetaMeta | null): Info {
+  if (!meta) return info;
   return {
     ...info,
     title: meta.name || info.title,
@@ -229,9 +268,12 @@ export function getEpisodeNumber(title: string, season: number): number | undefi
 
 export function enrichCinemetaEpisodes<T extends EpisodeLink>(
   episodes: T[],
-  videos: CinemetaVideo[],
-  season: number,
+  videos?: CinemetaVideo[] | null,
+  season?: number,
 ): T[] {
+  if (!videos || !Array.isArray(videos) || videos.length === 0 || !season) {
+    return episodes;
+  }
   const videosByEpisode = new Map<number, CinemetaVideo>();
   let hasDuplicateVideo = false;
   for (const video of videos) {
