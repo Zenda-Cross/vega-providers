@@ -71,9 +71,15 @@ export const unlockNetMirrorMobileSession = async (
       timeout: 8000,
     });
 
-    const setCookies = homeRes.headers?.["set-cookie"] || [];
+    const setCookies =
+      homeRes.headers?.["set-cookie"] ||
+      homeRes.headers?.["x-set-cookie"] ||
+      [];
     const cookiesArr = Array.isArray(setCookies) ? setCookies : [setCookies];
-    const initialCookie = cookiesArr.map((c: string) => c.split(";")[0]).join("; ");
+    const initialCookie = cookiesArr
+      .map((c: string) => String(c).split(";")[0])
+      .filter(Boolean)
+      .join("; ");
 
     const html = typeof homeRes.data === "string" ? homeRes.data : "";
     const matchAddHash = html.match(/data-addhash=["']([^"']+)["']/);
@@ -130,10 +136,13 @@ export const unlockNetMirrorMobileSession = async (
           }
         );
 
-        const vSetCookies = vRes.headers?.["set-cookie"] || [];
+        const vSetCookies =
+          vRes.headers?.["set-cookie"] ||
+          vRes.headers?.["x-set-cookie"] ||
+          [];
         const vCookiesArr = Array.isArray(vSetCookies) ? vSetCookies : [vSetCookies];
         for (const sc of vCookiesArr) {
-          if (sc.includes("t_hash_t=")) {
+          if (typeof sc === "string" && sc.includes("t_hash_t=")) {
             const tokenMatch = sc.match(/t_hash_t=([^;]+)/);
             if (tokenMatch && !tokenMatch[1].includes("::99")) {
               verifiedToken = decodeURIComponent(tokenMatch[1]);
@@ -159,10 +168,13 @@ export const unlockNetMirrorMobileSession = async (
             })
             .catch(() => null);
 
-          const rSetCookies = reloadRes?.headers?.["set-cookie"] || [];
+          const rSetCookies =
+            reloadRes?.headers?.["set-cookie"] ||
+            reloadRes?.headers?.["x-set-cookie"] ||
+            [];
           const rCookiesArr = Array.isArray(rSetCookies) ? rSetCookies : [rSetCookies];
           for (const sc of rCookiesArr) {
-            if (sc.includes("t_hash_t=")) {
+            if (typeof sc === "string" && sc.includes("t_hash_t=")) {
               const tokenMatch = sc.match(/t_hash_t=([^;]+)/);
               if (tokenMatch && !tokenMatch[1].includes("::99")) {
                 verifiedToken = decodeURIComponent(tokenMatch[1]);
@@ -337,7 +349,7 @@ export const netMirrorSearch = async ({
   try {
     if (page > 1) return [];
     const { axios } = providerContext;
-    const baseUrl = await getNetMirrorBaseUrl();
+    const baseUrl = await getNetMirrorBaseUrl(providerContext);
     const query = searchQuery?.trim();
     if (!query) return [];
 
@@ -477,7 +489,7 @@ export const getCachedHomeTrays = async (
 
   try {
     const { axios, cheerio } = providerContext;
-    const baseUrl = await getNetMirrorBaseUrl();
+    const baseUrl = await getNetMirrorBaseUrl(providerContext);
     const cookies = await getNetMirrorCookie(providerContext, prefix);
     const url = `${baseUrl}/mobile/home?app=1`;
 
@@ -584,7 +596,7 @@ export const netMirrorGetPosts = async ({
   try {
     if (page > 1) return [];
     const { axios } = providerContext;
-    const baseUrl = await getNetMirrorBaseUrl();
+    const baseUrl = await getNetMirrorBaseUrl(providerContext);
     const prefixPath = prefix ? `${prefix}/` : "";
     const t = Math.round(Date.now() / 1000);
     const cleanFilter = (filter || "").trim().toLowerCase();
@@ -762,7 +774,7 @@ export const netMirrorGetMeta = async ({
   providerContext: ProviderContext;
 }): Promise<Info> => {
   const { axios } = providerContext;
-  const baseUrl = await getNetMirrorBaseUrl();
+  const baseUrl = await getNetMirrorBaseUrl(providerContext);
 
   let id = "";
   let prefix: NetMirrorOtt = defaultPrefix;
@@ -901,7 +913,7 @@ export const netMirrorGetEpisodes = async ({
   providerContext: ProviderContext;
 }): Promise<EpisodeLink[]> => {
   const { axios } = providerContext;
-  const baseUrl = await getNetMirrorBaseUrl();
+  const baseUrl = await getNetMirrorBaseUrl(providerContext);
   const t = Math.round(Date.now() / 1000);
 
   let sid = seasonId;
@@ -1001,7 +1013,7 @@ export const netMirrorGetStream = async ({
   isDownload?: boolean;
 }): Promise<Stream[]> => {
   const { axios } = providerContext;
-  const baseUrl = await getNetMirrorBaseUrl();
+  const baseUrl = await getNetMirrorBaseUrl(providerContext);
 
   let id = rawId;
   let prefix = defaultPrefix;
