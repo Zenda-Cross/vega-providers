@@ -82,10 +82,13 @@ export const getSearchPosts = async ({
         const doc = hit.document;
         const permalink = doc.permalink || "";
         const postUrl = new URL(permalink, `${baseUrl}/`);
-        const post = {
+        const docRating = doc.rating || doc.imdbRating || doc.imdb_rating;
+        const tag = docRating ? `${docRating}★` : undefined;
+        const post: Post = {
           title: doc.post_title.replace("Download", "").trim(),
           link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
           image: doc.post_thumbnail,
+          tag,
         };
         posts.push(post);
       });
@@ -125,7 +128,15 @@ async function posts(
         const href =
           $(element)?.find("a")?.attr("href") || $(element)?.attr("href") || "";
         const postUrl = new URL(href, `${baseUrl}/`);
-        const post = {
+        const rating =
+          $(element)
+            .find(".imdb-score, .rating, [class*='score']")
+            .text()
+            .match(/(\d+(?:\.\d+)?)/)?.[1] ||
+          $(element).find('meta[itemprop="ratingValue"]').attr("content")?.trim();
+        const tag = rating ? `${rating}★` : undefined;
+
+        const post: Post = {
           title: (
             $(element)
               ?.find(".entry-title,.poster-title")
@@ -148,6 +159,7 @@ async function posts(
             $(element).find("img").attr("data-src") ||
             $(element).find("img").attr("src") ||
             "",
+          tag,
         };
         if (post.image.startsWith("//")) {
           post.image = "https:" + post.image;

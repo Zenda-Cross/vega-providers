@@ -87,7 +87,7 @@ export const getSearchPosts = async function ({
         "";
       const type = result?.type;
       const rating = result?.imdbRating || result?.rating;
-      const tag = rating ? `★ ${rating}` : undefined;
+      const tag = rating ? `${rating}★` : undefined;
 
       if (id) {
         catalog.push({
@@ -116,7 +116,7 @@ export const getSearchPosts = async function ({
         "";
       const type = result?.type;
       const rating = result?.imdbRating || result?.rating;
-      const tag = rating ? `★ ${rating}` : undefined;
+      const tag = rating ? `${rating}★` : undefined;
 
       if (id && !catalog.some((c) => c.link.includes(id))) {
         catalog.push({
