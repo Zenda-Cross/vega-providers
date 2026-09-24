@@ -5,48 +5,7 @@ import {
   readCinemetaContext,
 } from "../getCinemetaMeta";
 import { enrichEpisodesWithSkipTimings } from "../theintrodb";
-
-async function getWithWAF(
-  url: string,
-  axios: any,
-  openWebView: any,
-  headers: any,
-): Promise<any> {
-  const baseUrl = url.split("/").slice(0, 3).join("/");
-  try {
-    return await axios.get(url, { headers: { ...headers, Referer: baseUrl } });
-  } catch (error: any) {
-    if (error.response?.status === 403 && openWebView) {
-      console.log(`WAF detected (403) for ${url}, using solver...`);
-      const wafResult = await openWebView(url, {
-        title: "Solve the captcha below and click done",
-        description: "Required to bypass anti-bot protection.",
-        headers: { ...headers, Referer: baseUrl },
-        waitForCookie: "cf_clearance",
-      });
-      if (wafResult.data) {
-        try {
-          const text = wafResult.data.replace(/<[^>]+>/g, '').trim();
-          const parsed = JSON.parse(text);
-          return { data: parsed };
-        } catch {
-          if (wafResult.data.length > 500) {
-            return { data: wafResult.data };
-          }
-        }
-      }
-      return await axios.get(url, {
-        headers: {
-          ...headers,
-          Referer: baseUrl,
-          "User-Agent": wafResult.userAgent || headers["User-Agent"],
-          Cookie: wafResult.cookies || wafResult.cookie,
-        },
-      });
-    }
-    throw error;
-  }
-}
+import { getWithWAF } from "./helper";
 
 const formatEpisodeTitle = (fileName: string): string => {
   try {
@@ -138,12 +97,19 @@ export const getEpisodes = async function ({
           headers,
         );
 
+        let altData = altRes?.data;
+        if (typeof altData === "string") {
+          try {
+            altData = JSON.parse(altData.replace(/<[^>]+>/g, "").trim());
+          } catch {}
+        }
+
         // Check if hubcloud is available
-        if (altRes.data?.hasHubcloud) {
+        if (altData?.hasHubcloud) {
           const hubcloudUrl = `${baseUrl}/api/s/${id}/hubcloud`;
           return enrich([
             {
-              title: formatEpisodeTitle(altRes.data.fileName || "Movie"),
+              title: formatEpisodeTitle(altData.fileName || "Movie"),
               link: hubcloudUrl,
             },
           ]);
@@ -156,7 +122,14 @@ export const getEpisodes = async function ({
 
     const episodes: EpisodeLink[] = [];
 
-    const items = res.data?.pack?.items || [];
+    let packData = res?.data;
+    if (typeof packData === "string") {
+      try {
+        packData = JSON.parse(packData.replace(/<[^>]+>/g, "").trim());
+      } catch {}
+    }
+
+    const items = packData?.pack?.items || [];
 
     for (const item of items) {
       if (item.file_name && item.hubcloud_link) {
