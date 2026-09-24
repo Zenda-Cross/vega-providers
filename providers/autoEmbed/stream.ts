@@ -52,11 +52,13 @@ export const getStream = async ({
   type,
   providerContext,
   signal,
+  isDownload,
 }: {
   link: string;
   type: string;
   providerContext: ProviderContext;
   signal?: AbortSignal;
+  isDownload?: boolean;
 }): Promise<Stream[]> => {
   try {
     const streams: Stream[] = [];
@@ -299,6 +301,27 @@ export const getStream = async ({
     })();
 
     await Promise.allSettled([cinejoyPromise, videasyPromise]);
+
+    streams.sort((a, b) => {
+      if (isDownload) {
+        const aDl =
+          a.type === "mkv" ||
+          a.type === "mp4" ||
+          a.server.toLowerCase().includes("download");
+        const bDl =
+          b.type === "mkv" ||
+          b.type === "mp4" ||
+          b.server.toLowerCase().includes("download");
+        if (aDl && !bDl) return -1;
+        if (!aDl && bDl) return 1;
+      } else {
+        const aHls = a.type === "m3u8";
+        const bHls = b.type === "m3u8";
+        if (aHls && !bHls) return -1;
+        if (!aHls && bHls) return 1;
+      }
+      return 0;
+    });
 
     console.log(`MultiStream resolved ${streams.length} stream(s)`);
     return streams;
