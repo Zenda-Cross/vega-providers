@@ -34,7 +34,8 @@ export function isWafChallenge(html: string): boolean {
     html.includes("challenges.cloudflare.com") ||
     html.includes("cf-mitigated") ||
     html.includes("cf-chl-widget") ||
-    html.includes("Attention Required! | Cloudflare")
+    html.includes("Attention Required! | Cloudflare") ||
+    (html.includes("Cloudflare Ray ID") && html.includes("Please wait"))
   );
 }
 
@@ -55,6 +56,7 @@ export async function getWithWAF(
         description: "Required to bypass anti-bot protection.",
         headers: { ...headers, Referer: baseUrl },
         waitForCookie: "cf_clearance",
+        force: true,
       });
 
       if (

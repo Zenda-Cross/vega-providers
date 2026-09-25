@@ -45,7 +45,7 @@
   {
     "display_name": "Cinewood",
     "value": "1cinevood",
-    "version": "1.37",
+    "version": "1.38",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/1cinevood.png",
     "type": "global",
     "disabled": false,
