@@ -16,15 +16,8 @@ export interface VideasyServer {
 }
 
 export const VIDEASY_SERVERS: VideasyServer[] = [
-  { displayName: "Yoru", path: "cdn", mayHave4K: true, audioLabel: "Original" },
-  { displayName: "Cypher", path: "downloader2", audioLabel: "Original" },
-  { displayName: "Breach", path: "m4uhd", audioLabel: "Original" },
-  { displayName: "Neon", path: "vsrc", audioLabel: "Original" },
   { displayName: "Vyse", path: "hdmovie", qualityFilter: "English", audioLabel: "Original" },
-  { displayName: "Killjoy", path: "meine", language: "german", audioLabel: "German" },
   { displayName: "Fade", path: "hdmovie", qualityFilter: "Hindi", audioLabel: "Hindi" },
-  { displayName: "Omen", path: "lamovie", audioLabel: "Spanish" },
-  { displayName: "Raze", path: "superflix", audioLabel: "Portuguese" },
 ];
 
 function pctEncode(s: string): string {
@@ -86,7 +79,7 @@ export const getStream = async ({
           }/${imdbId}.json`;
         const cRes = await providerContext.axios.get(cinemetaUrl, {
           headers: providerContext.commonHeaders,
-          timeout: 8000,
+          timeout: 5000,
           signal,
         });
         const cMeta = cRes.data?.meta;
@@ -110,7 +103,7 @@ export const getStream = async ({
             Origin: ORIGIN,
             ...providerContext.commonHeaders,
           },
-          timeout: 8000,
+          timeout: 4000,
           signal,
         });
         const dData = dRes.data;
@@ -133,21 +126,26 @@ export const getStream = async ({
       return [];
     }
 
-    const skipTimings = await providerContext.kvStore?.get<boolean>("autoEmbed_skipTimings");
-    const skipTimingsEnabled = skipTimings ?? true;
-    let streamSkip: SkipInterval[] | undefined = undefined;
-    if (skipTimingsEnabled && !isMovie && (imdbId || tmdbId)) {
-      streamSkip = await fetchTheIntroDbSkipTimings({
-        imdbId,
-        tmdbId,
-        season: Number(season),
-        episode: Number(episode),
-        providerContext,
-      });
-      if (!streamSkip?.length) streamSkip = undefined;
-    }
+    // 1. Fetch skip timings in parallel with stream extraction
+    const skipPromise = (async (): Promise<SkipInterval[] | undefined> => {
+      try {
+        const skipTimings = await providerContext.kvStore?.get<boolean>("autoEmbed_skipTimings");
+        const skipTimingsEnabled = skipTimings ?? true;
+        if (skipTimingsEnabled && !isMovie && (imdbId || tmdbId)) {
+          const streamSkip = await fetchTheIntroDbSkipTimings({
+            imdbId,
+            tmdbId,
+            season: Number(season),
+            episode: Number(episode),
+            providerContext,
+          });
+          if (streamSkip?.length) return streamSkip;
+        }
+      } catch {}
+      return undefined;
+    })();
 
-    // 1. Fetch Cinejoy streams in parallel
+    // 2. Fetch Cinejoy streams in parallel
     const cinejoyPromise = extractCinejoyStreams({
       tmdbId,
       season: Number(season),
@@ -155,19 +153,14 @@ export const getStream = async ({
       type: effectiveType,
       providerContext,
       signal,
-    }).then((cjStreams) => {
-      cjStreams.forEach((s) => {
-        streams.push({
-          ...s,
-          skip: streamSkip,
-        });
-      });
     }).catch((err) => {
       console.log("Cinejoy extraction error in MultiStream:", err);
+      return [] as Stream[];
     });
 
-    // 2. Fetch Videasy streams in parallel
-    const videasyPromise = (async () => {
+    // 3. Fetch Videasy streams in parallel
+    const videasyPromise = (async (): Promise<Stream[]> => {
+      const vStreams: Stream[] = [];
       const backendHeaders = {
         Referer: `${ORIGIN}/`,
         Origin: ORIGIN,
@@ -178,10 +171,10 @@ export const getStream = async ({
       try {
         const seedRes = await providerContext.axios.get(
           `${VIDEASY_API_BASE}/seed?mediaId=${tmdbId}`,
-          { headers: backendHeaders, timeout: 10000, signal }
+          { headers: backendHeaders, timeout: 4000, signal }
         );
         const seed = seedRes.data?.seed;
-        if (!seed) return;
+        if (!seed) return [];
 
         const tasks = VIDEASY_SERVERS.map(async (server) => {
           try {
@@ -193,7 +186,7 @@ export const getStream = async ({
 
             const encRes = await providerContext.axios.get(serverUrl, {
               headers: backendHeaders,
-              timeout: 8000,
+              timeout: 4000,
               signal,
             });
 
@@ -212,7 +205,7 @@ export const getStream = async ({
               },
               {
                 headers: { "Content-Type": "application/json" },
-                timeout: 8000,
+                timeout: 4000,
                 signal,
               }
             );
@@ -255,29 +248,27 @@ export const getStream = async ({
                 const q = extractQuality(src.quality);
                 const serverLabel = `${server.displayName} (${server.audioLabel || "Original"
                   })`;
-                streams.push({
+                vStreams.push({
                   server: serverLabel,
                   link: src.url,
                   type: src.url.includes(".m3u8") ? "m3u8" : "mp4",
                   quality: q,
                   subtitles: subtitles.length > 0 ? subtitles : undefined,
                   headers: videoHeaders,
-                  skip: streamSkip,
                 });
               });
             } else if (result.url) {
-              streams.push({
+              vStreams.push({
                 server: `${server.displayName} (${server.audioLabel || "Original"
                   })`,
                 link: result.url,
                 type: "m3u8",
                 subtitles: subtitles.length > 0 ? subtitles : undefined,
                 headers: videoHeaders,
-                skip: streamSkip,
               });
             } else if (result.streams) {
               for (const [qStr, sUrl] of Object.entries(result.streams)) {
-                streams.push({
+                vStreams.push({
                   server: `${server.displayName} (${server.audioLabel || "Original"
                     })`,
                   link: sUrl as string,
@@ -285,7 +276,6 @@ export const getStream = async ({
                   quality: extractQuality(qStr),
                   subtitles: subtitles.length > 0 ? subtitles : undefined,
                   headers: videoHeaders,
-                  skip: streamSkip,
                 });
               }
             }
@@ -298,11 +288,26 @@ export const getStream = async ({
       } catch (e) {
         console.log("Videasy extraction error in MultiStream:", e);
       }
+      return vStreams;
     })();
 
-    await Promise.allSettled([cinejoyPromise, videasyPromise]);
+    const [streamSkip, cjStreams, vStreams] = await Promise.all([
+      skipPromise,
+      cinejoyPromise,
+      videasyPromise,
+    ]);
+
+    (cjStreams || []).forEach((s) => {
+      streams.push({ ...s, skip: streamSkip });
+    });
+    (vStreams || []).forEach((s) => {
+      streams.push({ ...s, skip: streamSkip });
+    });
 
     streams.sort((a, b) => {
+      const aQual = parseInt(a.quality || "0", 10);
+      const bQual = parseInt(b.quality || "0", 10);
+
       if (isDownload) {
         const aDl =
           a.type === "mkv" ||
@@ -314,11 +319,20 @@ export const getStream = async ({
           b.server.toLowerCase().includes("download");
         if (aDl && !bDl) return -1;
         if (!aDl && bDl) return 1;
+
+        if (aQual !== bQual) return bQual - aQual;
       } else {
         const aHls = a.type === "m3u8";
         const bHls = b.type === "m3u8";
         if (aHls && !bHls) return -1;
         if (!aHls && bHls) return 1;
+
+        const aCj = a.server.startsWith("Cinejoy");
+        const bCj = b.server.startsWith("Cinejoy");
+        if (aCj && !bCj) return -1;
+        if (!aCj && bCj) return 1;
+
+        if (aQual !== bQual) return bQual - aQual;
       }
       return 0;
     });

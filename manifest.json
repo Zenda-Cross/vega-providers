@@ -11,7 +11,7 @@
   {
     "display_name": "MultiStream",
     "value": "autoEmbed",
-    "version": "3.0",
+    "version": "3.1",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/autoEmbed.png",
     "type": "global",
     "disabled": false

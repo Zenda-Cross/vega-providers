@@ -2,8 +2,13 @@ import { ProviderContext, Stream, TextTracks } from "../types";
 
 let cachedCode: string | null = null;
 let cachedChunkUrl: string | null = null;
-let cachedServers: any[] | null = null;
-let lastServerFetchTime = 0;
+let cachedServers: any[] = [
+  { name: "Lisbon", "4k": true },
+  { name: "Nebula" },
+  { name: "Solara" },
+  { name: "Athens" },
+];
+let lastServerFetchTime = Date.now();
 
 function safeBtoa(str: string): string {
   if (typeof btoa !== "undefined") return btoa(str);
@@ -153,47 +158,73 @@ export async function extractCinejoyStreams({
       }
     }
 
-    // 2. Fetch available servers (cache for 5 minutes)
+    // 2. Refresh available servers in background (cache for 5 minutes)
     const now = Date.now();
-    if (!cachedServers || now - lastServerFetchTime > 300000) {
+    if (now - lastServerFetchTime > 300000) {
+      axios
+        .get("https://api.wing.st/servers", { headers, timeout: 5000, signal })
+        .then((sRes: any) => {
+          if (sRes.data?.servers?.length) {
+            cachedServers = sRes.data.servers;
+            lastServerFetchTime = Date.now();
+          }
+        })
+        .catch(() => {});
+    }
+
+    // 3. Start fetching external subtitles and direct download links concurrently
+    const subPromise = (async (): Promise<any[]> => {
       try {
-        const sRes = await axios.get("https://api.wing.st/servers", {
+        const subUrl = `https://subs.wing.st/subtitles?tmdb=${tmdbId}${
+          isMovie ? "" : `&season=${season || 1}&episode=${episode || 1}`
+        }`;
+        const subRes = await axios.get(subUrl, { headers, timeout: 5000, signal });
+        if (Array.isArray(subRes.data)) {
+          return subRes.data
+            .filter((sub: any) => sub && sub.url)
+            .map((sub: any) => ({
+              title: sub.display || sub.language || "Subtitle",
+              language: (sub.language || "en").slice(0, 2).toLowerCase(),
+              type: sub.type === "vtt" ? ("text/vtt" as const) : ("application/x-subrip" as const),
+              uri: sub.url,
+            }));
+        }
+      } catch {}
+      return [];
+    })();
+
+    const dlPromise = (async (): Promise<Stream[]> => {
+      try {
+        const dlUrl = `https://downloads.wing.st/${isMovie ? "movie" : "tv"}/${tmdbId}${
+          isMovie ? "" : `/${season || 1}/${episode || 1}`
+        }`;
+        const dlRes = await axios.get(dlUrl, {
           headers,
           timeout: 6000,
           signal,
         });
-        cachedServers = sRes.data?.servers || [];
-        lastServerFetchTime = now;
-      } catch {
-        if (!cachedServers?.length) {
-          cachedServers = [
-            { name: "Lisbon", "4k": true },
-            { name: "Nebula" },
-            { name: "Solara" },
-            { name: "Athens" },
-          ];
+        const dlLinks = dlRes.data?.links || [];
+        const result: Stream[] = [];
+        for (const dl of dlLinks) {
+          if (!dl?.url) continue;
+          const srvName = dl.source || "Download";
+          const sizeTag = dl.size ? ` [${dl.size}]` : "";
+          result.push({
+            server: `Cinejoy - ${srvName}${sizeTag}`,
+            link: dl.url,
+            type: dl.url.includes(".m3u8") ? "m3u8" : "mkv",
+            quality: dl.quality ? String(dl.quality) : undefined,
+            headers: {
+              Referer: "https://cinejoy.pk/",
+              Origin: "https://cinejoy.pk",
+            },
+          });
         }
+        return result;
+      } catch {
+        return [];
       }
-    }
-
-    // 3. Fetch external subtitles from subs.wing.st
-    let externalSubtitles: any[] = [];
-    try {
-      const subUrl = `https://subs.wing.st/subtitles?tmdb=${tmdbId}${
-        isMovie ? "" : `&season=${season || 1}&episode=${episode || 1}`
-      }`;
-      const subRes = await axios.get(subUrl, { headers, timeout: 5000, signal });
-      if (Array.isArray(subRes.data)) {
-        externalSubtitles = subRes.data
-          .filter((sub: any) => sub && sub.url)
-          .map((sub: any) => ({
-            title: sub.display || sub.language || "Subtitle",
-            language: (sub.language || "en").slice(0, 2).toLowerCase(),
-            type: sub.type === "vtt" ? ("text/vtt" as const) : ("application/x-subrip" as const),
-            uri: sub.url,
-          }));
-      }
-    } catch {}
+    })();
 
     // 4. Setup sandbox execution (zero Node.js dependencies, 100% WebWorker compatible)
     const sandbox: any = {
@@ -243,7 +274,7 @@ export async function extractCinejoyStreams({
             },
             data: opts?.body,
             responseType: "arraybuffer",
-            timeout: 8000,
+            timeout: 6000,
             signal,
           });
           const rawData = fetchRes.data;
@@ -306,6 +337,8 @@ export async function extractCinejoyStreams({
     const streams: Stream[] = [];
 
     // 5. Query active servers in parallel
+    const externalSubtitles = await subPromise;
+
     const tasks = activeServers.map(async (srv) => {
       const serverName = srv.name;
       try {
@@ -373,36 +406,13 @@ export async function extractCinejoyStreams({
       }
     });
 
-    await Promise.allSettled(tasks);
+    const [dlStreams] = await Promise.all([
+      dlPromise,
+      Promise.allSettled(tasks),
+    ]);
 
-    // 6. Fetch downloads.wing.st direct links and append at the end
-    try {
-      const dlUrl = `https://downloads.wing.st/${isMovie ? "movie" : "tv"}/${tmdbId}${
-        isMovie ? "" : `/${season || 1}/${episode || 1}`
-      }`;
-      const dlRes = await axios.get(dlUrl, {
-        headers,
-        timeout: 8000,
-        signal,
-      });
-      const dlLinks = dlRes.data?.links || [];
-      for (const dl of dlLinks) {
-        if (!dl?.url) continue;
-        const srvName = dl.source || "Download";
-        const sizeTag = dl.size ? ` [${dl.size}]` : "";
-        streams.push({
-          server: `Cinejoy - ${srvName}${sizeTag}`,
-          link: dl.url,
-          type: dl.url.includes(".m3u8") ? "m3u8" : "mkv",
-          quality: dl.quality ? String(dl.quality) : undefined,
-          headers: {
-            Referer: "https://cinejoy.pk/",
-            Origin: "https://cinejoy.pk",
-          },
-        });
-      }
-    } catch {
-      // Ignore if downloads endpoint has no entries for this title
+    if (dlStreams && dlStreams.length > 0) {
+      streams.push(...dlStreams);
     }
 
     return streams;
