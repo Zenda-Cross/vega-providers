@@ -1,5 +1,92 @@
 import { Stream, ProviderContext } from "../types";
 
+const TURNSTILE_INJECT_JS = `(function() {
+  if (window.__vega_turnstile_injected) return;
+  window.__vega_turnstile_injected = true;
+
+  function init() {
+    if (!document.body) {
+      setTimeout(init, 50);
+      return;
+    }
+
+    var container = document.getElementById('vega-turnstile-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'vega-turnstile-container';
+      container.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999999;background:#18181b;padding:24px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:300px;border:1px solid #333;font-family:system-ui,-apple-system,sans-serif;';
+      
+      var title = document.createElement('div');
+      title.innerText = 'Security Verification';
+      title.style.cssText = 'color:#fff;font-size:15px;font-weight:600;margin-bottom:8px;text-align:center;';
+      container.appendChild(title);
+
+      var subtitle = document.createElement('div');
+      subtitle.innerText = 'Please wait or verify below to load streams...';
+      subtitle.style.cssText = 'color:#a1a1aa;font-size:13px;margin-bottom:16px;text-align:center;';
+      container.appendChild(subtitle);
+
+      var widget = document.createElement('div');
+      widget.id = 'vega-turnstile-widget';
+      container.appendChild(widget);
+
+      document.body.appendChild(container);
+    }
+
+    function renderWidget() {
+      if (!window.turnstile || typeof window.turnstile.render !== 'function') return false;
+      var widget = document.getElementById('vega-turnstile-widget');
+      if (!widget || widget.children.length > 0) return true;
+      try {
+        window.turnstile.render(widget, {
+          sitekey: '0x4AAAAAAE88TTCq-X3s3srZ',
+          theme: 'dark',
+          callback: function(token) {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                __waf: true,
+                data: token
+              }));
+            }
+          },
+          'error-callback': function() {
+            console.error('Turnstile error');
+          }
+        });
+        return true;
+      } catch (err) {
+        console.error('Turnstile render error', err);
+        return false;
+      }
+    }
+
+    if (window.turnstile && renderWidget()) {
+      return;
+    }
+
+    if (!document.getElementById('vega-turnstile-script')) {
+      var script = document.createElement('script');
+      script.id = 'vega-turnstile-script';
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+
+    var poll = setInterval(function() {
+      if (window.turnstile && renderWidget()) {
+        clearInterval(poll);
+      }
+    }, 100);
+    setTimeout(function() { clearInterval(poll); }, 25000);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})(); true;`;
+
 const DIRECT_REGEX =
   /(r2\.dev|workers\.dev|foxcloud\.rest|neetflixcdn|drive\.google\.com\/uc|video-downloads\.googleusercontent|vikingfile\.com\/download|download\d*\.mediafire|111477|sermoviedown|highxhd|archive\.org|uupload\.ir|hakunaymatata\.com|vadapav\.mov|tattooin\.ru|public\.animeout|nimbus\.animeout|mydriveku|dl\.anime7\.download|\.mkv($|\?)|\.mp4($|\?)|\.webm($|\?)|\.avi($|\?))/i;
 
@@ -266,19 +353,61 @@ export const getStream = async function ({
       "x-defe-manual": "1",
     };
 
-    const res = await providerContext.axios.post(
-      "https://slave.downloadeverythingfromeverywhere.com/",
-      payload,
-      {
-        headers,
-        responseType: "text",
-        signal,
-        timeout: 45000,
-      },
-    );
+    const fetchStreams = async (bodyPayload: any): Promise<string> => {
+      const response = await providerContext.axios.post(
+        "https://slave.downloadeverythingfromeverywhere.com/",
+        bodyPayload,
+        {
+          headers,
+          responseType: "text",
+          signal,
+          timeout: 45000,
+        },
+      );
+      return typeof response.data === "string"
+        ? response.data
+        : JSON.stringify(response.data);
+    };
 
-    const rawData =
-      typeof res.data === "string" ? res.data : JSON.stringify(res.data);
+    let rawData = "";
+    try {
+      rawData = await fetchStreams(payload);
+    } catch (err: any) {
+      if (err.response) {
+        rawData =
+          typeof err.response.data === "string"
+            ? err.response.data
+            : JSON.stringify(err.response.data || "");
+      } else {
+        throw err;
+      }
+    }
+
+    if (
+      (rawData.includes('"verify failed"') || rawData.includes('"error"')) &&
+      providerContext.openWebView
+    ) {
+      try {
+        const wafResult = await providerContext.openWebView(
+          "https://downloadeverythingfromeverywhere.com/",
+          {
+            title: "Security Verification",
+            description: "Please complete the verification to load streams",
+            force: true,
+            injectedJavaScript: TURNSTILE_INJECT_JS,
+          },
+        );
+
+        const token = wafResult?.data?.trim();
+        if (token && !token.startsWith("<") && !token.startsWith("{")) {
+          payload.turnstile = token;
+          rawData = await fetchStreams(payload);
+        }
+      } catch (wafErr) {
+        console.error("Turnstile WAF solving failed or cancelled:", wafErr);
+      }
+    }
+
     const lines = rawData.split("\n").filter((l: string) => l.trim().length > 0);
 
     const streams: Stream[] = [];

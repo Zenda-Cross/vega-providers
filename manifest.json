@@ -432,7 +432,7 @@
   {
     "display_name": "Everything",
     "value": "everything",
-    "version": "1.4",
+    "version": "1.5",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/everything.png",
     "type": "global",
     "disabled": false
