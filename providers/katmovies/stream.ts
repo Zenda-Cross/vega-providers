@@ -63,7 +63,7 @@ async function extractKmhdLink(
       }
       const gdId = res.data?.upload_links?.gdflix_res;
       if (gdId && gdId !== "None") {
-        return `https://gd.kmhd.eu/file/${gdId}`;
+        return `https://new.gdflix.cfd/file/${gdId}`;
       }
     } catch (e) {
       console.log("api.dandndn.one error, trying fallback...", e);
@@ -79,8 +79,9 @@ async function extractKmhdLink(
   const hubDriveLink = data.match(
     /hubdrive_res\s*:\s*{[^}]*?link\s*:\s*"([^"]+)"/,
   )?.[1]?.replace("hubcloud.foo", "hubcloud.cx");
-  if (hubDriveLink && hubDriveRes) {
-    return hubDriveLink + hubDriveRes;
+  if (hubDriveRes) {
+    const base = hubDriveLink || "https://hubcloud.cx/drive/";
+    return base + hubDriveRes;
   }
   return katlink;
 }
@@ -101,7 +102,7 @@ export const getStream = async function ({
   const { axios, cheerio, commonHeaders, openWebView } = providerContext;
   console.log("katGetStream", link);
   try {
-    if (link.includes("gdflix")) {
+    if (link.includes("gdflix") || link.includes("gd.kmhd")) {
       return await gdflixExtractor(
         link,
         signal,
@@ -113,7 +114,7 @@ export const getStream = async function ({
     }
     if (link.includes("kmhd") || link.includes("kmphotos")) {
       const hubcloudLink = await extractKmhdLink(link, providerContext);
-      if (hubcloudLink.includes("gdflix")) {
+      if (hubcloudLink.includes("gdflix") || hubcloudLink.includes("gd.kmhd")) {
         return await gdflixExtractor(
           hubcloudLink,
           signal,

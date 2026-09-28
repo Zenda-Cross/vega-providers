@@ -41,6 +41,20 @@ async function getWithWAF(
   }
 }
 
+function parseSvelteData(html: string): any {
+  const match = html.match(/resolve\(\{\s*id:\s*\d+,\s*data:/);
+  if (!match || match.index === undefined) return null;
+  const start = match.index + match[0].length;
+  const errorIdx = html.indexOf(",error:", start);
+  if (errorIdx === -1) return null;
+  const dataStr = html.substring(start, errorIdx);
+  try {
+    return Function(`"use strict"; return (${dataStr});`)();
+  } catch {
+    return null;
+  }
+}
+
 export const getMeta = async function ({
   link,
   providerContext,
@@ -54,19 +68,33 @@ export const getMeta = async function ({
     const url = new URL(link, `${baseUrl}/`).href;
     const res = await getWithWAF(url, axios, openWebView, commonHeaders);
     const data = res.data;
-    const $ = cheerio.load(data);
+
+    const parsed = parseSvelteData(data);
+    const postContent = parsed?.data?.post_content || "";
+    const page$ = cheerio.load(data);
+    const $ = cheerio.load(
+      postContent ? `<div class="entry-content">${postContent}</div>` : data,
+    );
+
     const container = $(".yQ8hqd.ksSzJd.LoQAYe").html()
       ? $(".yQ8hqd.ksSzJd.LoQAYe")
       : $(".FxvUNb");
+
     const imdbId =
       container
         .find('a[href*="imdb.com/title/tt"]:not([href*="imdb.com/title/tt/"])')
         .attr("href")
         ?.split("/")[4] ||
+      $('a[href*="imdb.com/title/tt"]').attr("href")?.match(/tt\d+/)?.[0] ||
       data.match(/imdb\.com\/title\/(tt\d+)/i)?.[1] ||
+      (postContent && postContent.match(/imdb\.com\/title\/(tt\d+)/i)?.[1]) ||
       "";
 
-    const pageTitle = $("h1, .entry-title, title").first().text().replace("Download", "").trim();
+    const pageTitle = (
+      page$("title").text().replace(/^Download\s+/i, "").trim() ||
+      page$('meta[property="og:title"]').attr("content")?.replace(/^Download\s+/i, "").trim() ||
+      $("h1, .entry-title").first().text().replace(/^Download\s+/i, "").trim()
+    );
 
     let title = container
       .find('li:contains("Name")')
@@ -77,20 +105,30 @@ export const getMeta = async function ({
       .trim();
 
     if (!title) {
+      title = $('h3, h2').first().text().replace(/^Download\s+/i, "").trim();
+    }
+    if (!title) {
       title = pageTitle.replace(/\[.*?\]|\(.*?\)|\|.*/g, "").trim();
     }
 
     const isSeries =
       /season\s*\d+/i.test(pageTitle) ||
       /\[\s*s\d{1,2}\s*\]/i.test(pageTitle) ||
-      (/episode/i.test(data) && !pageTitle.toLowerCase().includes("full movie")) ||
+      (/(?:^|\b)(?:season|episode)\b/i.test(postContent || data) && !pageTitle.toLowerCase().includes("full movie")) ||
       $(".yQ8hqd.ksSzJd.LoQAYe").length > 0;
     const type = isSeries ? "series" : "movie";
 
-    const synopsis = container.find('li:contains("Stars"), li:contains("Storyline")').text().trim();
+    let synopsis = container.find('li:contains("Stars"), li:contains("Storyline")').text().trim();
+    if (!synopsis) {
+      synopsis = $('p:contains("Storyline"), h2:contains("Storyline")').next("p").text().trim() ||
+        page$('meta[name="description"]').attr("content") || "";
+    }
+
     const image =
       $('h4:contains("SCREENSHOTS")').next().find("img").attr("src") ||
+      $('img[src*="amazon.com"], img[src*="tmdb.org"]').first().attr("src") ||
       $(".entry-content img").first().attr("src") ||
+      page$('meta[property="og:image"]').attr("content") ||
       "";
 
     console.log("katGetInfo", title, synopsis, image, imdbId, type);
@@ -107,11 +145,11 @@ export const getMeta = async function ({
           $(element)
             .nextAll("h3,h2")
             .first()
-            .find('a:contains("1080"),a:contains("720"),a:contains("480")')
+            .find('a:contains("1080"),a:contains("720"),a:contains("480"),a:contains("HEVC")')
             .attr("href") || "";
-        const dlTitle = $(element).find("span").text().trim();
+        const dlTitle = $(element).text().trim();
 
-        if (dlLink.trim().length > 0 && dlTitle.includes("Episode ")) {
+        if (dlLink.trim().length > 0 && dlTitle.includes("Episode")) {
           directLink.push({
             title: dlTitle,
             link: dlLink,
@@ -148,7 +186,7 @@ export const getMeta = async function ({
       }
 
       if (
-        /links\.(?:kmhd|kmphotos)\.[a-z]+\/(?:file|pack)\/[\w]+/i.test(aHref) ||
+        /links\.(?:kmhd|kmphotos)\.[a-z]+\/(?:file|pack)\/[\w-]+/i.test(aHref) ||
         /(?:480|720|1080|2160|4k)/i.test(aText) ||
         aHref.includes("gdflix") ||
         aHref.includes("hubcloud")
@@ -159,6 +197,8 @@ export const getMeta = async function ({
         }
         const quality = (linkTitle + " " + aText).match(/\b(480p|720p|1080p|2160p|4k)\b/i)?.[0] || "";
 
+        const isPack = aHref.includes("/pack/");
+
         if (type === "movie") {
           if (!links.some((l) => l.directLinks?.[0]?.link === aHref)) {
             links.push({
@@ -168,12 +208,34 @@ export const getMeta = async function ({
             });
           }
         } else {
-          if (!links.some((l) => l.episodesLink === aHref)) {
-            links.push({
-              quality,
-              title: linkTitle,
-              episodesLink: aHref,
-            });
+          if (isPack) {
+            if (!links.some((l) => l.episodesLink === aHref)) {
+              links.push({
+                quality,
+                title: linkTitle,
+                episodesLink: aHref,
+              });
+            }
+          } else {
+            const alreadyInDirect = links.some((l) =>
+              l.directLinks?.some((dl) => dl.link === aHref)
+            );
+            if (!alreadyInDirect) {
+              const firstGroup = links.find((l) => l.directLinks && l.directLinks.length > 0);
+              if (firstGroup && firstGroup.directLinks) {
+                firstGroup.directLinks.push({
+                  title: linkTitle,
+                  link: aHref,
+                  type: "series",
+                });
+              } else {
+                links.push({
+                  quality,
+                  title: linkTitle,
+                  directLinks: [{ link: aHref, title: linkTitle, type: "series" }],
+                });
+              }
+            }
           }
         }
       }

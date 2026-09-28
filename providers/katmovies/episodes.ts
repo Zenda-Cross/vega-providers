@@ -125,10 +125,46 @@ export const getEpisodes = async function ({
       }
     }
 
+function parseSvelteData(html: string): any {
+  const match = html.match(/resolve\(\{\s*id:\s*\d+,\s*data:/);
+  if (!match || match.index === undefined) return null;
+  const start = match.index + match[0].length;
+  const errorIdx = html.indexOf(",error:", start);
+  if (errorIdx === -1) return null;
+  const dataStr = html.substring(start, errorIdx);
+  try {
+    return Function(`"use strict"; return (${dataStr});`)();
+  } catch {
+    return null;
+  }
+}
+
     if (requestUrl.includes("/pack") || requestUrl.includes("kmhd") || requestUrl.includes("kmphotos")) {
-      const epIds = await extractKmhdEpisodes(requestUrl, providerContext);
+      const res = await getWithWAF(
+        requestUrl,
+        axios,
+        openWebView,
+        commonHeaders,
+      );
+      const data = res.data;
+      const parsed = parseSvelteData(data);
+      const info = parsed?.info || parsed?.data?.info;
+      const hostBase = requestUrl.split("/pack")[0].split("/file")[0];
+      if (info && typeof info === "object") {
+        for (const [id, ep] of Object.entries(info as Record<string, any>)) {
+          const epTitle = ep?.name
+            ? ep.name.replace(/\.mkv$/i, "").replace(/\./g, " ").trim()
+            : id;
+          episodesLink.push({
+            title: epTitle,
+            link: `${hostBase}/file/${id}`,
+          });
+        }
+        if (episodesLink.length > 0) return finish();
+      }
+
+      const epIds = await extractKmhdEpisodes(requestUrl, providerContext, data);
       if (epIds && epIds.length > 0) {
-        const hostBase = requestUrl.split("/pack")[0].split("/file")[0];
         epIds.forEach((id: string, index: number) => {
           episodesLink.push({
             title: `Episode ${index + 1}`,
@@ -170,6 +206,7 @@ export const getEpisodes = async function ({
 async function extractKmhdEpisodes(
   katlink: string,
   providerContext: ProviderContext,
+  cachedData?: string,
 ) {
   const packIdMatch = katlink.match(/[\w]+_[a-f0-9]{8}/);
   if (packIdMatch) {
@@ -194,10 +231,12 @@ async function extractKmhdEpisodes(
   }
   const { axios, openWebView, commonHeaders } = providerContext;
   try {
-    const res = await getWithWAF(katlink, axios, openWebView, commonHeaders);
-    const data = res.data;
+    const data = cachedData || (await getWithWAF(katlink, axios, openWebView, commonHeaders)).data;
     const ids = data.match(/[\w]+_[a-f0-9]{8}/g);
-    return ids;
+    if (ids && ids.length > 0) {
+      return Array.from(new Set(ids));
+    }
+    return [];
   } catch {
     return [];
   }

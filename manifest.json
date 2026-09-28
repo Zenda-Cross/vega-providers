@@ -62,7 +62,7 @@
   {
     "display_name": "KatMoviesHd",
     "value": "katmovies",
-    "version": "1.36",
+    "version": "1.37",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/katmovies.png",
     "type": "global",
     "disabled": false,
