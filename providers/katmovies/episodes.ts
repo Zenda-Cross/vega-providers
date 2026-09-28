@@ -208,31 +208,56 @@ async function extractKmhdEpisodes(
   providerContext: ProviderContext,
   cachedData?: string,
 ) {
-  const packIdMatch = katlink.match(/[\w]+_[a-f0-9]{8}/);
-  if (packIdMatch) {
-    const packId = packIdMatch[0];
-    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTgwNzQ4NDIzMywiaWF0IjoxNzA3NDg0MjMzfQ.7u5bF9PcMhvClSDZgsd6EU-CQnp1Ec--wsezkDEgiZo";
+  const { axios, openWebView, commonHeaders } = providerContext;
+  let origin = "https://links.kmhd.me";
+  try {
+    origin = new URL(katlink).origin;
+  } catch {}
+
+  let pageData: string = cachedData || "";
+  if (!pageData) {
     try {
-      const res = await providerContext.axios.get(
-        `https://api.dandndn.one/api/v1/file/${packId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            ...providerContext.commonHeaders,
-            Origin: "https://links.kmhd.eu",
-            Referer: "https://links.kmhd.eu/",
-          },
-        }
-      );
+      const res = await getWithWAF(katlink, axios, openWebView, commonHeaders, {
+        Cookie: "unlocked=true",
+        Referer: origin + "/",
+      });
+      pageData =
+        typeof res.data === "string" ? res.data : JSON.stringify(res.data);
+    } catch {}
+  }
+
+  const packIdMatch = katlink.match(/[\w]+_[a-f0-9]{8}/);
+  if (packIdMatch && pageData) {
+    const packId = packIdMatch[0];
+    const dynamicToken = pageData.match(/"PUBLIC_TOKEN"\s*:\s*"([^"]+)"/)?.[1];
+    const token =
+      dynamicToken ||
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTgwNzQ4NDIzMywiaWF0IjoxNzA3NDg0MjMzfQ.7u5bF9PcMhvClSDZgsd6EU-CQnp1Ec--wsezkDEgiZo";
+
+    const chibiMatch = pageData.match(
+      /"PUBLIC_CHIBI_PATH"\s*:\s*"https?:\/\/([^"\/]+)"/,
+    )?.[1];
+    const apiHost = chibiMatch
+      ? chibiMatch.replace(/^upload-[^.]+\./, "api.")
+      : "api.dandndn.one";
+
+    try {
+      const res = await axios.get(`https://${apiHost}/api/v1/file/${packId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...commonHeaders,
+          Origin: origin,
+          Referer: origin + "/",
+        },
+      });
       if (res.data?.zip_files?.length > 0) {
         return res.data.zip_files;
       }
     } catch (e) {}
   }
-  const { axios, openWebView, commonHeaders } = providerContext;
+
   try {
-    const data = cachedData || (await getWithWAF(katlink, axios, openWebView, commonHeaders)).data;
-    const ids = data.match(/[\w]+_[a-f0-9]{8}/g);
+    const ids = pageData.match(/[\w]+_[a-f0-9]{8}/g);
     if (ids && ids.length > 0) {
       return Array.from(new Set(ids));
     }
