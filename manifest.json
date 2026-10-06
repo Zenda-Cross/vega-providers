@@ -436,5 +436,13 @@
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/everything.png",
     "type": "global",
     "disabled": false
+  },
+  {
+    "display_name": "Castle TV",
+    "value": "castle",
+    "version": "1.0",
+    "icon": "",
+    "type": "global",
+    "disabled": false
   }
 ]

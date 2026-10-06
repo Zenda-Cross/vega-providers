@@ -158,5 +158,9 @@
   "kickAssAnime": {
     "name": "kickAssAnime",
     "url": "https://kaa.lt"
+  },
+  "castle": {
+    "name": "Castle TV",
+    "url": "https://api.hlowb.com"
   }
 }
