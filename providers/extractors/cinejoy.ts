@@ -172,7 +172,7 @@ export async function extractCinejoyStreams({
         .catch(() => {});
     }
 
-    // 3. Start fetching external subtitles and direct download links concurrently
+    // 3. Start fetching external subtitles concurrently
     const subPromise = (async (): Promise<any[]> => {
       try {
         const subUrl = `https://subs.wing.st/subtitles?tmdb=${tmdbId}${
@@ -191,39 +191,6 @@ export async function extractCinejoyStreams({
         }
       } catch {}
       return [];
-    })();
-
-    const dlPromise = (async (): Promise<Stream[]> => {
-      try {
-        const dlUrl = `https://downloads.wing.st/${isMovie ? "movie" : "tv"}/${tmdbId}${
-          isMovie ? "" : `/${season || 1}/${episode || 1}`
-        }`;
-        const dlRes = await axios.get(dlUrl, {
-          headers,
-          timeout: 6000,
-          signal,
-        });
-        const dlLinks = dlRes.data?.links || [];
-        const result: Stream[] = [];
-        for (const dl of dlLinks) {
-          if (!dl?.url) continue;
-          const srvName = dl.source || "Download";
-          const sizeTag = dl.size ? ` [${dl.size}]` : "";
-          result.push({
-            server: `Cinejoy - ${srvName}${sizeTag}`,
-            link: dl.url,
-            type: dl.url.includes(".m3u8") ? "m3u8" : "mkv",
-            quality: dl.quality ? String(dl.quality) : undefined,
-            headers: {
-              Referer: "https://cinejoy.pk/",
-              Origin: "https://cinejoy.pk",
-            },
-          });
-        }
-        return result;
-      } catch {
-        return [];
-      }
     })();
 
     // 4. Setup sandbox execution (zero Node.js dependencies, 100% WebWorker compatible)
@@ -336,27 +303,42 @@ export async function extractCinejoyStreams({
     const activeServers = cachedServers || [];
     const streams: Stream[] = [];
 
-    // 5. Query active servers in parallel
+    // 5. Query active servers in parallel with per-server timeout
     const externalSubtitles = await subPromise;
+
+    const streamHeaders = {
+      Referer: "https://cinejoy.pk/",
+      Origin: "https://cinejoy.pk",
+      "User-Agent": headers["User-Agent"],
+    };
 
     const tasks = activeServers.map(async (srv) => {
       const serverName = srv.name;
       try {
-        let resData: any = null;
-        if (isMovie && exportsObj.resolveMovie) {
-          resData = await exportsObj.resolveMovie(serverName, String(tmdbId));
-        } else if (!isMovie && exportsObj.resolveTv) {
-          resData = await exportsObj.resolveTv(
-            serverName,
-            String(tmdbId),
-            Number(season || 1),
-            Number(episode || 1)
-          );
-        }
+        const serverQuery = (async () => {
+          let resData: any = null;
+          if (isMovie && exportsObj.resolveMovie) {
+            resData = await exportsObj.resolveMovie(serverName, String(tmdbId));
+          } else if (!isMovie && exportsObj.resolveTv) {
+            resData = await exportsObj.resolveTv(
+              serverName,
+              String(tmdbId),
+              Number(season || 1),
+              Number(episode || 1)
+            );
+          }
+          return resData;
+        })();
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Server timeout")), 5000)
+        );
+
+        const resData: any = await Promise.race([serverQuery, timeoutPromise]);
 
         if (resData?.stream && Array.isArray(resData.stream)) {
           for (const item of resData.stream) {
-            const subtitles: TextTracks = [
+            const rawSubs = [
               ...(item.captions || []).map((c: any) => ({
                 title: c.id || c.language || "Subtitle",
                 uri: c.url,
@@ -366,6 +348,15 @@ export async function extractCinejoyStreams({
               ...externalSubtitles,
             ];
 
+            const seenSubs = new Set<string>();
+            const subtitles: TextTracks = [];
+            for (const s of rawSubs) {
+              if (s && s.uri && !seenSubs.has(s.uri)) {
+                seenSubs.add(s.uri);
+                subtitles.push(s);
+              }
+            }
+
             if (item.type === "hls" && item.playlist) {
               streams.push({
                 server: `Cinejoy - ${serverName}${srv["4k"] ? " (4K)" : ""}`,
@@ -373,10 +364,7 @@ export async function extractCinejoyStreams({
                 type: "m3u8",
                 quality: srv["4k"] ? "2160" : "1080",
                 subtitles: subtitles.length ? subtitles : undefined,
-                headers: {
-                  Referer: "https://cinejoy.pk/",
-                  Origin: "https://cinejoy.pk",
-                },
+                headers: streamHeaders,
               });
             } else if (item.type === "file" && item.qualities) {
               for (const [qKey, qVal] of Object.entries<any>(item.qualities)) {
@@ -391,10 +379,7 @@ export async function extractCinejoyStreams({
                       ? "720"
                       : undefined,
                     subtitles: subtitles.length ? subtitles : undefined,
-                    headers: {
-                      Referer: "https://cinejoy.pk/",
-                      Origin: "https://cinejoy.pk",
-                    },
+                    headers: streamHeaders,
                   });
                 }
               }
@@ -402,19 +387,11 @@ export async function extractCinejoyStreams({
           }
         }
       } catch {
-        // Skip server if unavailable for this media
+        // Skip server if unavailable or timed out
       }
     });
 
-    const [dlStreams] = await Promise.all([
-      dlPromise,
-      Promise.allSettled(tasks),
-    ]);
-
-    if (dlStreams && dlStreams.length > 0) {
-      streams.push(...dlStreams);
-    }
-
+    await Promise.allSettled(tasks);
     return streams;
   } catch (err) {
     console.log("extractCinejoyStreams error:", err);

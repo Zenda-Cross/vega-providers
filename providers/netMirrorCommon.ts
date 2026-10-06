@@ -81,6 +81,19 @@ export const unlockNetMirrorMobileSession = async (
       .filter(Boolean)
       .join("; ");
 
+    // A session can already be verified (e.g. another mirror unlocked it).
+    // Cache a returned token even when the page has no verification form.
+    for (const cookie of cookiesArr) {
+      const token = usableSessionToken(String(cookie).match(/t_hash_t=([^;]+)/)?.[1]);
+      if (token) {
+        if (kvStore) {
+          await kvStore.set("t_hash_t", token);
+          await kvStore.set("t_hash_t_data", { token, ts: Date.now() });
+        }
+        return token;
+      }
+    }
+
     const html = typeof homeRes.data === "string" ? homeRes.data : "";
     const matchAddHash = html.match(/data-addhash=["']([^"']+)["']/);
     const addhash = matchAddHash ? matchAddHash[1] : null;
@@ -199,7 +212,34 @@ export const unlockNetMirrorMobileSession = async (
   }
 };
 
-let unlockPromise: Promise<string | undefined> | null = null;
+const unlockPromises = new Map<string, Promise<string | undefined>>();
+
+const unlockSharedSession = (
+  providerContext: ProviderContext,
+  baseUrl: string
+): Promise<string | undefined> => {
+  let promise = unlockPromises.get(baseUrl);
+  if (!promise) {
+    promise = unlockNetMirrorMobileSession(providerContext, baseUrl).finally(() => {
+      unlockPromises.delete(baseUrl);
+    });
+    unlockPromises.set(baseUrl, promise);
+  }
+  return promise;
+};
+
+// The server owns the token format. Only reject a known failure marker or an
+// identifiable expired Unix timestamp; opaque/manual tokens are valid inputs.
+const usableSessionToken = (value: unknown): string | undefined => {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  let token = value.trim();
+  try { token = decodeURIComponent(token); } catch {}
+  if (token.includes("::99")) return undefined;
+  const timestamp = token.split("::")[2];
+  if (timestamp && /^\d{10}$/.test(timestamp) &&
+      Date.now() / 1000 - Number(timestamp) >= 43200) return undefined;
+  return token;
+};
 
 export const getNetMirrorCookie = async (
   providerContext: ProviderContext,
@@ -213,47 +253,39 @@ export const getNetMirrorCookie = async (
   try {
     if (kvStore) {
       const cached = await kvStore.get<{ token: string; ts: number }>("t_hash_t_data");
-      if (
-        cached &&
-        cached.token &&
-        !cached.token.includes("::99") &&
-        Date.now() - cached.ts < 43200000
-      ) {
-        t_hash_t = cached.token;
+      const userToken = usableSessionToken(await kvStore.get<string>("t_hash_t"));
+      // A newly pasted setting takes precedence over an older automatic cache.
+      if (userToken && userToken !== usableSessionToken(cached?.token)) {
+        t_hash_t = userToken;
+        await kvStore.set("t_hash_t_data", { token: t_hash_t, ts: Date.now() });
       }
-
-      if (!t_hash_t) {
-        const userToken = await kvStore.get<string>("t_hash_t");
-        if (userToken && userToken.trim() && !userToken.includes("::99")) {
-          const parts = userToken.trim().split("::");
-          if (parts.length >= 3) {
-            const tokenSec = parseInt(parts[2], 10);
-            if (!isNaN(tokenSec) && Date.now() / 1000 - tokenSec < 43200) {
-              t_hash_t = userToken.trim();
-            }
-          }
-        }
-      }
-
-      if (!t_hash_t) {
+      if (!t_hash_t && providerContext.getCookies) {
         try {
-          await kvStore.delete("t_hash_t");
-          await kvStore.delete("t_hash_t_data");
+          const siteCookies = await providerContext.getCookies(baseUrl);
+          t_hash_t = usableSessionToken(siteCookies.t_hash_t);
+          if (t_hash_t && (cached?.token !== t_hash_t || Date.now() - cached.ts >= 43200000)) {
+            await kvStore.set("t_hash_t", t_hash_t);
+            await kvStore.set("t_hash_t_data", { token: t_hash_t, ts: Date.now() });
+          }
         } catch {}
+      }
+      if (!t_hash_t && cached && Date.now() - cached.ts < 43200000) {
+        t_hash_t = usableSessionToken(cached.token);
       }
     }
   } catch {}
 
   if (!t_hash_t) {
-    if (!unlockPromise) {
-      unlockPromise = unlockNetMirrorMobileSession(providerContext, baseUrl).finally(() => {
-        unlockPromise = null;
-      });
+    t_hash_t = await unlockSharedSession(providerContext, baseUrl);
+    if (t_hash_t && kvStore) {
+      await kvStore.set("t_hash_t", t_hash_t);
+      await kvStore.set("t_hash_t_data", { token: t_hash_t, ts: Date.now() });
     }
-    t_hash_t = await unlockPromise;
   }
 
-  return `t_hash_t=${t_hash_t || ""}; hd=on; ott=${ottCookie}`;
+  // Never overwrite a shared valid site cookie with an empty token.
+  return [t_hash_t ? `t_hash_t=${t_hash_t}` : "", "hd=on", `ott=${ottCookie}`]
+    .filter(Boolean).join("; ");
 };
 
 export const resolveNewTvApiBase = async (
@@ -490,7 +522,7 @@ export const getCachedHomeTrays = async (
   try {
     const { axios, cheerio } = providerContext;
     const baseUrl = await getNetMirrorBaseUrl(providerContext);
-    const cookies = await getNetMirrorCookie(providerContext, prefix);
+    let cookies = await getNetMirrorCookie(providerContext, prefix);
     const url = `${baseUrl}/mobile/home?app=1`;
 
     const homeHeaders = {
@@ -525,15 +557,11 @@ export const getCachedHomeTrays = async (
         } catch {}
       }
 
-      if (!unlockPromise) {
-        unlockPromise = unlockNetMirrorMobileSession(providerContext, baseUrl).finally(() => {
-          unlockPromise = null;
-        });
-      }
-      const newCookie = await unlockPromise;
+      const newCookie = await unlockSharedSession(providerContext, baseUrl);
 
       if (newCookie && !newCookie.includes("::99")) {
         const freshCookies = `t_hash_t=${newCookie}; hd=on; ott=${prefix === "hs" ? "dp" : prefix === "pv" ? "pv" : "nf"}`;
+        cookies = freshCookies;
         const retryRes = await axios.get(url, {
           headers: {
             ...getNetMirrorMobileHeaders(baseUrl, freshCookies),

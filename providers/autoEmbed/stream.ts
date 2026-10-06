@@ -171,7 +171,7 @@ export const getStream = async ({
       try {
         const seedRes = await providerContext.axios.get(
           `${VIDEASY_API_BASE}/seed?mediaId=${tmdbId}`,
-          { headers: backendHeaders, timeout: 4000, signal }
+          { headers: backendHeaders, timeout: 2500, signal }
         );
         const seed = seedRes.data?.seed;
         if (!seed) return [];
@@ -285,8 +285,9 @@ export const getStream = async ({
         });
 
         await Promise.allSettled(tasks);
-      } catch (e) {
-        console.log("Videasy extraction error in MultiStream:", e);
+      } catch (e: any) {
+        const status = e?.response?.status || e?.message || "offline";
+        console.log(`Videasy backend offline (${status})`);
       }
       return vStreams;
     })();
