@@ -162,5 +162,25 @@
   "castle": {
     "name": "Castle TV",
     "url": "https://api.hlowb.com"
+  },
+  "animesalt": {
+    "name": "animesalt",
+    "url": "https://animesalt.in"
+  },
+  "animeworld": {
+    "name": "animeworld",
+    "url": "https://watchanimeworld.one"
+  },
+  "movielinkdb": {
+    "name": "movielinkbd",
+    "url": "https://ex5wfv.movielinkbd.li"
+  },
+  "movielinkbd": {
+    "name": "movielinkbd",
+    "url": "https://ex5wfv.movielinkbd.li"
+  },
+  "mxplayer": {
+    "name": "mxplayer",
+    "url": "https://www.mxplayer.in"
   }
 }

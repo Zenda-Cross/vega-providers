@@ -444,5 +444,39 @@
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/castle.png",
     "type": "global",
     "disabled": false
+  },
+  {
+    "display_name": "AnimeSalt",
+    "value": "animesalt",
+    "version": "1.0",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/animesalt.png",
+    "type": "anime",
+    "disabled": false,
+    "hasSettings": true
+  },
+  {
+    "display_name": "AnimeWorld",
+    "value": "animeworld",
+    "version": "1.0",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/animeworld.png",
+    "type": "anime",
+    "disabled": false,
+    "hasSettings": true
+  },
+  {
+    "display_name": "MovieLinkBD",
+    "value": "movielinkdb",
+    "version": "1.0",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/movielinkdb.png",
+    "type": "india",
+    "disabled": false
+  },
+  {
+    "display_name": "MX Player",
+    "value": "mxplayer",
+    "version": "1.0",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/mxplayer.png",
+    "type": "india",
+    "disabled": false
   }
 ]

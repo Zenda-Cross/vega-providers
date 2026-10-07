@@ -1,0 +1,22 @@
+export const catalog = [
+  {
+    title: "Hindi Movies",
+    filter: "browseLangFilterIds=hi&type=1",
+  },
+  {
+    title: "Telugu Movies",
+    filter: "browseLangFilterIds=te&type=1",
+  },
+  {
+    title: "Drama Shows",
+    filter: "genreFilterIds=48efa872f6f17facebf6149dfc536ee1&type=2",
+  },
+  {
+    title: "Crime Shows",
+    filter: "genreFilterIds=b413dff55bdad743c577a8bea3b65044&type=2",
+  },
+  {
+    title: "Thriller Shows",
+    filter: "genreFilterIds=2dd5daf25be5619543524f360c73c3d8&type=2",
+  },
+];
