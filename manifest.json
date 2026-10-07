@@ -11,7 +11,7 @@
   {
     "display_name": "MultiStream",
     "value": "autoEmbed",
-    "version": "3.2",
+    "version": "3.4",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/autoEmbed.png",
     "type": "global",
     "disabled": false
@@ -198,7 +198,7 @@
   {
     "display_name": "NetflixMirror",
     "value": "netflixMirror",
-    "version": "2.10",
+    "version": "2.11",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/netflixMirror.webp",
     "type": "global",
     "disabled": false,
@@ -207,7 +207,7 @@
   {
     "display_name": "PrimeMirror",
     "value": "primeMirror",
-    "version": "2.9",
+    "version": "2.10",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/primeMirror.webp",
     "type": "global",
     "disabled": false,
@@ -216,7 +216,7 @@
   {
     "display_name": "DisneyMirror",
     "value": "disneyMirror",
-    "version": "2.1",
+    "version": "2.2",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/disneyMirror.webp",
     "type": "global",
     "disabled": false,

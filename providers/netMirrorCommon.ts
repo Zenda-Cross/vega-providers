@@ -7,7 +7,6 @@ import {
   Stream,
   TextTracks,
 } from "./types";
-import { getBaseUrl } from "./getBaseUrl";
 
 export type NetMirrorOtt = "" | "pv" | "hs";
 
@@ -23,19 +22,9 @@ export const getNetMirrorBaseUrl = async (
     }
   } catch {}
 
-  try {
-    const url = await getBaseUrl("nfMirror");
-    if (
-      url &&
-      !url.includes("net22.cc") &&
-      !url.includes("net77.cc") &&
-      !url.includes("net50.cc")
-    ) {
-      return url.replace(/\/+$/, "");
-    }
-  } catch (err) {
-    console.error("Error reading nfMirror baseUrl:", err);
-  }
+  // The remote URL list currently points to net77.cc, which this provider
+  // rejects. Avoid a network lookup before every catalog request. The setting
+  // above remains available when the working mirror changes.
   return "https://net52.cc";
 };
 
@@ -243,7 +232,8 @@ const usableSessionToken = (value: unknown): string | undefined => {
 
 export const getNetMirrorCookie = async (
   providerContext: ProviderContext,
-  ott: NetMirrorOtt
+  ott: NetMirrorOtt,
+  unlockIfMissing = true
 ): Promise<string> => {
   const { kvStore } = providerContext;
   const baseUrl = await getNetMirrorBaseUrl(providerContext);
@@ -259,23 +249,13 @@ export const getNetMirrorCookie = async (
         t_hash_t = userToken;
         await kvStore.set("t_hash_t_data", { token: t_hash_t, ts: Date.now() });
       }
-      if (!t_hash_t && providerContext.getCookies) {
-        try {
-          const siteCookies = await providerContext.getCookies(baseUrl);
-          t_hash_t = usableSessionToken(siteCookies.t_hash_t);
-          if (t_hash_t && (cached?.token !== t_hash_t || Date.now() - cached.ts >= 43200000)) {
-            await kvStore.set("t_hash_t", t_hash_t);
-            await kvStore.set("t_hash_t_data", { token: t_hash_t, ts: Date.now() });
-          }
-        } catch {}
-      }
       if (!t_hash_t && cached && Date.now() - cached.ts < 43200000) {
         t_hash_t = usableSessionToken(cached.token);
       }
     }
   } catch {}
 
-  if (!t_hash_t) {
+  if (!t_hash_t && unlockIfMissing) {
     t_hash_t = await unlockSharedSession(providerContext, baseUrl);
     if (t_hash_t && kvStore) {
       await kvStore.set("t_hash_t", t_hash_t);
@@ -522,7 +502,10 @@ export const getCachedHomeTrays = async (
   try {
     const { axios, cheerio } = providerContext;
     const baseUrl = await getNetMirrorBaseUrl(providerContext);
-    let cookies = await getNetMirrorCookie(providerContext, prefix);
+    // First ask the site with the author-scoped cookie jar. A sibling mirror
+    // may already have verified this domain, even when this provider's KV is
+    // empty. The HTTP layer adds that cookie automatically.
+    let cookies = await getNetMirrorCookie(providerContext, prefix, false);
     const url = `${baseUrl}/mobile/home?app=1`;
 
     const homeHeaders = {
@@ -545,10 +528,8 @@ export const getCachedHomeTrays = async (
     // If home page returned the ad verification screen (data-addhash) or 0 trays because session is unverified:
     if (
       trays.length === 0 &&
-      (html.includes("data-addhash") ||
-        html.includes("verify2.php") ||
-        !cookies.includes("t_hash_t=") ||
-        cookies.includes("t_hash_t=;"))
+      (html.includes("data-addhash") || html.includes("verify2.php") ||
+        !cookies.includes("t_hash_t="))
     ) {
       if (providerContext.kvStore) {
         try {
@@ -700,9 +681,10 @@ export const netMirrorGetPosts = async ({
     if (matchedTray && matchedTray.items.length > 0) {
       const cookies = await getNetMirrorCookie(providerContext, prefix);
 
-      // Fetch titles in parallel for items missing from titleCache
+      // Most trays include a usable image alt title. Avoid a request per card
+      // on the catalog path; only fetch titles for cards without one.
       const itemsToFetch = matchedTray.items.filter(
-        (it) => !titleCache.has(it.id)
+        (it) => !titleCache.has(it.id) && !it.alt?.trim()
       );
 
       if (itemsToFetch.length > 0) {
@@ -741,7 +723,7 @@ export const netMirrorGetPosts = async ({
     }
 
     // 3. Fallback: query search.php?s=
-    const cookies = await getNetMirrorCookie(providerContext, prefix);
+    const cookies = await getNetMirrorCookie(providerContext, prefix, false);
     const url = `${baseUrl}/mobile/search.php?s=${encodeURIComponent(filter)}&t=${t}`;
 
     const res = await axios.get(url, {

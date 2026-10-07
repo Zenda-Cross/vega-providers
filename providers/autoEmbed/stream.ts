@@ -1,44 +1,8 @@
 import { Stream, ProviderContext, TextTracks, SkipInterval } from "../types";
 import { fetchTheIntroDbSkipTimings } from "../theintrodb";
 import { extractCinejoyStreams } from "../extractors/cinejoy";
-
-const VIDEASY_API_BASE = "https://api.speedracelight.com";
-const DECRYPTION_API_URL = "https://enc-dec.app/api/dec-videasy";
-const ORIGIN = "https://www.cineby.at";
-
-export interface VideasyServer {
-  displayName: string;
-  path: string;
-  mayHave4K?: boolean;
-  audioLabel?: string;
-  qualityFilter?: string;
-  language?: string;
-}
-
-export const VIDEASY_SERVERS: VideasyServer[] = [
-  { displayName: "Vyse", path: "hdmovie", qualityFilter: "English", audioLabel: "Original" },
-  { displayName: "Fade", path: "hdmovie", qualityFilter: "Hindi", audioLabel: "Hindi" },
-];
-
-function pctEncode(s: string): string {
-  return encodeURIComponent(s).replace(
-    /[!'()*]/g,
-    (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase()
-  );
-}
-
-const doubleEncode = (s: string) => pctEncode(pctEncode(s));
-
-function extractQuality(q: string | undefined): "360" | "480" | "720" | "1080" | "2160" | undefined {
-  if (!q) return undefined;
-  const str = String(q).toLowerCase();
-  if (str.includes("2160") || str.includes("4k")) return "2160";
-  if (str.includes("1080")) return "1080";
-  if (str.includes("720")) return "720";
-  if (str.includes("480")) return "480";
-  if (str.includes("360")) return "360";
-  return undefined;
-}
+import { extractMovyStreams } from "../extractors/movy";
+import { extractVidstuckStreams } from "../extractors/vidstuck";
 
 export const getStream = async ({
   link: id,
@@ -71,6 +35,7 @@ export const getStream = async ({
     const isMovie = effectiveType === "movie";
     let title: string = payload.title ?? "";
     let year: string = (payload.year ? String(payload.year) : "").slice(0, 4);
+    let releaseDate: string = payload.releaseDate || payload.date || "";
 
     // If tmdbId or title/year is missing, resolve via Cinemeta or TMDb proxy
     if (!tmdbId && imdbId) {
@@ -95,12 +60,12 @@ export const getStream = async ({
 
     if (tmdbId && (!title || !year)) {
       try {
-        const detailUrl = `https://db.speedracelight.com/3/${isMovie ? "movie" : "tv"
+        const detailUrl = `https://db.wecollege.net/3/${isMovie ? "movie" : "tv"
           }/${tmdbId}?append_to_response=external_ids`;
         const dRes = await providerContext.axios.get(detailUrl, {
           headers: {
-            Referer: `${ORIGIN}/`,
-            Origin: ORIGIN,
+            Referer: `https://www.movy.sx/`,
+            Origin: "https://www.movy.sx",
             ...providerContext.commonHeaders,
           },
           timeout: 4000,
@@ -116,6 +81,9 @@ export const getStream = async ({
             );
           }
           if (!imdbId) imdbId = dData.external_ids?.imdb_id || "";
+          if (!releaseDate) {
+            releaseDate = dData.release_date || dData.first_air_date || "";
+          }
         }
       } catch {
         // ignore fallback error
@@ -158,154 +126,63 @@ export const getStream = async ({
       return [] as Stream[];
     });
 
-    // 3. Fetch Videasy streams in parallel
-    const videasyPromise = (async (): Promise<Stream[]> => {
-      const vStreams: Stream[] = [];
-      const backendHeaders = {
-        Referer: `${ORIGIN}/`,
-        Origin: ORIGIN,
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      };
+    // 3. Fetch Movy streams in parallel (movy.sx / wecollege.net)
+    const movyPromise = extractMovyStreams({
+      tmdbId,
+      imdbId,
+      title,
+      year,
+      season: Number(season),
+      episode: Number(episode),
+      type: effectiveType,
+      providerContext,
+      signal,
+    }).catch((err) => {
+      console.log("Movy extraction error in MultiStream:", err);
+      return [] as Stream[];
+    });
 
-      try {
-        const seedRes = await providerContext.axios.get(
-          `${VIDEASY_API_BASE}/seed?mediaId=${tmdbId}`,
-          { headers: backendHeaders, timeout: 2500, signal }
-        );
-        const seed = seedRes.data?.seed;
-        if (!seed) return [];
+    // 4. Fetch Vidstuck streams in parallel (sacdn.hakunaymatata.com / workers.dev)
+    const vidstuckPromise = extractVidstuckStreams({
+      tmdbId,
+      imdbId,
+      title,
+      year,
+      date: releaseDate,
+      season: Number(season),
+      episode: Number(episode),
+      type: effectiveType,
+      providerContext,
+      signal,
+    }).catch((err) => {
+      console.log("Vidstuck extraction error in MultiStream:", err);
+      return [] as Stream[];
+    });
 
-        const tasks = VIDEASY_SERVERS.map(async (server) => {
-          try {
-            let serverUrl = `${VIDEASY_API_BASE}/${server.path}/sources-with-title?title=${doubleEncode(
-              title
-            )}&mediaType=${isMovie ? "movie" : "tv"}&year=${year}&episodeId=${episode}&seasonId=${season}&tmdbId=${tmdbId}&enc=2&seed=${seed}`;
-            if (imdbId) serverUrl += `&imdbId=${imdbId}`;
-            if (server.language) serverUrl += `&language=${server.language}`;
-
-            const encRes = await providerContext.axios.get(serverUrl, {
-              headers: backendHeaders,
-              timeout: 4000,
-              signal,
-            });
-
-            const encText =
-              typeof encRes.data === "string"
-                ? encRes.data
-                : JSON.stringify(encRes.data);
-            if (!encText || encText.length < 5) return;
-
-            const decRes = await providerContext.axios.post(
-              DECRYPTION_API_URL,
-              {
-                text: encText,
-                id: String(tmdbId),
-                seed: seed,
-              },
-              {
-                headers: { "Content-Type": "application/json" },
-                timeout: 4000,
-                signal,
-              }
-            );
-
-            const result = decRes.data?.result;
-            if (!result) return;
-
-            const subtitles: TextTracks = (result.subtitles || [])
-              .map((sub: any) => {
-                const u = sub.url || sub.file || sub.src;
-                const lang =
-                  sub.language || sub.lang || sub.label || sub.name || "Unknown";
-                if (!u) return null;
-                return {
-                  title: lang,
-                  language: lang.slice(0, 2).toLowerCase(),
-                  type: u.endsWith(".srt")
-                    ? ("application/x-subrip" as const)
-                    : ("text/vtt" as const),
-                  uri: u,
-                };
-              })
-              .filter(Boolean) as TextTracks;
-
-            const videoHeaders = {
-              Referer: `${ORIGIN}/`,
-              Origin: ORIGIN,
-            };
-
-            if (result.sources && result.sources.length > 0) {
-              let sources = result.sources;
-              if (server.qualityFilter) {
-                sources = sources.filter(
-                  (s: any) =>
-                    s.quality &&
-                    s.quality.toLowerCase() === server.qualityFilter!.toLowerCase()
-                );
-              }
-              sources.forEach((src: any) => {
-                const q = extractQuality(src.quality);
-                const serverLabel = `${server.displayName} (${server.audioLabel || "Original"
-                  })`;
-                vStreams.push({
-                  server: serverLabel,
-                  link: src.url,
-                  type: src.url.includes(".m3u8") ? "m3u8" : "mp4",
-                  quality: q,
-                  subtitles: subtitles.length > 0 ? subtitles : undefined,
-                  headers: videoHeaders,
-                });
-              });
-            } else if (result.url) {
-              vStreams.push({
-                server: `${server.displayName} (${server.audioLabel || "Original"
-                  })`,
-                link: result.url,
-                type: "m3u8",
-                subtitles: subtitles.length > 0 ? subtitles : undefined,
-                headers: videoHeaders,
-              });
-            } else if (result.streams) {
-              for (const [qStr, sUrl] of Object.entries(result.streams)) {
-                vStreams.push({
-                  server: `${server.displayName} (${server.audioLabel || "Original"
-                    })`,
-                  link: sUrl as string,
-                  type: (sUrl as string).includes(".m3u8") ? "m3u8" : "mp4",
-                  quality: extractQuality(qStr),
-                  subtitles: subtitles.length > 0 ? subtitles : undefined,
-                  headers: videoHeaders,
-                });
-              }
-            }
-          } catch {
-            // Ignore individual server failures
-          }
-        });
-
-        await Promise.allSettled(tasks);
-      } catch (e: any) {
-        const status = e?.response?.status || e?.message || "offline";
-        console.log(`Videasy backend offline (${status})`);
-      }
-      return vStreams;
-    })();
-
-    const [streamSkip, cjStreams, vStreams] = await Promise.all([
+    const [streamSkip, cjStreams, movyStreams, vsStreams] = await Promise.all([
       skipPromise,
       cinejoyPromise,
-      videasyPromise,
+      movyPromise,
+      vidstuckPromise,
     ]);
 
     (cjStreams || []).forEach((s) => {
       streams.push({ ...s, skip: streamSkip });
     });
-    (vStreams || []).forEach((s) => {
+    (vsStreams || []).forEach((s) => {
+      streams.push({ ...s, skip: streamSkip });
+    });
+    (movyStreams || []).forEach((s) => {
       streams.push({ ...s, skip: streamSkip });
     });
 
-    streams.sort((a, b) => {
+    const cleanStreams = streams.filter(
+      (s) =>
+        !s.server.toLowerCase().includes("lisbon") &&
+        !s.link.includes("cheaptruckrepairs")
+    );
+
+    cleanStreams.sort((a, b) => {
       const aQual = parseInt(a.quality || "0", 10);
       const bQual = parseInt(b.quality || "0", 10);
 
@@ -323,23 +200,23 @@ export const getStream = async ({
 
         if (aQual !== bQual) return bQual - aQual;
       } else {
-        const aHls = a.type === "m3u8";
-        const bHls = b.type === "m3u8";
-        if (aHls && !bHls) return -1;
-        if (!aHls && bHls) return 1;
+        const aStream = a.type === "m3u8" || a.type === "dash";
+        const bStream = b.type === "m3u8" || b.type === "dash";
+        if (aStream && !bStream) return -1;
+        if (!aStream && bStream) return 1;
 
-        const aCj = a.server.startsWith("Cinejoy");
-        const bCj = b.server.startsWith("Cinejoy");
-        if (aCj && !bCj) return -1;
-        if (!aCj && bCj) return 1;
+        const aTop = a.server.includes("Nebula") || a.server.includes("Andromeda");
+        const bTop = b.server.includes("Nebula") || b.server.includes("Andromeda");
+        if (aTop && !bTop) return -1;
+        if (!aTop && bTop) return 1;
 
         if (aQual !== bQual) return bQual - aQual;
       }
       return 0;
     });
 
-    console.log(`MultiStream resolved ${streams.length} stream(s)`);
-    return streams;
+    console.log(`MultiStream resolved ${cleanStreams.length} stream(s)`);
+    return cleanStreams;
   } catch (err) {
     console.error("autoEmbed getStream error:", err);
     return [];

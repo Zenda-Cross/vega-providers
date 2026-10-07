@@ -3,7 +3,6 @@ import { ProviderContext, Stream, TextTracks } from "../types";
 let cachedCode: string | null = null;
 let cachedChunkUrl: string | null = null;
 let cachedServers: any[] = [
-  { name: "Lisbon", "4k": true },
   { name: "Nebula" },
   { name: "Solara" },
   { name: "Athens" },
@@ -165,7 +164,10 @@ export async function extractCinejoyStreams({
         .get("https://api.wing.st/servers", { headers, timeout: 5000, signal })
         .then((sRes: any) => {
           if (sRes.data?.servers?.length) {
-            cachedServers = sRes.data.servers;
+            // Filter out Lisbon (lit.cheaptruckrepairs.cc returns 502 Bad Gateway on segments)
+            cachedServers = sRes.data.servers.filter(
+              (s: any) => s && s.name !== "Lisbon" && s.status !== "offline"
+            );
             lastServerFetchTime = Date.now();
           }
         })
@@ -300,7 +302,9 @@ export async function extractCinejoyStreams({
     );
     const exportsObj = runner(sandbox);
 
-    const activeServers = cachedServers || [];
+    const activeServers = (cachedServers || []).filter(
+      (s: any) => s && s.name !== "Lisbon" && s.status !== "offline"
+    );
     const streams: Stream[] = [];
 
     // 5. Query active servers in parallel with per-server timeout
@@ -358,6 +362,12 @@ export async function extractCinejoyStreams({
             }
 
             if (item.type === "hls" && item.playlist) {
+              if (
+                serverName === "Lisbon" ||
+                item.playlist.includes("cheaptruckrepairs")
+              ) {
+                continue;
+              }
               streams.push({
                 server: `Cinejoy - ${serverName}${srv["4k"] ? " (4K)" : ""}`,
                 link: item.playlist,
