@@ -441,7 +441,7 @@
     "display_name": "Castle TV",
     "value": "castle",
     "version": "1.0",
-    "icon": "",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/castle.png",
     "type": "global",
     "disabled": false
   }
