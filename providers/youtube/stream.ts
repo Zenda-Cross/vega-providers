@@ -18,97 +18,240 @@ const QUALITY_ORDER: Record<string, number> = {
   "144": 8,
 };
 
-async function fetchFromInstance(
+async function fetchFromInnerTube(
+  axios: any,
+  videoId: string,
+  signal?: AbortSignal
+): Promise<Stream[]> {
+  const streams: Stream[] = [];
+  const subtitles: TextTracks = [];
+
+  // 1. iOS Client - provides Master HLS .m3u8 manifest with multi-quality adaptive streaming
+  try {
+    const iosRes = await axios.post(
+      "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+      {
+        context: {
+          client: {
+            clientName: "IOS",
+            clientVersion: "20.11.6",
+            deviceModel: "iPhone10,4",
+            osName: "iOS",
+            osVersion: "16.7.7.20H330",
+          },
+        },
+        videoId,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent":
+            "com.google.ios.youtube/20.11.6 (iPhone10,4; U; CPU iOS 16_7_7 like Mac OS X)",
+        },
+        timeout: 4500,
+        signal,
+      }
+    );
+
+    const iosData = iosRes?.data;
+    if (iosData?.streamingData?.hlsManifestUrl) {
+      streams.push({
+        server: "YouTube HLS (Multi-Quality)",
+        link: iosData.streamingData.hlsManifestUrl,
+        type: "m3u8",
+        quality: "1080",
+        headers: {
+          "User-Agent":
+            "com.google.ios.youtube/20.11.6 (iPhone10,4; U; CPU iOS 16_7_7 like Mac OS X)",
+        },
+      });
+    }
+
+    // Extract subtitles if present
+    const captionTracks =
+      iosData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    if (Array.isArray(captionTracks)) {
+      for (const c of captionTracks) {
+        if (c.baseUrl) {
+          const name =
+            c.name?.runs?.[0]?.text || c.name?.simpleText || c.languageCode;
+          subtitles.push({
+            title: name,
+            language: c.languageCode || name,
+            type: "text/vtt",
+            uri: c.baseUrl.includes("fmt=") ? c.baseUrl : `${c.baseUrl}&fmt=vtt`,
+          });
+        }
+      }
+    }
+  } catch {
+    // Continue to Android client
+  }
+
+  // 2. Android Client - provides muxed direct video+audio MP4s and high-res adaptive streams
+  try {
+    const androidRes = await axios.post(
+      "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+      {
+        context: {
+          client: {
+            clientName: "ANDROID",
+            clientVersion: "20.10.38",
+            androidSdkVersion: 34,
+          },
+        },
+        videoId,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent":
+            "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
+        },
+        timeout: 4500,
+        signal,
+      }
+    );
+
+    const aData = androidRes?.data;
+    if (aData?.playabilityStatus?.status === "OK" && aData?.streamingData) {
+      // Subtitles fallback if iOS didn't have them
+      if (subtitles.length === 0) {
+        const captionTracks =
+          aData.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+        if (Array.isArray(captionTracks)) {
+          for (const c of captionTracks) {
+            if (c.baseUrl) {
+              const name =
+                c.name?.runs?.[0]?.text || c.name?.simpleText || c.languageCode;
+              subtitles.push({
+                title: name,
+                language: c.languageCode || name,
+                type: "text/vtt",
+                uri: c.baseUrl.includes("fmt=")
+                  ? c.baseUrl
+                  : `${c.baseUrl}&fmt=vtt`,
+              });
+            }
+          }
+        }
+      }
+
+      // Muxed formats (combined audio+video, e.g. 360p / 720p)
+      for (const f of aData.streamingData.formats || []) {
+        if (f.url) {
+          const qual = f.qualityLabel || f.quality || "360p";
+          const qualityStr = qual.replace("p", "");
+          streams.push({
+            server: `YouTube MP4 (${qual})`,
+            link: f.url,
+            type: "mp4",
+            quality: qualityStr,
+            subtitles: subtitles.length > 0 ? subtitles : undefined,
+            headers: {
+              "User-Agent":
+                "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
+            },
+          });
+        }
+      }
+
+      // Adaptive formats (high quality video streams)
+      const seenQuals = new Set<string>();
+      for (const f of aData.streamingData.adaptiveFormats || []) {
+        if (f.url && f.mimeType?.startsWith("video/")) {
+          const qual = f.qualityLabel || "HD";
+          if (!seenQuals.has(qual)) {
+            seenQuals.add(qual);
+            const qualityStr = qual.replace("p", "");
+            streams.push({
+              server: `YouTube Stream (${qual})`,
+              link: f.url,
+              type: f.mimeType.includes("webm") ? "webm" : "mp4",
+              quality: qualityStr,
+              subtitles: subtitles.length > 0 ? subtitles : undefined,
+              headers: {
+                "User-Agent":
+                  "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
+              },
+            });
+          }
+        }
+      }
+
+      // Audio only option
+      const audioFormat = (aData.streamingData.adaptiveFormats || []).find(
+        (f: any) => f.url && f.mimeType?.startsWith("audio/")
+      );
+      if (audioFormat) {
+        streams.push({
+          server: "YouTube Audio Only",
+          link: audioFormat.url,
+          type: audioFormat.mimeType.includes("webm") ? "webm" : "m4a",
+          quality: "Audio",
+          headers: {
+            "User-Agent":
+              "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
+          },
+        });
+      }
+    }
+  } catch {
+    // Continue
+  }
+
+  // Attach subtitles to HLS stream if present
+  if (subtitles.length > 0) {
+    for (const s of streams) {
+      if (!s.subtitles) s.subtitles = subtitles;
+    }
+  }
+
+  return streams;
+}
+
+async function fetchFromPiped(
   axios: any,
   baseUrl: string,
   videoId: string,
   signal?: AbortSignal
 ): Promise<Stream[]> {
-  const apiUrl = `${baseUrl.replace(/\/+$/, "")}/api/v1/videos/${videoId}`;
-  const res = await axios.get(apiUrl, {
+  const url = `${baseUrl.replace(/\/+$/, "")}/streams/${videoId}`;
+  const res = await axios.get(url, {
     headers: {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
     },
-    timeout: 3000,
+    timeout: 3500,
     signal,
   });
 
-  const data = res.data;
+  const data = res?.data;
   if (!data) return [];
 
   const streams: Stream[] = [];
-  const seenUrls = new Set<string>();
 
-  // Extract subtitles/captions
-  const subtitles: TextTracks = [];
-  if (Array.isArray(data.captions)) {
-    for (const c of data.captions) {
-      if (c.url && c.label) {
-        subtitles.push({
-          title: c.label,
-          language: c.languageCode || c.label,
-          type: "text/vtt",
-          uri: c.url.startsWith("http") ? c.url : `${baseUrl.replace(/\/+$/, "")}${c.url}`,
-        });
-      }
-    }
-  }
-
-  // 1. Regular combined formatStreams
-  if (Array.isArray(data.formatStreams)) {
-    for (const f of data.formatStreams) {
-      if (f.url && !seenUrls.has(f.url)) {
-        seenUrls.add(f.url);
-        const qualityStr = f.resolution
-          ? f.resolution.replace("p", "")
-          : f.quality || "720";
-        streams.push({
-          server: `YouTube Direct (${f.resolution || qualityStr + "p"})`,
-          link: f.url,
-          type: f.container || "mp4",
-          quality: qualityStr,
-          subtitles: subtitles.length > 0 ? subtitles : undefined,
-        });
-      }
-    }
-  }
-
-  // 2. Adaptive video formats
-  if (Array.isArray(data.adaptiveFormats)) {
-    for (const f of data.adaptiveFormats) {
-      if (
-        f.url &&
-        f.type &&
-        f.type.startsWith("video/") &&
-        !seenUrls.has(f.url)
-      ) {
-        seenUrls.add(f.url);
-        const qual = f.qualityLabel || f.resolution || "HD";
-        const qualityStr = qual.replace("p", "");
-        streams.push({
-          server: `YouTube Stream (${qual})`,
-          link: f.url,
-          type: f.container || "mp4",
-          quality: qualityStr,
-          subtitles: subtitles.length > 0 ? subtitles : undefined,
-        });
-      }
-    }
-  }
-
-  // 3. Audio stream option
-  const audioFormat = (data.adaptiveFormats || []).find(
-    (f: any) => f.url && f.type && f.type.startsWith("audio/")
-  );
-  if (audioFormat && !seenUrls.has(audioFormat.url)) {
-    seenUrls.add(audioFormat.url);
+  // HLS stream if available
+  if (data.hls) {
     streams.push({
-      server: "YouTube Audio Only",
-      link: audioFormat.url,
-      type: audioFormat.container || "m4a",
-      quality: "Audio",
+      server: "YouTube HLS (Piped)",
+      link: data.hls,
+      type: "m3u8",
+      quality: "1080",
     });
+  }
+
+  // Proxied video streams
+  for (const v of data.videoStreams || []) {
+    if (v.url && !v.videoOnly) {
+      const qualityStr = (v.quality || "720").replace("p", "");
+      streams.push({
+        server: `YouTube Direct (${v.quality || qualityStr + "p"})`,
+        link: v.url,
+        type: v.format?.toLowerCase() || "mp4",
+        quality: qualityStr,
+      });
+    }
   }
 
   return streams;
@@ -130,46 +273,55 @@ export const getStream = async function ({
   const videoId = extractVideoId(link);
   if (!videoId) return [];
 
-  const customInstance = await kvStore?.get<string>("invidiousInstance");
   const preferredQuality = await kvStore?.get<string>("preferredQuality");
 
-  const instances = [
-    customInstance,
-    "https://invidious.f5.si",
-    "https://inv.nadeko.net",
-    "https://yewtu.be",
-    "https://invidious.nerdvpn.de",
-  ].filter(Boolean) as string[];
-
-  // Race instances in parallel so requests never get stuck sequentially
+  // 1. Direct InnerTube API (runs on client IP, eliminates 403 Forbidden)
   try {
-    const promises = instances.map((inst) =>
-      fetchFromInstance(axios, inst, videoId, signal).then((results) => {
-        if (results && results.length > 0) return results;
-        throw new Error("No streams returned");
-      })
-    );
-
-    const streams = await Promise.any(promises);
-
-    if (streams && streams.length > 0) {
-      streams.sort((a, b) => {
-        if (preferredQuality && preferredQuality !== "auto") {
-          const cleanPref = preferredQuality.replace("p", "");
-          if (a.quality === cleanPref && b.quality !== cleanPref) return -1;
-          if (b.quality === cleanPref && a.quality !== cleanPref) return 1;
-        }
-
-        const orderA = QUALITY_ORDER[a.quality || ""] || 99;
-        const orderB = QUALITY_ORDER[b.quality || ""] || 99;
-        return orderA - orderB;
-      });
-
-      return streams;
+    const directStreams = await fetchFromInnerTube(axios, videoId, signal);
+    if (directStreams && directStreams.length > 0) {
+      sortStreams(directStreams, preferredQuality);
+      return directStreams;
     }
   } catch {
-    // If all public instances fail or time out, return empty gracefully without hanging
+    // Fallback to proxy instances below
+  }
+
+  // 2. Piped Proxy Fallback
+  const pipedInstances = [
+    "https://api.piped.private.coffee",
+    "https://piped-api.lunar.icu",
+    "https://pipedapi.tokhmi.xyz",
+  ];
+
+  for (const inst of pipedInstances) {
+    try {
+      const pStreams = await fetchFromPiped(axios, inst, videoId, signal);
+      if (pStreams && pStreams.length > 0) {
+        sortStreams(pStreams, preferredQuality);
+        return pStreams;
+      }
+    } catch {
+      // Try next instance
+    }
   }
 
   return [];
 };
+
+function sortStreams(streams: Stream[], preferredQuality?: string) {
+  streams.sort((a, b) => {
+    // Put HLS Master first unless a specific quality is preferred
+    if (!preferredQuality || preferredQuality === "auto") {
+      if (a.type === "m3u8" && b.type !== "m3u8") return -1;
+      if (b.type === "m3u8" && a.type !== "m3u8") return 1;
+    } else {
+      const cleanPref = preferredQuality.replace("p", "");
+      if (a.quality === cleanPref && b.quality !== cleanPref) return -1;
+      if (b.quality === cleanPref && a.quality !== cleanPref) return 1;
+    }
+
+    const orderA = QUALITY_ORDER[a.quality || ""] || 99;
+    const orderB = QUALITY_ORDER[b.quality || ""] || 99;
+    return orderA - orderB;
+  });
+}
