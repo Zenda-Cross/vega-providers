@@ -448,7 +448,7 @@
   {
     "display_name": "AnimeSalt",
     "value": "animesalt",
-    "version": "1.0",
+    "version": "1.2",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/animesalt.png",
     "type": "anime",
     "disabled": false,

@@ -5,6 +5,10 @@ export const catalog = [
   },
   {
     title: "Series",
-    filter: "series/",
+    filter: "series",
+  },
+  {
+    title: "Movies",
+    filter: "movies",
   },
 ];

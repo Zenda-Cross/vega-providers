@@ -62,24 +62,17 @@ async function fetchPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
+    if (page > 1) return [];
+
     const { axios, cheerio } = providerContext;
 
-    // ✅ Use Animesalt's real base URL
+    // Use Animesalt's real base URL
     const baseUrl =
       ((await getBaseUrl("animesalt").catch(() => "")) || "https://animesalt.in").replace(/\/+$/, "");
 
-    let url: string;
-
-    // --- Build URL ---
+    let url = baseUrl;
     if (query && query.trim()) {
-      url = `${baseUrl}/?s=${encodeURIComponent(query)}${
-        page > 1 ? `&paged=${page}` : ""
-      }`;
-    } else if (filter) {
-      const cleanFilter = filter.replace(/^\/+/, "").replace(/\/+$/, "");
-      url = `${baseUrl}/${cleanFilter}${page > 1 ? `/page/${page}` : ""}`;
-    } else {
-      url = `${baseUrl}${page > 1 ? `/page/${page}` : ""}`;
+      url = `${baseUrl}/search.php?search=${encodeURIComponent(query.trim())}`;
     }
 
     const res = await axios.get(url, { headers: defaultHeaders, signal });
@@ -87,6 +80,26 @@ async function fetchPosts({
 
     const resolveUrl = (href: string) =>
       href?.startsWith("http") ? href : new URL(href, baseUrl).href;
+
+    let container = $("body");
+    if (!query) {
+      if (filter && /series/i.test(filter)) {
+        const sec = $("h2")
+          .filter((_, el) => /series/i.test($(el).text()))
+          .closest("section");
+        if (sec.length) container = sec;
+      } else if (filter && /movie/i.test(filter)) {
+        const sec = $("h2")
+          .filter((_, el) => /movie/i.test($(el).text()))
+          .closest("section");
+        if (sec.length) container = sec;
+      } else {
+        const sec = $("h2")
+          .filter((_, el) => /recent/i.test($(el).text()))
+          .closest("section");
+        if (sec.length) container = sec;
+      }
+    }
 
     const seen = new Set<string>();
     const catalog: Post[] = [];
@@ -100,13 +113,13 @@ async function fetchPosts({
       "ul.post-lst li",
     ].join(",");
 
-    $(POST_SELECTORS).each((_, el) => {
+    container.find(POST_SELECTORS).each((_, el) => {
       const card = $(el);
 
-      // get link
       let link =
-        card.find("a.lnk-blk[href]").attr("href") ||
         card.find(".action-overlay a[href]").attr("href") ||
+        card.find("a.lnk-blk[href]").attr("href") ||
+        card.find("a[href*='/series/'], a[href*='/movies/']").first().attr("href") ||
         card.find("a[href]").first().attr("href") ||
         "";
       if (!link) return;
@@ -114,24 +127,17 @@ async function fetchPosts({
       link = resolveUrl(link);
       if (seen.has(link)) return;
 
-      // get title
-      let rawTitle =
+      let title =
+        card.find("img").attr("alt")?.trim() ||
         card.find("h2.entry-title").first().text().trim() ||
         card.find(".entry-title").first().text().trim() ||
-        card.find("img").attr("alt")?.trim() ||
         card.find("p[style*='medium']").first().text().trim() ||
         card.find("a[href]").last().text().trim() ||
         "";
 
-      if (!rawTitle) return;
+      title = title.replace(/^Play Now\s*/i, "").replace(/^Image\s+/i, "").trim();
+      if (!title) return;
 
-      // remove "Image " prefix from title if present
-      let title = rawTitle.replace(/^Image\s+/, "").trim();
-      if (title.startsWith("Image ")) {
-        title = title.substring(6).trim();
-      }
-
-      // get image URL
       let img =
         card.find("img").attr("data-src") ||
         card.find("img").attr("src") ||
@@ -143,9 +149,7 @@ async function fetchPosts({
       catalog.push({ title, link, image });
     });
 
-    // ✅ Limit first page to 20 posts, other pages to 100
-    const limit = page === 1 ? 20 : 100;
-    return catalog.slice(0, limit);
+    return catalog;
   } catch (err) {
     console.error(
       "Animesalt fetchPosts error:",

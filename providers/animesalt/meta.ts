@@ -75,10 +75,10 @@ export const getMeta = async function ({
       result.linkList.push({
         title: result.title || "Play Movie",
         quality: "Movie",
+        directLinks: [{ title: "Play", link: link, type: "movie" }],
         episodesLink: `watchanimeworld://movie?url=${encodeURIComponent(
           link
         )}`,
-        directLinks: [],
       });
 
       return result;

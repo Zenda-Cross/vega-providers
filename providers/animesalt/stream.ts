@@ -174,33 +174,46 @@ const getEpisodeStreams = async function ({
 
     const iframeUrls: string[] = [];
     const pick = (sel: string) => {
-      const f = $(sel);
-      if (!f.length) return;
-      const src = f.attr("data-src") || f.attr("src") || "";
-      if (src) iframeUrls.push(makeAbsolute(src, url));
+      $(sel).each((_: any, el: any) => {
+        const src = $(el).attr("data-src") || $(el).attr("src") || "";
+        if (src) {
+          const abs = makeAbsolute(src, url);
+          if (!iframeUrls.includes(abs)) {
+            iframeUrls.push(abs);
+          }
+        }
+      });
     };
 
-    // Series + movie pages both use these containers
+    // Primary selectors for AnimeSalt
+    pick(".video-box iframe");
+    pick("#responsiveIframe");
+    pick("section.video iframe");
+    pick(".video-content iframe");
+
+    // Toro/WordPress theme legacy selectors
     pick("#options-0 iframe");
     pick("#options-1 iframe");
+    pick(".video-player iframe");
+    pick("#aa-options iframe");
+    pick("aside.video-player iframe");
 
-    // Extra fallbacks for movie pages
+    // Generic fallback for any iframe (ignoring ad networks)
     if (iframeUrls.length === 0) {
-      pick(".video-player iframe");
-      pick("#aa-options iframe");
-      pick("aside.video-player iframe");
+      $("iframe").each((_: any, el: any) => {
+        const src = $(el).attr("data-src") || $(el).attr("src") || "";
+        if (
+          src &&
+          !/google|doubleclick|highrevenueformat|adservice|disqus|llvpn/i.test(src)
+        ) {
+          const abs = makeAbsolute(src, url);
+          if (!iframeUrls.includes(abs)) iframeUrls.push(abs);
+        }
+      });
     }
 
     if (!iframeUrls.length) {
-      return [
-        {
-          server: "Episode",
-          link: url,
-          type: "iframe",
-          headers: {},
-          subtitles: [],
-        },
-      ];
+      return [];
     }
 
     const signal = new AbortController().signal;
@@ -248,28 +261,32 @@ const getEpisodeStreams = async function ({
 
     console.log(`[episode] ${merged.length} streams in ${Date.now() - t0}ms`);
     if (!merged.length) {
-      return [
-        {
-          server: "Episode",
-          link: iframeUrls[0] || url,
-          type: "iframe",
-          headers: {},
-          subtitles: [],
-        },
-      ];
+      if (
+        iframeUrls.length > 0 &&
+        !iframeUrls[0].includes("/episode/") &&
+        !iframeUrls[0].includes("/movies/")
+      ) {
+        return [
+          {
+            server: "AnimeSalt (Embed)",
+            link: iframeUrls[0],
+            type: "iframe",
+            headers: {},
+            subtitles: [],
+          },
+        ];
+      }
+      return [];
     }
-    return merged;
+
+    const mapped = merged.map((s) => ({
+      ...s,
+      server: s.server === "ZephyrFlick" ? "HLS (Multi-Audio)" : s.server,
+    }));
+    return mapped;
   } catch (err: any) {
     console.error("[episode] error:", err?.message || err);
-    return [
-      {
-        server: "Episode",
-        link: url,
-        type: "iframe",
-        headers: {},
-        subtitles: [],
-      },
-    ];
+    return [];
   }
 };
 
