@@ -13,6 +13,34 @@ function extractVideoId(link: string): string {
   return match ? match[1] : link;
 }
 
+function formatViews(rawCount: number | string): string {
+  const num = typeof rawCount === "number" ? rawCount : parseInt(rawCount, 10);
+  if (isNaN(num) || num <= 0) return "";
+  if (num >= 1000000000) {
+    return (num / 1000000000).toFixed(1).replace(/\.0$/, "") + "B views";
+  }
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M views";
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1).replace(/\.0$/, "") + "K views";
+  }
+  return num.toLocaleString() + " views";
+}
+
+function formatDuration(totalSeconds: number | string): string {
+  const sec = typeof totalSeconds === "number" ? totalSeconds : parseInt(totalSeconds, 10);
+  if (isNaN(sec) || sec <= 0) return "";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  if (h > 0) {
+    return `${h}:${remM.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  }
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 export const getMeta = async function ({
   link,
   providerContext,
@@ -29,13 +57,28 @@ export const getMeta = async function ({
     const res = await axios.get(watchUrl, { headers: defaultHeaders });
     const $ = cheerio.load(res.data);
 
-    let title = $('meta[name="title"]').attr("content") || $('meta[property="og:title"]').attr("content") || $("title").text().replace(/ - YouTube$/, "").trim();
-    let synopsis = $('meta[name="description"]').attr("content") || $('meta[property="og:description"]').attr("content") || "";
-    let channel = $('link[itemprop="name"]').attr("content") || $('span[itemprop="author"] link[itemprop="name"]').attr("content") || "";
-    let tags: string[] = [];
-    let rating = "";
+    let title =
+      $('meta[name="title"]').attr("content") ||
+      $('meta[property="og:title"]').attr("content") ||
+      $("title").text().replace(/ - YouTube$/, "").trim();
 
-    // Parse ytInitialPlayerResponse if present
+    let synopsis =
+      $('meta[name="description"]').attr("content") ||
+      $('meta[property="og:description"]').attr("content") ||
+      "";
+
+    let channel =
+      $('link[itemprop="name"]').attr("content") ||
+      $('span[itemprop="author"] link[itemprop="name"]').attr("content") ||
+      "";
+
+    let formattedViewCount = "";
+    let durationStr = "";
+    let publishDateStr = "";
+    let category = "";
+    let likes = "";
+
+    // 1. Parse ytInitialPlayerResponse for video details & microformat
     const prMatch =
       res.data.match(/var ytInitialPlayerResponse\s*=\s*({.+?});(?:var|<\/script>)/) ||
       res.data.match(/ytInitialPlayerResponse\s*=\s*({.+?});/);
@@ -48,20 +91,81 @@ export const getMeta = async function ({
           title = details.title || title;
           synopsis = details.shortDescription || synopsis;
           channel = details.author || channel;
-          if (Array.isArray(details.keywords)) {
-            tags = details.keywords.slice(0, 8);
-          }
           if (details.viewCount) {
-            const views = parseInt(details.viewCount, 10);
-            if (!isNaN(views)) {
-              rating = `${(views / 1000000).toFixed(1)}M views`;
+            formattedViewCount = formatViews(details.viewCount);
+          }
+          if (details.lengthSeconds) {
+            durationStr = formatDuration(details.lengthSeconds);
+          }
+        }
+
+        const micro = pr.microformat?.playerMicroformatRenderer;
+        if (micro) {
+          if (micro.category) {
+            category = micro.category;
+          }
+          const pubDate = micro.publishDate || micro.uploadDate;
+          if (pubDate) {
+            const dateObj = new Date(pubDate);
+            if (!isNaN(dateObj.getTime())) {
+              publishDateStr = dateObj.toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              });
             }
           }
         }
       } catch {
-        // ignore JSON parse error
+        // ignore parse error
       }
     }
+
+    // 2. Parse ytInitialData for likes count
+    const dMatch =
+      res.data.match(/var ytInitialData\s*=\s*({.+?});<\/script>/) ||
+      res.data.match(/ytInitialData\s*=\s*({.+?});/);
+
+    if (dMatch) {
+      try {
+        const data = JSON.parse(dMatch[1]);
+        function findLikes(obj: any) {
+          if (!obj || typeof obj !== "object" || likes) return;
+          if (obj.iconName === "LIKE" && typeof obj.title === "string") {
+            likes = obj.title.trim();
+            return;
+          }
+          if (
+            obj.defaultText &&
+            typeof obj.defaultText.simpleText === "string" &&
+            /^[0-9.]+[KMB]?$/i.test(obj.defaultText.simpleText)
+          ) {
+            likes = obj.defaultText.simpleText.trim();
+            return;
+          }
+          for (const k of Object.keys(obj)) {
+            if (!likes) findLikes(obj[k]);
+          }
+        }
+        findLikes(data);
+      } catch {
+        // ignore parse error
+      }
+    }
+
+    // Fallback regex for likes
+    if (!likes) {
+      const regexMatch = res.data.match(/"iconName":"LIKE"[^}]*?"title":"([^"]+)"/);
+      if (regexMatch) likes = regexMatch[1].trim();
+    }
+
+    // Build informative tags (views, likes, duration, date, category) instead of SEO hashtags
+    const tags: string[] = [];
+    if (formattedViewCount) tags.push(formattedViewCount);
+    if (likes) tags.push(likes.toLowerCase().includes("like") ? likes : `${likes} likes`);
+    if (durationStr) tags.push(`⏱ ${durationStr}`);
+    if (publishDateStr) tags.push(publishDateStr);
+    if (category) tags.push(category);
 
     // High quality landscape image (16:9)
     const landscapeImage = `https://i.ytimg.com/vi/${videoId}/hq720.jpg`;
@@ -76,7 +180,7 @@ export const getMeta = async function ({
       type: "movie",
       cast: channel ? [channel] : undefined,
       tags: tags.length > 0 ? tags : undefined,
-      rating: rating || undefined,
+      rating: undefined, // Do not set rating to avoid "views/10" in the app UI
       linkList: [
         {
           title: "Watch Video",
