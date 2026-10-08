@@ -18,59 +18,131 @@ const QUALITY_ORDER: Record<string, number> = {
   "144": 8,
 };
 
+async function getVisitorData(axios: any, kvStore: any): Promise<string> {
+  const fallback =
+    "CgtSdHczNXdoNzhqQSiYoJ7WBjIKCgJJThIEGgAgZGLfAgrcAjIyLllUPUpQRHNlLWd6ZzYwc3FRN2JRSGNlMzdJWHFlelQxLUZMd00yR3M5X1gxZUd4RWtRdUxyakphLS1iaU1LMk9fcU83MHl4cExXcFRKd3p2ckcxcGMyU0RBS3FmYXVPOGpnd1dpWUtUdU5rQ1pZZzFZeHh3UkFnRXYtNE9YR1gtaWhvd2RvblQ3dENIV0NmdDgtZU9Ibi04M2QtUlBoZlhoZGpyNjE4YlFGY0VWVU5UanJBZ2g0cVFCRXJWbktnQm4tV1Eydm1CNE5qTl9FajBQVV9TaFlsYkxEOGY3WFJaUGVNRnIzTzhoejEyMDJQQlJpRUwyX1gtV2N0WG1YRmFvLVYyZXRpTWJDSUZLaU9jNEZUTU1lSktrWVBKV1A0WlV5eFZYeTNPZUlFMS1XeXpaa1Y3T1dVVDE5SllHcTNSN0NFcE5HNTNFZElmcW9UVDdMYjV2N09mdw==";
+  try {
+    const cached = await kvStore?.get("youtube_visitor_data");
+    if (cached) return cached;
+    const res = await axios.get("https://www.youtube.com", {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+      timeout: 3000,
+    });
+    const match =
+      typeof res?.data === "string"
+        ? res.data.match(/"visitorData"\s*:\s*"([^"]+)"/)
+        : null;
+    if (match && match[1]) {
+      await kvStore?.set("youtube_visitor_data", match[1]);
+      return match[1];
+    }
+  } catch {
+    // Fall back to default
+  }
+  return fallback;
+}
+
 async function fetchFromInnerTube(
   axios: any,
+  kvStore: any,
   videoId: string,
   signal?: AbortSignal
 ): Promise<Stream[]> {
   const streams: Stream[] = [];
   const subtitles: TextTracks = [];
 
-  // 1. iOS Client - provides Master HLS .m3u8 manifest with multi-quality adaptive streaming & full audio
-  try {
-    const iosRes = await axios.post(
-      "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
-      {
-        context: {
-          client: {
-            clientName: "IOS",
-            clientVersion: "20.11.6",
-            deviceModel: "iPhone10,4",
-            osName: "iOS",
-            osVersion: "16.7.7.20H330",
-          },
-        },
-        videoId,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent":
-            "com.google.ios.youtube/20.11.6 (iPhone10,4; U; CPU iOS 16_7_7 like Mac OS X)",
-        },
-        timeout: 4500,
-        signal,
-      }
-    );
+  const visitorData = await getVisitorData(axios, kvStore);
 
-    const iosData = iosRes?.data;
-    if (iosData?.streamingData?.hlsManifestUrl) {
+  // 1. VISIONOS Client - extracts Master HLS .m3u8 manifest (multi-quality 1080p/720p/etc. with full audio & subtitles)
+  const visionPromise = axios.post(
+    "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json",
+    {
+      videoId,
+      racyCheckOk: true,
+      contentCheckOk: true,
+      playbackContext: {
+        contentPlaybackContext: {
+          signatureTimestamp: 20731,
+        },
+      },
+      context: {
+        client: {
+          hl: "en",
+          gl: "US",
+          visitorData,
+          clientName: "VISIONOS",
+          clientVersion: "1.02",
+          osName: "visionOS",
+          osVersion: "26.5.23O471",
+          platform: "MOBILE",
+          deviceMake: "Apple",
+          deviceModel: "RealityDevice17,1",
+        },
+      },
+    },
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "X-YouTube-Client-Name": "101",
+        "X-YouTube-Client-Version": "1.02",
+        "X-Goog-Visitor-Id": visitorData,
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+        Origin: "https://www.youtube.com",
+        Referer: `https://www.youtube.com/watch?v=${videoId}`,
+      },
+      timeout: 5000,
+      signal,
+    }
+  );
+
+  // 2. Android Client - provides muxed direct video+audio MP4s and DASH tracks
+  const androidPromise = axios.post(
+    "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+    {
+      context: {
+        client: {
+          clientName: "ANDROID",
+          clientVersion: "20.10.38",
+          androidSdkVersion: 34,
+        },
+      },
+      videoId,
+    },
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent":
+          "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
+      },
+      timeout: 5000,
+      signal,
+    }
+  );
+
+  const [visionRes, androidRes] = await Promise.allSettled([
+    visionPromise,
+    androidPromise,
+  ]);
+
+  // Process VISIONOS response (Master HLS + Captions)
+  if (visionRes.status === "fulfilled") {
+    const vData = visionRes.value?.data;
+    if (vData?.streamingData?.hlsManifestUrl) {
       streams.push({
         server: "YouTube HLS (Multi-Quality)",
-        link: iosData.streamingData.hlsManifestUrl,
+        link: vData.streamingData.hlsManifestUrl,
         type: "m3u8",
         quality: "1080",
         tag: "Audio + Video",
-        headers: {
-          "User-Agent":
-            "com.google.ios.youtube/20.11.6 (iPhone10,4; U; CPU iOS 16_7_7 like Mac OS X)",
-        },
       });
     }
 
-    // Extract subtitles if present
     const captionTracks =
-      iosData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+      vData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
     if (Array.isArray(captionTracks)) {
       for (const c of captionTracks) {
         if (c.baseUrl) {
@@ -85,38 +157,12 @@ async function fetchFromInnerTube(
         }
       }
     }
-  } catch {
-    // Continue to Android client
   }
 
-  // 2. Android Client - provides muxed direct video+audio MP4s and high-res adaptive streams
-  try {
-    const androidRes = await axios.post(
-      "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
-      {
-        context: {
-          client: {
-            clientName: "ANDROID",
-            clientVersion: "20.10.38",
-            androidSdkVersion: 34,
-          },
-        },
-        videoId,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent":
-            "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
-        },
-        timeout: 4500,
-        signal,
-      }
-    );
-
-    const aData = androidRes?.data;
+  // Process Android response (Muxed MP4s & DASH tracks)
+  if (androidRes.status === "fulfilled") {
+    const aData = androidRes.value?.data;
     if (aData?.playabilityStatus?.status === "OK" && aData?.streamingData) {
-      // Subtitles fallback if iOS didn't have them
       if (subtitles.length === 0) {
         const captionTracks =
           aData.captions?.playerCaptionsTracklistRenderer?.captionTracks;
@@ -138,7 +184,7 @@ async function fetchFromInnerTube(
         }
       }
 
-      // Muxed formats (combined audio+video directly inside the MP4 container)
+      // Muxed formats (combined audio+video inside MP4 container)
       for (const f of aData.streamingData.formats || []) {
         if (f.url) {
           const qual = f.qualityLabel || f.quality || "360p";
@@ -149,7 +195,6 @@ async function fetchFromInnerTube(
             type: "mp4",
             quality: qualityStr,
             tag: "Audio + Video",
-            subtitles: subtitles.length > 0 ? subtitles : undefined,
             headers: {
               "User-Agent":
                 "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
@@ -172,7 +217,6 @@ async function fetchFromInnerTube(
               type: f.mimeType.includes("webm") ? "webm" : "mp4",
               quality: qualityStr,
               tag: "Video Only",
-              subtitles: subtitles.length > 0 ? subtitles : undefined,
               headers: {
                 "User-Agent":
                   "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
@@ -200,11 +244,9 @@ async function fetchFromInnerTube(
         });
       }
     }
-  } catch {
-    // Continue
   }
 
-  // Attach subtitles to HLS stream if present
+  // Attach subtitles to streams
   if (subtitles.length > 0) {
     for (const s of streams) {
       if (!s.subtitles) s.subtitles = subtitles;
@@ -218,6 +260,7 @@ export const getStream = async function ({
   link,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
@@ -232,11 +275,15 @@ export const getStream = async function ({
 
   const preferredQuality = await kvStore?.get<string>("preferredQuality");
 
-  // Direct client InnerTube API (runs 100% locally on device IP)
   try {
-    const directStreams = await fetchFromInnerTube(axios, videoId, signal);
+    const directStreams = await fetchFromInnerTube(
+      axios,
+      kvStore,
+      videoId,
+      signal
+    );
     if (directStreams && directStreams.length > 0) {
-      sortStreams(directStreams, preferredQuality);
+      sortStreams(directStreams, preferredQuality, isDownload);
       return directStreams;
     }
   } catch {
@@ -246,19 +293,31 @@ export const getStream = async function ({
   return [];
 };
 
-function sortStreams(streams: Stream[], preferredQuality?: string) {
+function sortStreams(
+  streams: Stream[],
+  preferredQuality?: string,
+  isDownload?: boolean
+) {
   streams.sort((a, b) => {
+    // For downloads, prioritize MP4 streams with Audio + Video
+    if (isDownload) {
+      const aIsMuxedMp4 = a.type === "mp4" && a.tag === "Audio + Video";
+      const bIsMuxedMp4 = b.type === "mp4" && b.tag === "Audio + Video";
+      if (aIsMuxedMp4 && !bIsMuxedMp4) return -1;
+      if (!aIsMuxedMp4 && bIsMuxedMp4) return 1;
+    }
+
     // Prioritize streams with audio over video-only or audio-only
     const aHasBoth = a.tag === "Audio + Video";
     const bHasBoth = b.tag === "Audio + Video";
     if (aHasBoth && !bHasBoth) return -1;
     if (!aHasBoth && bHasBoth) return 1;
 
-    // Put HLS Master first unless a specific quality is preferred
-    if (!preferredQuality || preferredQuality === "auto") {
+    // For playback, prioritize HLS Master unless a specific resolution is preferred
+    if (!isDownload && (!preferredQuality || preferredQuality === "auto")) {
       if (a.type === "m3u8" && b.type !== "m3u8") return -1;
       if (b.type === "m3u8" && a.type !== "m3u8") return 1;
-    } else {
+    } else if (preferredQuality && preferredQuality !== "auto") {
       const cleanPref = preferredQuality.replace("p", "");
       if (a.quality === cleanPref && b.quality !== cleanPref) return -1;
       if (b.quality === cleanPref && a.quality !== cleanPref) return 1;
