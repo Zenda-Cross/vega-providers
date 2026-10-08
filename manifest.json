@@ -478,5 +478,14 @@
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/mxplayer.png",
     "type": "india",
     "disabled": false
+  },
+  {
+    "display_name": "YouTube",
+    "value": "youtube",
+    "version": "1.0",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/youtube.png",
+    "type": "global",
+    "disabled": false,
+    "hasSettings": true
   }
 ]
