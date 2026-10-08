@@ -56,55 +56,91 @@ async function fetchFromInnerTube(
 
   const visitorData = await getVisitorData(axios, kvStore);
 
-  // VISIONOS Client - extracts Master HLS .m3u8 manifest
   try {
-    const visionRes = await axios.post(
-      "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json",
-      {
-        videoId,
-        racyCheckOk: true,
-        contentCheckOk: true,
-        playbackContext: {
-          contentPlaybackContext: {
-            signatureTimestamp: 20731,
+    // Query VISIONOS (for Master HLS) and ANDROID_VR (for progressive MP4 with audio) in parallel
+    const [visionRes, vrRes] = await Promise.allSettled([
+      axios.post(
+        "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json",
+        {
+          videoId,
+          racyCheckOk: true,
+          contentCheckOk: true,
+          playbackContext: {
+            contentPlaybackContext: {
+              signatureTimestamp: 20731,
+            },
+          },
+          context: {
+            client: {
+              hl: "en",
+              gl: "US",
+              visitorData,
+              clientName: "VISIONOS",
+              clientVersion: "1.02",
+              osName: "visionOS",
+              osVersion: "26.5.23O471",
+              platform: "MOBILE",
+              deviceMake: "Apple",
+              deviceModel: "RealityDevice17,1",
+            },
           },
         },
-        context: {
-          client: {
-            hl: "en",
-            gl: "US",
-            visitorData,
-            clientName: "VISIONOS",
-            clientVersion: "1.02",
-            osName: "visionOS",
-            osVersion: "26.5.23O471",
-            platform: "MOBILE",
-            deviceMake: "Apple",
-            deviceModel: "RealityDevice17,1",
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "X-YouTube-Client-Name": "101",
+            "X-YouTube-Client-Version": "1.02",
+            "X-Goog-Visitor-Id": visitorData,
+            "User-Agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+            Origin: "https://www.youtube.com",
+            Referer: `https://www.youtube.com/watch?v=${videoId}`,
+          },
+          timeout: 5000,
+          signal,
+        }
+      ),
+      axios.post(
+        "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json",
+        {
+          videoId,
+          racyCheckOk: true,
+          contentCheckOk: true,
+          playbackContext: {
+            contentPlaybackContext: {
+              signatureTimestamp: 20731,
+            },
+          },
+          context: {
+            client: {
+              clientName: "ANDROID_VR",
+              clientVersion: "1.60.19",
+              deviceMake: "Oculus",
+              deviceModel: "Quest 3",
+              platform: "MOBILE",
+              hl: "en",
+              gl: "US",
+            },
           },
         },
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "X-YouTube-Client-Name": "101",
-          "X-YouTube-Client-Version": "1.02",
-          "X-Goog-Visitor-Id": visitorData,
-          "User-Agent":
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
-          Origin: "https://www.youtube.com",
-          Referer: `https://www.youtube.com/watch?v=${videoId}`,
-        },
-        timeout: 5000,
-        signal,
-      }
-    );
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "User-Agent":
+              "Mozilla/5.0 (Linux; Android 12; Quest 3) AppleWebKit/537.36",
+          },
+          timeout: 5000,
+          signal,
+        }
+      ),
+    ]);
 
-    const vData = visionRes?.data;
+    const vData = visionRes.status === "fulfilled" ? visionRes.value?.data : null;
+    const vrData = vrRes.status === "fulfilled" ? vrRes.value?.data : null;
+
+    // 1. Master HLS (Multi-Quality adaptive stream with audio)
     const masterUrl = vData?.streamingData?.hlsManifestUrl;
-
     if (masterUrl) {
-      // 1. Master HLS (Multi-Quality adaptive stream)
       streams.push({
         server: "YouTube HLS (Multi-Quality)",
         link: masterUrl,
@@ -112,70 +148,27 @@ async function fetchFromInnerTube(
         quality: "1080",
         tag: "Audio + Video",
       });
+    }
 
-      // 2. Parse individual resolution variants from master manifest
-      try {
-        const manifestRes = await axios.get(masterUrl, {
-          timeout: 4000,
-          signal,
+    // 2. Progressive MP4 (Audio + Video muxed, ideal for offline download)
+    const formats = vrData?.streamingData?.formats || [];
+    for (const f of formats) {
+      if (f.url) {
+        const qualityLabel = f.qualityLabel || "360p";
+        streams.push({
+          server: `YouTube (${qualityLabel} MP4)`,
+          link: f.url,
+          type: "mp4",
+          quality: qualityLabel.replace("p", ""),
+          tag: "Audio + Video",
         });
-        const manifestText =
-          typeof manifestRes?.data === "string" ? manifestRes.data : "";
-        const lines = manifestText.split("\n");
-
-        const variantsByRes = new Map<
-          string,
-          { height: string; bandwidth: number; isAvc: boolean; url: string }
-        >();
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (line.startsWith("#EXT-X-STREAM-INF")) {
-            const resMatch = line.match(/RESOLUTION=(\d+)x(\d+)/);
-            const bwMatch = line.match(/BANDWIDTH=(\d+)/);
-            const nextUrl = lines[i + 1]?.trim();
-            if (resMatch && nextUrl && nextUrl.startsWith("http")) {
-              const height = resMatch[2]; // e.g. 1080, 720, 480, 360, 240, 144
-              const bandwidth = parseInt(bwMatch ? bwMatch[1] : "0", 10);
-              const isAvc = line.includes("avc1");
-              const existing = variantsByRes.get(height);
-              if (
-                !existing ||
-                (isAvc && !existing.isAvc) ||
-                (isAvc === existing.isAvc && bandwidth > existing.bandwidth)
-              ) {
-                variantsByRes.set(height, {
-                  height,
-                  bandwidth,
-                  isAvc,
-                  url: nextUrl,
-                });
-              }
-            }
-          }
-        }
-
-        // Add individual resolution HLS streams in descending quality order
-        const sortedHeights = Array.from(variantsByRes.keys()).sort(
-          (a, b) => parseInt(b, 10) - parseInt(a, 10)
-        );
-        for (const h of sortedHeights) {
-          const v = variantsByRes.get(h)!;
-          streams.push({
-            server: `YouTube HLS (${h}p)`,
-            link: v.url,
-            type: "m3u8",
-            quality: h,
-            tag: "Audio + Video",
-          });
-        }
-      } catch {
-        // Continue with available streams
       }
     }
 
-    // Extract subtitles
+    // Extract subtitles from captions
     const captionTracks =
-      vData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+      vData?.captions?.playerCaptionsTracklistRenderer?.captionTracks ||
+      vrData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
     if (Array.isArray(captionTracks)) {
       for (const c of captionTracks) {
         if (c.baseUrl) {
@@ -208,6 +201,7 @@ export const getStream = async function ({
   link,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
@@ -230,7 +224,7 @@ export const getStream = async function ({
       signal
     );
     if (directStreams && directStreams.length > 0) {
-      sortStreams(directStreams, preferredQuality);
+      sortStreams(directStreams, preferredQuality, isDownload);
       return directStreams;
     }
   } catch {
@@ -240,8 +234,20 @@ export const getStream = async function ({
   return [];
 };
 
-function sortStreams(streams: Stream[], preferredQuality?: string) {
+function sortStreams(
+  streams: Stream[],
+  preferredQuality?: string,
+  isDownload?: boolean
+) {
   streams.sort((a, b) => {
+    // If downloading, sort progressive MP4 ahead of HLS for reliable download
+    if (isDownload) {
+      const aIsMp4 = a.type === "mp4";
+      const bIsMp4 = b.type === "mp4";
+      if (aIsMp4 && !bIsMp4) return -1;
+      if (!aIsMp4 && bIsMp4) return 1;
+    }
+
     // Quality preference matching
     if (preferredQuality && preferredQuality !== "auto") {
       const cleanPref = preferredQuality.replace("p", "");
@@ -249,17 +255,14 @@ function sortStreams(streams: Stream[], preferredQuality?: string) {
       const bMatches = b.quality === cleanPref;
       if (aMatches && !bMatches) return -1;
       if (!aMatches && bMatches) return 1;
-    } else if (!preferredQuality || preferredQuality === "auto") {
-      if (
-        a.server.includes("Multi-Quality") &&
-        !b.server.includes("Multi-Quality")
-      )
-        return -1;
-      if (
-        !a.server.includes("Multi-Quality") &&
-        b.server.includes("Multi-Quality")
-      )
-        return 1;
+    }
+
+    // For streaming (default), prioritize Multi-Quality HLS
+    if (!isDownload) {
+      const aIsHls = a.server.includes("Multi-Quality");
+      const bIsHls = b.server.includes("Multi-Quality");
+      if (aIsHls && !bIsHls) return -1;
+      if (!aIsHls && bIsHls) return 1;
     }
 
     const orderA = QUALITY_ORDER[a.quality || ""] || 99;
