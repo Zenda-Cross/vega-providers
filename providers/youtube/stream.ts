@@ -56,94 +56,64 @@ async function fetchFromInnerTube(
 
   const visitorData = await getVisitorData(axios, kvStore);
 
-  // 1. VISIONOS Client - extracts Master HLS .m3u8 manifest (multi-quality 1080p/720p/etc. with full audio & subtitles)
-  const visionPromise = axios.post(
-    "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json",
-    {
-      videoId,
-      racyCheckOk: true,
-      contentCheckOk: true,
-      playbackContext: {
-        contentPlaybackContext: {
-          signatureTimestamp: 20731,
+  // VISIONOS Client - extracts Master HLS .m3u8 manifest
+  try {
+    const visionRes = await axios.post(
+      "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json",
+      {
+        videoId,
+        racyCheckOk: true,
+        contentCheckOk: true,
+        playbackContext: {
+          contentPlaybackContext: {
+            signatureTimestamp: 20731,
+          },
+        },
+        context: {
+          client: {
+            hl: "en",
+            gl: "US",
+            visitorData,
+            clientName: "VISIONOS",
+            clientVersion: "1.02",
+            osName: "visionOS",
+            osVersion: "26.5.23O471",
+            platform: "MOBILE",
+            deviceMake: "Apple",
+            deviceModel: "RealityDevice17,1",
+          },
         },
       },
-      context: {
-        client: {
-          hl: "en",
-          gl: "US",
-          visitorData,
-          clientName: "VISIONOS",
-          clientVersion: "1.02",
-          osName: "visionOS",
-          osVersion: "26.5.23O471",
-          platform: "MOBILE",
-          deviceMake: "Apple",
-          deviceModel: "RealityDevice17,1",
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-YouTube-Client-Name": "101",
+          "X-YouTube-Client-Version": "1.02",
+          "X-Goog-Visitor-Id": visitorData,
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+          Origin: "https://www.youtube.com",
+          Referer: `https://www.youtube.com/watch?v=${videoId}`,
         },
-      },
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "X-YouTube-Client-Name": "101",
-        "X-YouTube-Client-Version": "1.02",
-        "X-Goog-Visitor-Id": visitorData,
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
-        Origin: "https://www.youtube.com",
-        Referer: `https://www.youtube.com/watch?v=${videoId}`,
-      },
-      timeout: 5000,
-      signal,
-    }
-  );
+        timeout: 5000,
+        signal,
+      }
+    );
 
-  // 2. Android Client - provides muxed direct video+audio MP4s and DASH tracks
-  const androidPromise = axios.post(
-    "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
-    {
-      context: {
-        client: {
-          clientName: "ANDROID",
-          clientVersion: "20.10.38",
-          androidSdkVersion: 34,
-        },
-      },
-      videoId,
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent":
-          "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
-      },
-      timeout: 5000,
-      signal,
-    }
-  );
-
-  const [visionRes, androidRes] = await Promise.allSettled([
-    visionPromise,
-    androidPromise,
-  ]);
-
-  // Process VISIONOS response (Master HLS + Individual HLS Qualities + HLS Audio + Captions)
-  if (visionRes.status === "fulfilled") {
-    const vData = visionRes.value?.data;
+    const vData = visionRes?.data;
     const masterUrl = vData?.streamingData?.hlsManifestUrl;
 
     if (masterUrl) {
-      // 1. Master HLS (Auto / Multi-Quality adaptive stream)
+      // 1. Master HLS (Multi-Quality adaptive stream)
       streams.push({
-        server: "YouTube HLS (Auto)",
+        server: "YouTube HLS (Multi-Quality)",
         link: masterUrl,
         type: "m3u8",
         quality: "1080",
         tag: "Audio + Video",
       });
 
-      // 2. Parse individual resolution variants and HLS audio tracks from master manifest
+      // 2. Parse individual resolution variants from master manifest
       try {
         const manifestRes = await axios.get(masterUrl, {
           timeout: 4000,
@@ -153,26 +123,6 @@ async function fetchFromInnerTube(
           typeof manifestRes?.data === "string" ? manifestRes.data : "";
         const lines = manifestText.split("\n");
 
-        // Extract HLS Audio streams
-        for (const line of lines) {
-          if (line.startsWith("#EXT-X-MEDIA:") && line.includes("TYPE=AUDIO")) {
-            const uriMatch = line.match(/URI="([^"]+)"/);
-            const groupMatch = line.match(/GROUP-ID="([^"]+)"/);
-            if (uriMatch) {
-              const isHigh =
-                groupMatch?.[1] === "234" || line.includes("itag/234");
-              streams.push({
-                server: `YouTube Audio (HLS - ${isHigh ? "High Quality" : "Standard"})`,
-                link: uriMatch[1],
-                type: "m3u8",
-                quality: "Audio",
-                tag: "Audio Only",
-              });
-            }
-          }
-        }
-
-        // Extract individual video quality variants (filter duplicates, prefer AVC1 / highest bitrate)
         const variantsByRes = new Map<
           string,
           { height: string; bandwidth: number; isAvc: boolean; url: string }
@@ -223,6 +173,7 @@ async function fetchFromInnerTube(
       }
     }
 
+    // Extract subtitles
     const captionTracks =
       vData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
     if (Array.isArray(captionTracks)) {
@@ -239,70 +190,8 @@ async function fetchFromInnerTube(
         }
       }
     }
-  }
-
-  // Process Android response (Muxed MP4s & M4A Audio)
-  if (androidRes.status === "fulfilled") {
-    const aData = androidRes.value?.data;
-    if (aData?.playabilityStatus?.status === "OK" && aData?.streamingData) {
-      if (subtitles.length === 0) {
-        const captionTracks =
-          aData.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-        if (Array.isArray(captionTracks)) {
-          for (const c of captionTracks) {
-            if (c.baseUrl) {
-              const name =
-                c.name?.runs?.[0]?.text || c.name?.simpleText || c.languageCode;
-              subtitles.push({
-                title: name,
-                language: c.languageCode || name,
-                type: "text/vtt",
-                uri: c.baseUrl.includes("fmt=")
-                  ? c.baseUrl
-                  : `${c.baseUrl}&fmt=vtt`,
-              });
-            }
-          }
-        }
-      }
-
-      // Muxed formats (combined audio+video inside MP4 container - essential for offline downloads)
-      for (const f of aData.streamingData.formats || []) {
-        if (f.url) {
-          const qual = f.qualityLabel || f.quality || "360p";
-          const qualityStr = qual.replace("p", "");
-          streams.push({
-            server: `YouTube MP4 (${qual})`,
-            link: f.url,
-            type: "mp4",
-            quality: qualityStr,
-            tag: "Audio + Video",
-            headers: {
-              "User-Agent":
-                "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
-            },
-          });
-        }
-      }
-
-      // Standalone audio-only format (M4A)
-      const audioFormat = (aData.streamingData.adaptiveFormats || []).find(
-        (f: any) => f.url && f.mimeType?.startsWith("audio/")
-      );
-      if (audioFormat) {
-        streams.push({
-          server: "YouTube Audio (M4A)",
-          link: audioFormat.url,
-          type: audioFormat.mimeType.includes("webm") ? "webm" : "m4a",
-          quality: "Audio",
-          tag: "Audio Only",
-          headers: {
-            "User-Agent":
-              "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
-          },
-        });
-      }
-    }
+  } catch {
+    // Return empty on failure
   }
 
   // Attach subtitles to streams
@@ -319,7 +208,6 @@ export const getStream = async function ({
   link,
   signal,
   providerContext,
-  isDownload,
 }: {
   link: string;
   type: string;
@@ -342,7 +230,7 @@ export const getStream = async function ({
       signal
     );
     if (directStreams && directStreams.length > 0) {
-      sortStreams(directStreams, preferredQuality, isDownload);
+      sortStreams(directStreams, preferredQuality);
       return directStreams;
     }
   } catch {
@@ -352,26 +240,8 @@ export const getStream = async function ({
   return [];
 };
 
-function sortStreams(
-  streams: Stream[],
-  preferredQuality?: string,
-  isDownload?: boolean
-) {
+function sortStreams(streams: Stream[], preferredQuality?: string) {
   streams.sort((a, b) => {
-    // For downloads, prioritize MP4 streams with Audio + Video
-    if (isDownload) {
-      const aIsMuxedMp4 = a.type === "mp4" && a.tag === "Audio + Video";
-      const bIsMuxedMp4 = b.type === "mp4" && b.tag === "Audio + Video";
-      if (aIsMuxedMp4 && !bIsMuxedMp4) return -1;
-      if (!aIsMuxedMp4 && bIsMuxedMp4) return 1;
-    }
-
-    // Prioritize streams with audio+video over audio-only
-    const aHasBoth = a.tag === "Audio + Video";
-    const bHasBoth = b.tag === "Audio + Video";
-    if (aHasBoth && !bHasBoth) return -1;
-    if (!aHasBoth && bHasBoth) return 1;
-
     // Quality preference matching
     if (preferredQuality && preferredQuality !== "auto") {
       const cleanPref = preferredQuality.replace("p", "");
@@ -379,12 +249,17 @@ function sortStreams(
       const bMatches = b.quality === cleanPref;
       if (aMatches && !bMatches) return -1;
       if (!aMatches && bMatches) return 1;
-    } else if (
-      !isDownload &&
-      (!preferredQuality || preferredQuality === "auto")
-    ) {
-      if (a.server.includes("(Auto)") && !b.server.includes("(Auto)")) return -1;
-      if (!a.server.includes("(Auto)") && b.server.includes("(Auto)")) return 1;
+    } else if (!preferredQuality || preferredQuality === "auto") {
+      if (
+        a.server.includes("Multi-Quality") &&
+        !b.server.includes("Multi-Quality")
+      )
+        return -1;
+      if (
+        !a.server.includes("Multi-Quality") &&
+        b.server.includes("Multi-Quality")
+      )
+        return 1;
     }
 
     const orderA = QUALITY_ORDER[a.quality || ""] || 99;
