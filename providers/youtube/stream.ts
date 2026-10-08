@@ -214,55 +214,6 @@ async function fetchFromInnerTube(
   return streams;
 }
 
-async function fetchFromPiped(
-  axios: any,
-  baseUrl: string,
-  videoId: string,
-  signal?: AbortSignal
-): Promise<Stream[]> {
-  const url = `${baseUrl.replace(/\/+$/, "")}/streams/${videoId}`;
-  const res = await axios.get(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    },
-    timeout: 3500,
-    signal,
-  });
-
-  const data = res?.data;
-  if (!data) return [];
-
-  const streams: Stream[] = [];
-
-  // HLS stream if available
-  if (data.hls) {
-    streams.push({
-      server: "YouTube HLS (Piped)",
-      link: data.hls,
-      type: "m3u8",
-      quality: "1080",
-      tag: "Audio + Video",
-    });
-  }
-
-  // Proxied video streams
-  for (const v of data.videoStreams || []) {
-    if (v.url && !v.videoOnly) {
-      const qualityStr = (v.quality || "720").replace("p", "");
-      streams.push({
-        server: `YouTube Direct (${v.quality || qualityStr + "p"})`,
-        link: v.url,
-        type: v.format?.toLowerCase() || "mp4",
-        quality: qualityStr,
-        tag: "Audio + Video",
-      });
-    }
-  }
-
-  return streams;
-}
-
 export const getStream = async function ({
   link,
   signal,
@@ -281,7 +232,7 @@ export const getStream = async function ({
 
   const preferredQuality = await kvStore?.get<string>("preferredQuality");
 
-  // 1. Direct InnerTube API (runs on client IP, eliminates 403 Forbidden)
+  // Direct client InnerTube API (runs 100% locally on device IP)
   try {
     const directStreams = await fetchFromInnerTube(axios, videoId, signal);
     if (directStreams && directStreams.length > 0) {
@@ -289,26 +240,7 @@ export const getStream = async function ({
       return directStreams;
     }
   } catch {
-    // Fallback to proxy instances below
-  }
-
-  // 2. Piped Proxy Fallback
-  const pipedInstances = [
-    "https://api.piped.private.coffee",
-    "https://piped-api.lunar.icu",
-    "https://pipedapi.tokhmi.xyz",
-  ];
-
-  for (const inst of pipedInstances) {
-    try {
-      const pStreams = await fetchFromPiped(axios, inst, videoId, signal);
-      if (pStreams && pStreams.length > 0) {
-        sortStreams(pStreams, preferredQuality);
-        return pStreams;
-      }
-    } catch {
-      // Try next instance
-    }
+    // Return empty if extraction fails
   }
 
   return [];
