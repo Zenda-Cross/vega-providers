@@ -26,7 +26,7 @@ async function fetchFromInnerTube(
   const streams: Stream[] = [];
   const subtitles: TextTracks = [];
 
-  // 1. iOS Client - provides Master HLS .m3u8 manifest with multi-quality adaptive streaming
+  // 1. iOS Client - provides Master HLS .m3u8 manifest with multi-quality adaptive streaming & full audio
   try {
     const iosRes = await axios.post(
       "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
@@ -60,6 +60,7 @@ async function fetchFromInnerTube(
         link: iosData.streamingData.hlsManifestUrl,
         type: "m3u8",
         quality: "1080",
+        tag: "Audio + Video",
         headers: {
           "User-Agent":
             "com.google.ios.youtube/20.11.6 (iPhone10,4; U; CPU iOS 16_7_7 like Mac OS X)",
@@ -137,7 +138,7 @@ async function fetchFromInnerTube(
         }
       }
 
-      // Muxed formats (combined audio+video, e.g. 360p / 720p)
+      // Muxed formats (combined audio+video directly inside the MP4 container)
       for (const f of aData.streamingData.formats || []) {
         if (f.url) {
           const qual = f.qualityLabel || f.quality || "360p";
@@ -147,6 +148,7 @@ async function fetchFromInnerTube(
             link: f.url,
             type: "mp4",
             quality: qualityStr,
+            tag: "Audio + Video",
             subtitles: subtitles.length > 0 ? subtitles : undefined,
             headers: {
               "User-Agent":
@@ -156,7 +158,7 @@ async function fetchFromInnerTube(
         }
       }
 
-      // Adaptive formats (high quality video streams)
+      // Adaptive video formats (separate video-only DASH tracks)
       const seenQuals = new Set<string>();
       for (const f of aData.streamingData.adaptiveFormats || []) {
         if (f.url && f.mimeType?.startsWith("video/")) {
@@ -165,10 +167,11 @@ async function fetchFromInnerTube(
             seenQuals.add(qual);
             const qualityStr = qual.replace("p", "");
             streams.push({
-              server: `YouTube Stream (${qual})`,
+              server: `YouTube Stream (${qual} - Video Only)`,
               link: f.url,
               type: f.mimeType.includes("webm") ? "webm" : "mp4",
               quality: qualityStr,
+              tag: "Video Only",
               subtitles: subtitles.length > 0 ? subtitles : undefined,
               headers: {
                 "User-Agent":
@@ -189,6 +192,7 @@ async function fetchFromInnerTube(
           link: audioFormat.url,
           type: audioFormat.mimeType.includes("webm") ? "webm" : "m4a",
           quality: "Audio",
+          tag: "Audio Only",
           headers: {
             "User-Agent":
               "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
@@ -238,6 +242,7 @@ async function fetchFromPiped(
       link: data.hls,
       type: "m3u8",
       quality: "1080",
+      tag: "Audio + Video",
     });
   }
 
@@ -250,6 +255,7 @@ async function fetchFromPiped(
         link: v.url,
         type: v.format?.toLowerCase() || "mp4",
         quality: qualityStr,
+        tag: "Audio + Video",
       });
     }
   }
@@ -310,6 +316,12 @@ export const getStream = async function ({
 
 function sortStreams(streams: Stream[], preferredQuality?: string) {
   streams.sort((a, b) => {
+    // Prioritize streams with audio over video-only or audio-only
+    const aHasBoth = a.tag === "Audio + Video";
+    const bHasBoth = b.tag === "Audio + Video";
+    if (aHasBoth && !bHasBoth) return -1;
+    if (!aHasBoth && bHasBoth) return 1;
+
     // Put HLS Master first unless a specific quality is preferred
     if (!preferredQuality || preferredQuality === "auto") {
       if (a.type === "m3u8" && b.type !== "m3u8") return -1;
