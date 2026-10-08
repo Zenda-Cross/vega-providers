@@ -128,17 +128,99 @@ async function fetchFromInnerTube(
     androidPromise,
   ]);
 
-  // Process VISIONOS response (Master HLS + Captions)
+  // Process VISIONOS response (Master HLS + Individual HLS Qualities + HLS Audio + Captions)
   if (visionRes.status === "fulfilled") {
     const vData = visionRes.value?.data;
-    if (vData?.streamingData?.hlsManifestUrl) {
+    const masterUrl = vData?.streamingData?.hlsManifestUrl;
+
+    if (masterUrl) {
+      // 1. Master HLS (Auto / Multi-Quality adaptive stream)
       streams.push({
-        server: "YouTube HLS (Multi-Quality)",
-        link: vData.streamingData.hlsManifestUrl,
+        server: "YouTube HLS (Auto)",
+        link: masterUrl,
         type: "m3u8",
         quality: "1080",
         tag: "Audio + Video",
       });
+
+      // 2. Parse individual resolution variants and HLS audio tracks from master manifest
+      try {
+        const manifestRes = await axios.get(masterUrl, {
+          timeout: 4000,
+          signal,
+        });
+        const manifestText =
+          typeof manifestRes?.data === "string" ? manifestRes.data : "";
+        const lines = manifestText.split("\n");
+
+        // Extract HLS Audio streams
+        for (const line of lines) {
+          if (line.startsWith("#EXT-X-MEDIA:") && line.includes("TYPE=AUDIO")) {
+            const uriMatch = line.match(/URI="([^"]+)"/);
+            const groupMatch = line.match(/GROUP-ID="([^"]+)"/);
+            if (uriMatch) {
+              const isHigh =
+                groupMatch?.[1] === "234" || line.includes("itag/234");
+              streams.push({
+                server: `YouTube Audio (HLS - ${isHigh ? "High Quality" : "Standard"})`,
+                link: uriMatch[1],
+                type: "m3u8",
+                quality: "Audio",
+                tag: "Audio Only",
+              });
+            }
+          }
+        }
+
+        // Extract individual video quality variants (filter duplicates, prefer AVC1 / highest bitrate)
+        const variantsByRes = new Map<
+          string,
+          { height: string; bandwidth: number; isAvc: boolean; url: string }
+        >();
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.startsWith("#EXT-X-STREAM-INF")) {
+            const resMatch = line.match(/RESOLUTION=(\d+)x(\d+)/);
+            const bwMatch = line.match(/BANDWIDTH=(\d+)/);
+            const nextUrl = lines[i + 1]?.trim();
+            if (resMatch && nextUrl && nextUrl.startsWith("http")) {
+              const height = resMatch[2]; // e.g. 1080, 720, 480, 360, 240, 144
+              const bandwidth = parseInt(bwMatch ? bwMatch[1] : "0", 10);
+              const isAvc = line.includes("avc1");
+              const existing = variantsByRes.get(height);
+              if (
+                !existing ||
+                (isAvc && !existing.isAvc) ||
+                (isAvc === existing.isAvc && bandwidth > existing.bandwidth)
+              ) {
+                variantsByRes.set(height, {
+                  height,
+                  bandwidth,
+                  isAvc,
+                  url: nextUrl,
+                });
+              }
+            }
+          }
+        }
+
+        // Add individual resolution HLS streams in descending quality order
+        const sortedHeights = Array.from(variantsByRes.keys()).sort(
+          (a, b) => parseInt(b, 10) - parseInt(a, 10)
+        );
+        for (const h of sortedHeights) {
+          const v = variantsByRes.get(h)!;
+          streams.push({
+            server: `YouTube HLS (${h}p)`,
+            link: v.url,
+            type: "m3u8",
+            quality: h,
+            tag: "Audio + Video",
+          });
+        }
+      } catch {
+        // Continue with available streams
+      }
     }
 
     const captionTracks =
@@ -159,7 +241,7 @@ async function fetchFromInnerTube(
     }
   }
 
-  // Process Android response (Muxed MP4s & DASH tracks)
+  // Process Android response (Muxed MP4s & M4A Audio)
   if (androidRes.status === "fulfilled") {
     const aData = androidRes.value?.data;
     if (aData?.playabilityStatus?.status === "OK" && aData?.streamingData) {
@@ -184,7 +266,7 @@ async function fetchFromInnerTube(
         }
       }
 
-      // Muxed formats (combined audio+video inside MP4 container)
+      // Muxed formats (combined audio+video inside MP4 container - essential for offline downloads)
       for (const f of aData.streamingData.formats || []) {
         if (f.url) {
           const qual = f.qualityLabel || f.quality || "360p";
@@ -203,36 +285,13 @@ async function fetchFromInnerTube(
         }
       }
 
-      // Adaptive video formats (separate video-only DASH tracks)
-      const seenQuals = new Set<string>();
-      for (const f of aData.streamingData.adaptiveFormats || []) {
-        if (f.url && f.mimeType?.startsWith("video/")) {
-          const qual = f.qualityLabel || "HD";
-          if (!seenQuals.has(qual)) {
-            seenQuals.add(qual);
-            const qualityStr = qual.replace("p", "");
-            streams.push({
-              server: `YouTube Stream (${qual} - Video Only)`,
-              link: f.url,
-              type: f.mimeType.includes("webm") ? "webm" : "mp4",
-              quality: qualityStr,
-              tag: "Video Only",
-              headers: {
-                "User-Agent":
-                  "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
-              },
-            });
-          }
-        }
-      }
-
-      // Audio only option
+      // Standalone audio-only format (M4A)
       const audioFormat = (aData.streamingData.adaptiveFormats || []).find(
         (f: any) => f.url && f.mimeType?.startsWith("audio/")
       );
       if (audioFormat) {
         streams.push({
-          server: "YouTube Audio Only",
+          server: "YouTube Audio (M4A)",
           link: audioFormat.url,
           type: audioFormat.mimeType.includes("webm") ? "webm" : "m4a",
           quality: "Audio",
@@ -307,20 +366,25 @@ function sortStreams(
       if (!aIsMuxedMp4 && bIsMuxedMp4) return 1;
     }
 
-    // Prioritize streams with audio over video-only or audio-only
+    // Prioritize streams with audio+video over audio-only
     const aHasBoth = a.tag === "Audio + Video";
     const bHasBoth = b.tag === "Audio + Video";
     if (aHasBoth && !bHasBoth) return -1;
     if (!aHasBoth && bHasBoth) return 1;
 
-    // For playback, prioritize HLS Master unless a specific resolution is preferred
-    if (!isDownload && (!preferredQuality || preferredQuality === "auto")) {
-      if (a.type === "m3u8" && b.type !== "m3u8") return -1;
-      if (b.type === "m3u8" && a.type !== "m3u8") return 1;
-    } else if (preferredQuality && preferredQuality !== "auto") {
+    // Quality preference matching
+    if (preferredQuality && preferredQuality !== "auto") {
       const cleanPref = preferredQuality.replace("p", "");
-      if (a.quality === cleanPref && b.quality !== cleanPref) return -1;
-      if (b.quality === cleanPref && a.quality !== cleanPref) return 1;
+      const aMatches = a.quality === cleanPref;
+      const bMatches = b.quality === cleanPref;
+      if (aMatches && !bMatches) return -1;
+      if (!aMatches && bMatches) return 1;
+    } else if (
+      !isDownload &&
+      (!preferredQuality || preferredQuality === "auto")
+    ) {
+      if (a.server.includes("(Auto)") && !b.server.includes("(Auto)")) return -1;
+      if (!a.server.includes("(Auto)") && b.server.includes("(Auto)")) return 1;
     }
 
     const orderA = QUALITY_ORDER[a.quality || ""] || 99;
