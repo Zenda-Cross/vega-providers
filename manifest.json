@@ -474,7 +474,7 @@
   {
     "display_name": "MX Player",
     "value": "mxplayer",
-    "version": "1.0",
+    "version": "1.1",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/mxplayer.png",
     "type": "india",
     "disabled": false
