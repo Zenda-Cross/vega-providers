@@ -28,10 +28,10 @@
   {
     "display_name": "MultiMovies",
     "value": "multi",
-    "version": "1.4",
-    "icon": "",
+    "version": "1.5",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/multi.png",
     "type": "global",
-    "disabled": true
+    "disabled": false
   },
   {
     "display_name": "4khdHub",
