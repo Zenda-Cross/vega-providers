@@ -488,12 +488,16 @@ async function extractStreamsFromDriveseed(
     try {
       const instantHref = $file(".btn-danger, a:contains('Instant Download')").attr("href");
       if (instantHref && instantHref.startsWith("http")) {
+        let added = false;
         if (instantHref.includes("url=")) {
           const directPart = decodeURIComponent(instantHref.split("url=")[1]);
           if (directPart && directPart.startsWith("http")) {
             addStream("Instant Download", directPart);
+            added = true;
           }
-        } else {
+        }
+
+        if (!added) {
           try {
             const vRes = await axios.get(instantHref, {
               headers: { ...headers, Referer: fileUrl },
@@ -512,6 +516,30 @@ async function extractStreamsFromDriveseed(
               }
               if (directGoogleUrl && directGoogleUrl.startsWith("http")) {
                 addStream("Instant Download", directGoogleUrl);
+              }
+            } else if (typeof vRes.data === "string") {
+              const upMatch = vRes.data.match(/window\.location\.href\s*=\s*["']([^"']+)["']/);
+              if (upMatch) {
+                const upPath = upMatch[1];
+                const vOrigin = new URL(instantHref).origin;
+                const upUrl = upPath.startsWith("http") ? upPath : vOrigin + upPath;
+                const upRes = await axios.get(upUrl, {
+                  headers: { ...headers, Referer: instantHref },
+                  maxRedirects: 0,
+                  validateStatus: (s: number) => s >= 200 && s < 400,
+                  signal,
+                });
+
+                const loc2 = upRes.headers?.location;
+                if (loc2 && loc2.startsWith("http")) {
+                  addStream("Instant Download", loc2);
+                } else if (typeof upRes.data === "string") {
+                  const $up = cheerio.load(upRes.data);
+                  const dlBtn = $up("#downloadBtn, a.btn-danger, a.btn-success").attr("href");
+                  if (dlBtn && dlBtn.startsWith("http")) {
+                    addStream("Instant Download", dlBtn);
+                  }
+                }
               }
             }
           } catch {}

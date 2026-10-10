@@ -72,7 +72,7 @@
   {
     "display_name": "MoviesMod",
     "value": "mod",
-    "version": "1.9",
+    "version": "2.0",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/mod.png",
     "type": "global",
     "disabled": false
@@ -80,7 +80,7 @@
   {
     "display_name": "UHDMovies",
     "value": "uhd",
-    "version": "2.0",
+    "version": "2.1",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/uhd.webp",
     "type": "global",
     "disabled": false
