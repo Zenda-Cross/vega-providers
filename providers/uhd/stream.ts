@@ -322,40 +322,38 @@ async function extractStreamsFromDriveseed(
       }
     });
 
-    // 2. Instant Download (.btn-danger)
+    // 2. Instant Download (.btn-danger) -> Direct Google Video CDN
     try {
-      const instantHref = $file(".btn-danger").attr("href");
+      const instantHref = $file(".btn-danger, a:contains('Instant Download')").attr("href");
       if (instantHref && instantHref.startsWith("http")) {
-        if (instantHref.includes("?url=")) {
-          const directPart = instantHref.split("?url=")[1];
+        if (instantHref.includes("url=")) {
+          const directPart = decodeURIComponent(instantHref.split("url=")[1]);
           if (directPart && directPart.startsWith("http")) {
             addStream("Instant Download", directPart);
           }
-        }
-
-        // Try instant download gateway (video-gen / video-plex)
-        try {
-          const vRes = await axios.get(instantHref, {
-            headers: { ...headers, Referer: fileUrl },
-            signal,
-          });
-          const vHtml = typeof vRes.data === "string" ? vRes.data : "";
-          const upMatch = vHtml.match(/window\.location\.href\s*=\s*["']([^"']+)["']/);
-          if (upMatch) {
-            const upPath = upMatch[1];
-            const vOrigin = new URL(instantHref).origin;
-            const upUrl = upPath.startsWith("http") ? upPath : vOrigin + upPath;
-            const upRes = await axios.get(upUrl, {
-              headers: { ...headers, Referer: instantHref },
+        } else {
+          try {
+            const vRes = await axios.get(instantHref, {
+              headers: { ...headers, Referer: fileUrl },
+              maxRedirects: 0,
+              validateStatus: (s: number) => s >= 200 && s < 400,
               signal,
             });
-            const $up = cheerio.load(upRes.data);
-            const dlBtn = $up("#downloadBtn, a.btn-danger, a.btn-success").attr("href");
-            if (dlBtn && dlBtn.startsWith("http")) {
-              addStream("Instant CDN", dlBtn);
+
+            const loc = vRes.headers?.location;
+            if (loc) {
+              let directGoogleUrl: string | null = null;
+              if (loc.includes("url=")) {
+                directGoogleUrl = decodeURIComponent(loc.split("url=")[1]);
+              } else if (loc.includes("googleusercontent.com") || loc.startsWith("http")) {
+                directGoogleUrl = loc;
+              }
+              if (directGoogleUrl && directGoogleUrl.startsWith("http")) {
+                addStream("Instant Download", directGoogleUrl);
+              }
             }
-          }
-        } catch {}
+          } catch {}
+        }
       }
     } catch {}
 
