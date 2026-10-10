@@ -2,24 +2,19 @@ import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
 
-const headers = {
-  Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-  "Cache-Control": "no-store",
-  "Accept-Language": "en-US,en;q=0.9",
-  DNT: "1",
-  "sec-ch-ua":
-    '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
-  "sec-ch-ua-mobile": "?0",
-  "sec-ch-ua-platform": '"Windows"',
-  "Sec-Fetch-Dest": "document",
-  "Sec-Fetch-Mode": "navigate",
-  "Sec-Fetch-Site": "none",
-  "Sec-Fetch-User": "?1",
-  "Upgrade-Insecure-Requests": "1",
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0",
-};
+async function fetchWithRetry(axios: any, url: string, config: any, retries = 2): Promise<any> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await axios.get(url, config);
+    } catch (err: any) {
+      if ((err.code === "ECONNRESET" || err.message?.includes("ECONNRESET")) && attempt < retries) {
+        await new Promise((r) => setTimeout(r, 400));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
 
 export const getPosts = async function ({
   filter,
@@ -64,8 +59,8 @@ async function posts(
   operation: string,
 ): Promise<Post[]> {
   try {
-    const { axios, cheerio } = providerContext;
-    const res = await axios.get(url, { headers, signal });
+    const { axios, cheerio, commonHeaders } = providerContext;
+    const res = await fetchWithRetry(axios, url, { headers: commonHeaders, signal });
     const data = res.data;
     const $ = cheerio.load(data);
     const catalog: Post[] = [];

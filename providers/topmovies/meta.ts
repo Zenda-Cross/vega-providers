@@ -16,10 +16,22 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { axios, cheerio } = providerContext;
+    const { axios, cheerio, commonHeaders } = providerContext;
     const baseUrl = await getBaseUrl("Topmovies");
     const url = new URL(link, `${baseUrl}/`).href;
-    const res = await axios.get(url);
+    let res: any;
+    for (let attempt = 0; attempt <= 2; attempt++) {
+      try {
+        res = await axios.get(url, { headers: commonHeaders });
+        break;
+      } catch (err: any) {
+        if ((err.code === "ECONNRESET" || err.message?.includes("ECONNRESET")) && attempt < 2) {
+          await new Promise((r) => setTimeout(r, 400));
+          continue;
+        }
+        throw err;
+      }
+    }
     const data = res.data;
     const $ = cheerio.load(data);
     const meta: Info = {
