@@ -1,77 +1,20 @@
 export const catalog = [
-  {
-    title: "Trending",
-    filter: "/trending/",
-  },
-  {
-    title: "Netflix",
-    filter: "/genre/netflix/",
-  },
-  {
-    title: "Amazon Prime",
-    filter: "/genre/amazon-prime/",
-  },
-  {
-    title: "Disney Hotstar",
-    filter: "/genre/disney-hotstar/",
-  },
-];
+  { title: "Trending", filter: "" },
+  { title: "Movies", filter: "movies" },
+  { title: "Series", filter: "series" },
+  { title: "K-drama", filter: "genre/k-drama" },
 
-export const genres = [
-  {
-    title: "Action",
-    filter: "/genre/action/",
-  },
-  {
-    title: "Adventure",
-    filter: "/genre/adventure/",
-  },
-  {
-    title: "Animation",
-    filter: "/genre/animation/",
-  },
-  {
-    title: "Comedy",
-    filter: "/genre/comedy/",
-  },
-  {
-    title: "Crime",
-    filter: "/genre/crime/",
-  },
-  {
-    title: "Drama",
-    filter: "/genre/drama/",
-  },
-  {
-    title: "Family",
-    filter: "/genre/family/",
-  },
-  {
-    title: "Fantasy",
-    filter: "/genre/fantasy/",
-  },
-  {
-    title: "History",
-    filter: "/genre/history/",
-  },
-  {
-    title: "Horror",
-    filter: "/genre/horror/",
-  },
-  {
-    title: "Mystery",
-    filter: "/genre/mystery/",
-  },
-  {
-    title: "Romance",
-    filter: "/genre/romance/",
-  },
-  {
-    title: "Science Fiction",
-    filter: "/genre/science-fiction/",
-  },
-  {
-    title: "Thriller",
-    filter: "/genre/thriller/",
-  },
+  /*// OTT
+  { title: "Amazon Prime", filter: "genre/amazon-prime" },
+  { title: "Jio Hotstar", filter: "genre/disney-hotstar" },
+  { title: "Jio OTT", filter: "genre/jio-ott" },
+  { title: "K-drama", filter: "genre/k-drama" },
+  { title: "MX Player", filter: "genre/mx-player" },
+  { title: "Netflix", filter: "genre/netflix" },
+  { title: "Sony Liv", filter: "genre/sony-liv" },
+  { title: "Zee 5", filter: "genre/zee-5" },
+
+  // Genre
+  { title: "Action", filter: "genre/action" },*/
+  
 ];
