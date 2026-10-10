@@ -2,7 +2,7 @@
   {
     "display_name": "VMovies",
     "value": "vega",
-    "version": "2.45",
+    "version": "2.46",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/vega.png",
     "type": "global",
     "disabled": false,

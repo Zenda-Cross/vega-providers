@@ -16,9 +16,6 @@ const headers = {
   "Sec-Fetch-Dest": "document",
   "Sec-Fetch-Mode": "navigate",
   "Sec-Fetch-Site": "none",
-  "Sec-Fetch-User": "?1",
-  Cookie:
-    "xla=s4t; _ga=GA1.1.1081149560.1756378968; _ga_BLZGKYN5PF=GS2.1.s1756378968$o1$g1$t1756378984$j44$l0$h0",
   "Upgrade-Insecure-Requests": "1",
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
@@ -63,13 +60,19 @@ export const getMeta = async ({
     });
     const $ = cheerio.load(response.data);
     const infoContainer = $(
-      ".entry-content, .post-inner, .post-content, .page-body",
-    );
+      ".entry-content, .post-content, .post-inner, .page-body",
+    ).first();
+    const cleanContainer = infoContainer.clone();
+    cleanContainer
+      .find(
+        "#comments, .comments-area, #respond, .comments, .related-posts, footer, script, style, .sidebar, .widget",
+      )
+      .remove();
 
     // title
     let title = $("h1.post-title").text().trim();
     if (!title) {
-      const heading = infoContainer?.find("h3");
+      const heading = cleanContainer.find("h3");
       const titleRegex = /Name: (.+)/;
       title = heading?.next("p")?.text()?.match(titleRegex)?.[1] || "";
     }
@@ -79,10 +82,10 @@ export const getMeta = async ({
     let imdbId =
       $('a[href*="imdb.com"]').attr("href")?.match(/tt\d+/)?.[0] || "";
     if (!imdbId) {
-      const heading = infoContainer?.find("h3");
+      const heading = cleanContainer.find("h3");
       imdbId =
         heading?.next("p")?.find("a")?.attr("href")?.match(/tt\d+/g)?.[0] ||
-        infoContainer.text().match(/tt\d+/g)?.[0] ||
+        cleanContainer.text().match(/tt\d+/g)?.[0] ||
         "";
     }
     // console.log(imdbId)
@@ -90,18 +93,19 @@ export const getMeta = async ({
     // type
     let type = "movie";
 
-    const heading = infoContainer?.find("h3");
-    const pageText = `${title} ${infoContainer.text()}`;
+    const heading = cleanContainer.find("h3");
+    const cleanText = `${title} ${cleanContainer.text()}`;
     if (
       heading?.next("p")?.text()?.includes("Series Name") ||
-      /\b(?:web\s+series|season\s*\d{1,2}|s\d{1,2}\s*e\d{1,3})\b/i.test(
-        pageText,
-      )
+      heading?.text()?.includes("Series Info") ||
+      /\b(?:web\s*series|tv\s*series)\b/i.test(cleanText) ||
+      /\bseason\s*\d{1,2}\b/i.test(title) ||
+      /\bs\d{1,2}\s*e\d{1,3}\b/i.test(title) ||
+      (/\bseason\s*\d{1,2}\b/i.test(cleanText) &&
+        !/\b(?:full\s*movie|movie\s*info)\b/i.test(cleanText))
     ) {
       type = "series";
     }
-
-    //   console.log(type);
 
     // synopsis
     let synopsis = "";
@@ -114,21 +118,23 @@ export const getMeta = async ({
     }
     if (!synopsis) {
       const synopsisNode = //@ts-ignore
-        infoContainer?.find("p")?.next("h3,h4")?.next("p")?.[0]?.children?.[0];
+        cleanContainer.find("p")?.next("h3,h4")?.next("p")?.[0]?.children?.[0];
       synopsis =
         synopsisNode && "data" in synopsisNode ? synopsisNode.data : "";
     }
-    //   console.log(synopsis);
 
     // image
     let image =
-      infoContainer?.find("img[data-lazy-src]")?.attr("data-lazy-src") ||
-      infoContainer
-        ?.find("img")
-        ?.filter((i, el) => {
-          const src = $(el).attr("src");
+      cleanContainer.find("img[data-src]").first().attr("data-src") ||
+      cleanContainer.find("img[data-lazy-src]").first().attr("data-lazy-src") ||
+      cleanContainer.find("img[data-orig-src]").first().attr("data-orig-src") ||
+      cleanContainer
+        .find("img")
+        .filter((i, el) => {
+          const src = $(el).attr("src") || "";
           return (
             !!src &&
+            !src.startsWith("data:") &&
             !src.includes("logo") &&
             !src.includes("svg") &&
             !src.includes("placeholder") &&
