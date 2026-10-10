@@ -445,9 +445,13 @@ async function extractStreamsFromDriveseed(
           href &&
           (href.includes("workers.dev") ||
             href.includes("r2.dev") ||
+            href.includes("drive.google.com") ||
             /\.(mp4|mkv|m3u8)($|\?)/i.test(href))
         ) {
-          addStream("Resume Cloud (Fast)", href);
+          const serverName = href.includes("drive.google.com")
+            ? "Google Drive"
+            : "Resume Cloud (Fast)";
+          addStream(serverName, href);
         }
       });
 
@@ -470,9 +474,13 @@ async function extractStreamsFromDriveseed(
         href &&
         (href.includes("workers.dev") ||
           href.includes("r2.dev") ||
+          href.includes("drive.google.com") ||
           /\.(mp4|mkv|m3u8)($|\?)/i.test(href))
       ) {
-        addStream("Direct File Stream", href);
+        const serverName = href.includes("drive.google.com")
+          ? "Google Drive"
+          : "Direct File Stream";
+        addStream(serverName, href);
       }
     });
 
