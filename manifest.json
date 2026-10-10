@@ -71,7 +71,7 @@
   {
     "display_name": "MoviesMod",
     "value": "mod",
-    "version": "1.7",
+    "version": "1.8",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/mod.png",
     "type": "global",
     "disabled": false
@@ -356,10 +356,11 @@
   {
     "display_name": "TopMovies",
     "value": "topmovies",
-    "version": "1.16",
+    "version": "1.17",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/topmovies.png",
     "type": "india",
-    "disabled": false
+    "disabled": false,
+    "hasSettings": true
   },
   {
     "display_name": "GuardaHD",
