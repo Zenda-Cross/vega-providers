@@ -11,10 +11,11 @@
   {
     "display_name": "MultiStream",
     "value": "autoEmbed",
-    "version": "3.4",
+    "version": "3.5",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/autoEmbed.png",
     "type": "global",
-    "disabled": false
+    "disabled": false,
+    "hasSettings": true
   },
   {
     "display_name": "MoviesDrive",
