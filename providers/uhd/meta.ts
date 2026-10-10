@@ -38,84 +38,137 @@ export const getMeta = async function ({
 }): Promise<Info> {
   try {
     const { axios, cheerio, openWebView, commonHeaders } = providerContext;
-    console.log("Fetching metadata from UHD...", link, providerContext);
     const baseUrl = await getBaseUrl("UhdMovies");
     const url = new URL(link, `${baseUrl}/`).href;
     const res = await getWithWAF(url, axios, openWebView, commonHeaders);
     const html = await res.data;
     const $ = cheerio.load(html);
 
-    const title = $("h2:first").text() || "";
-    const image = $("h2").siblings().find("img").attr("src") || "";
-    // const trailer = $('iframe').attr('src') || '';
-
-    // console.log({ title, image, trailer });
+    const rawTitle = $("h2:first").text() || $("h1.entry-title").text() || $("title").text().split("-")[0].trim() || "";
+    const image = $("h2").siblings().find("img").attr("src") || $(".entry-content img").first().attr("src") || "";
 
     // Links
     const episodes: Link[] = [];
 
-    // new structure
-    $(".mks_separator,p:contains('mks_separator')").each((index, element) => {
+    const isJunkText = (t: string) => {
+      const lower = t.toLowerCase().trim();
+      return (
+        !lower ||
+        lower === " " ||
+        lower.includes("here you can download") ||
+        lower.includes("we do not host") ||
+        lower.includes("join telegram")
+      );
+    };
+
+    const isJunkLink = (title: string, link: string) => {
+      const lower = title.toLowerCase().trim();
+      if (lower.includes("zip")) return true;
+      if (
+        lower === "3d movies" ||
+        lower === "4k hdr" ||
+        lower === "4k 2160p" ||
+        lower === "1080p x264 uhd" ||
+        lower === "1080p 60fps" ||
+        lower === "1080p x265 10bit"
+      ) {
+        return true;
+      }
+      return false;
+    };
+
+    // 1. Try modern .mks_separator structure
+    $(".mks_separator, p:contains('mks_separator')").each((_, element) => {
       $(element)
         .nextUntil(".mks_separator")
-        .each((index, element) => {
-          const title = $(element).text();
+        .each((_, el) => {
+          const sectionTitle = $(el)
+            .text()
+            .replace(/[\r\n]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+          if (isJunkText(sectionTitle)) return;
+
           const episodesList: { title: string; link: string }[] = [];
-          $(element)
+          $(el)
             .next("p")
             .find("a")
-            .each((index, element) => {
-              const title = $(element).text();
-              const link = $(element).attr("href");
-              if (title && link && !title.toLocaleLowerCase().includes("zip")) {
-                episodesList.push({ title, link });
-                //   console.log({ title, link });
+            .each((_, a) => {
+              const aTitle = $(a).text().replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+              const aLink = $(a).attr("href");
+              if (aTitle && aLink && !isJunkLink(aTitle, aLink)) {
+                episodesList.push({ title: aTitle, link: aLink });
               }
             });
-          if (title && episodesList.length > 0) {
+
+          if (sectionTitle && episodesList.length > 0) {
             episodes.push({
-              title,
+              title: sectionTitle,
               directLinks: episodesList,
             });
           }
         });
     });
 
-    // old structure
-    $("hr").each((index, element) => {
-      $(element)
-        .nextUntil("hr")
-        .each((index, element) => {
-          const title = $(element).text();
-          const episodesList: { title: string; link: string }[] = [];
-          $(element)
-            .next("p")
-            .find("a")
-            .each((index, element) => {
-              const title = $(element).text();
-              const link = $(element).attr("href");
-              if (title && link && !title.toLocaleLowerCase().includes("zip")) {
-                episodesList.push({ title, link });
-                //   console.log({ title, link });
-              }
-            });
-          if (title && episodesList.length > 0) {
-            episodes.push({
-              title,
-              directLinks: episodesList,
-            });
-          }
-        });
-    });
-    // console.log(episodes);
+    // 2. Fallback to hr structure if no episodes found
+    if (episodes.length === 0) {
+      $("hr").each((_, element) => {
+        $(element)
+          .nextUntil("hr")
+          .each((_, el) => {
+            const sectionTitle = $(el)
+              .text()
+              .replace(/[\r\n]+/g, " ")
+              .replace(/\s+/g, " ")
+              .trim();
+            if (isJunkText(sectionTitle)) return;
+
+            const episodesList: { title: string; link: string }[] = [];
+            $(el)
+              .next("p")
+              .find("a")
+              .each((_, a) => {
+                const aTitle = $(a).text().replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+                const aLink = $(a).attr("href");
+                if (aTitle && aLink && !isJunkLink(aTitle, aLink)) {
+                  episodesList.push({ title: aTitle, link: aLink });
+                }
+              });
+
+            if (sectionTitle && episodesList.length > 0) {
+              episodes.push({
+                title: sectionTitle,
+                directLinks: episodesList,
+              });
+            }
+          });
+      });
+    }
+
+    const cleanTitle = rawTitle
+      .replace(/^Download\s+/i, "")
+      .replace(/\s+Esubs.*$/i, "")
+      .replace(/[\r\n]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const isSeries =
+      rawTitle.toLowerCase().includes("season") ||
+      rawTitle.toLowerCase().includes("series") ||
+      episodes.some((e) =>
+        e.directLinks?.some((d) =>
+          d.title.toLowerCase().includes("episode") ||
+          d.title.toLowerCase().includes("ep ") ||
+          /e\d+/i.test(d.title)
+        )
+      );
+
     return {
-      title: title.match(/^Download\s+([^(\[]+)/i)
-        ? title?.match(/^Download\s+([^(\[]+)/i)?.[1] || ""
-        : title.replace("Download", "") || "",
+      title: cleanTitle || rawTitle,
       image,
       imdbId: "",
-      synopsis: title,
-      type: "",
+      synopsis: cleanTitle || rawTitle,
+      type: isSeries ? "series" : "movie",
       linkList: episodes,
       webUrl: url,
     };
