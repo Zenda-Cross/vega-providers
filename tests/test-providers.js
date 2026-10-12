@@ -104,6 +104,7 @@ class ProviderTester {
     this.signal = new AbortController().signal;
     this.useFirst = options.useFirst || false;
     this.postIndex = options.postIndex;
+    this.isDownload = options.isDownload || false;
     this.results = {};
   }
 
@@ -471,6 +472,7 @@ class ProviderTester {
         type: streamType,
         signal: this.signal,
         providerContext,
+        isDownload: this.isDownload,
       });
 
       console.log(
@@ -662,12 +664,13 @@ async function main() {
   const args = process.argv.slice(2);
   const providerName = args.find((a) => !a.startsWith("-"));
   const useFirst = args.includes("--first");
+  const isDownload = args.includes("--download") || args.includes("-d");
   const postIndexArg = args.find((a) => a.startsWith("--index="));
   const postIndex = postIndexArg
     ? parseInt(postIndexArg.split("=")[1], 10)
     : undefined;
 
-  const tester = new ProviderTester({ useFirst, postIndex });
+  const tester = new ProviderTester({ useFirst, postIndex, isDownload });
 
   if (args.includes("--help") || args.includes("-h")) {
     console.log(`
@@ -682,6 +685,7 @@ Arguments:
 
 Options:
   --first           Always test the first post/link (deterministic)
+  --download, -d    Test stream in download mode (isDownload = true)
   --index=N         Test a specific 0-based post index from results
   --help, -h        Show this help message
 
@@ -690,7 +694,8 @@ Default behavior:
 
 Examples:
   npm test                                  # Test all providers
-  npm test -- hdhub4u                       # Test random movie/show from hdhub4u
+  npm test -- youtube                       # Test youtube provider
+  npm test -- youtube --download            # Test youtube in download mode (triggers Cobalt MP4)
   npm test -- hdhub4u --first               # Always test first post (e.g. pinned/latest)
   npm test -- hdhub4u --index=2             # Test 3rd post
   npm test -- kickAssAnime                  # Test kickAssAnime
