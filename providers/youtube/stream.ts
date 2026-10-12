@@ -1,7 +1,7 @@
 import { Stream, ProviderContext, TextTracks } from "../types";
 
 const TURNSTILE_DEFAULT_SITEKEY = "0x4AAAAAABBCV3tPrCXT9h2H";
-const DEFAULT_COBALT_API = "https://cobalt-alpha.wolfy.love";
+const DEFAULT_COBALT_API = "https://cobalt-backend.canine.tools";
 const DEFAULT_COBALT_WEB = "https://cobalt.canine.tools";
 
 function extractVideoId(link: string): string {
@@ -38,33 +38,53 @@ function getTurnstileInjectJs(sitekey: string): string {
     }
   }
 
+  function checkExistingTokens() {
+    // 1. Check window.turnstile.getResponse on existing widget
+    if (window.turnstile && typeof window.turnstile.getResponse === 'function') {
+      try {
+        var nativeWidget = document.getElementById('turnstile-widget');
+        var res = nativeWidget ? window.turnstile.getResponse(nativeWidget) : window.turnstile.getResponse();
+        if (res && res.length > 20) {
+          sendToken(res);
+          return true;
+        }
+      } catch (e) {}
+    }
+
+    // 2. Check input elements
+    var inputs = document.querySelectorAll('input[name="cf-turnstile-response"], [name="cf-turnstile-response"]');
+    for (var i = 0; i < inputs.length; i++) {
+      var val = inputs[i].value;
+      if (val && val.length > 20) {
+        sendToken(val);
+        return true;
+      }
+    }
+    return false;
+  }
+
   function init() {
     if (!document.body) {
       setTimeout(init, 50);
       return;
     }
 
-    var existing = document.querySelector('input[name="cf-turnstile-response"]') ||
-                   document.querySelector('[name="cf-turnstile-response"]');
-    if (existing && existing.value && existing.value.length > 20) {
-      sendToken(existing.value);
-      return;
-    }
+    if (checkExistingTokens()) return;
 
     var container = document.getElementById('vega-turnstile-container');
     if (!container) {
       container = document.createElement('div');
       container.id = 'vega-turnstile-container';
-      container.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999999;background:#18181b;padding:24px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:300px;border:1px solid #333;font-family:system-ui,-apple-system,sans-serif;';
+      container.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999999;background:#18181b;padding:16px 24px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:300px;border:1px solid #333;font-family:system-ui,-apple-system,sans-serif;';
 
       var title = document.createElement('div');
       title.innerText = 'Cobalt Verification';
-      title.style.cssText = 'color:#fff;font-size:15px;font-weight:600;margin-bottom:8px;text-align:center;';
+      title.style.cssText = 'color:#fff;font-size:14px;font-weight:600;margin-bottom:6px;text-align:center;';
       container.appendChild(title);
 
       var subtitle = document.createElement('div');
-      subtitle.innerText = 'Please complete verification to load MP4 streams...';
-      subtitle.style.cssText = 'color:#a1a1aa;font-size:13px;margin-bottom:16px;text-align:center;';
+      subtitle.innerText = 'Please complete the challenge to unlock MP4 streams...';
+      subtitle.style.cssText = 'color:#a1a1aa;font-size:12px;margin-bottom:12px;text-align:center;';
       container.appendChild(subtitle);
 
       var widget = document.createElement('div');
@@ -86,19 +106,16 @@ function getTurnstileInjectJs(sitekey: string): string {
             sendToken(token);
           },
           'error-callback': function() {
-            console.error('Turnstile error');
+            console.error('Turnstile render error');
           }
         });
         return true;
       } catch (err) {
-        console.error('Turnstile render error', err);
         return false;
       }
     }
 
-    if (window.turnstile && renderWidget()) {
-      // widget already rendered
-    } else if (!document.getElementById('vega-turnstile-script')) {
+    if (!window.turnstile && !document.getElementById('vega-turnstile-script')) {
       var script = document.createElement('script');
       script.id = 'vega-turnstile-script';
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
@@ -107,18 +124,15 @@ function getTurnstileInjectJs(sitekey: string): string {
     }
 
     var poll = setInterval(function() {
-      var inp = document.querySelector('input[name="cf-turnstile-response"]') ||
-                document.querySelector('[name="cf-turnstile-response"]');
-      if (inp && inp.value && inp.value.length > 20) {
+      if (checkExistingTokens()) {
         clearInterval(poll);
-        sendToken(inp.value);
         return;
       }
-      if (window.turnstile && renderWidget()) {
-        // widget rendered
+      if (window.turnstile) {
+        renderWidget();
       }
     }, 200);
-    setTimeout(function() { clearInterval(poll); }, 30000);
+    setTimeout(function() { clearInterval(poll); }, 35000);
   }
 
   if (document.readyState === 'loading') {
@@ -181,10 +195,13 @@ async function getOrRefreshCobaltJwt(
     });
 
     const turnstileToken = wafResult?.data?.trim();
+    console.log("[Cobalt] Solver returned token length:", turnstileToken?.length || 0);
     if (!turnstileToken || turnstileToken.startsWith("<") || turnstileToken.startsWith("{")) {
+      console.warn("[Cobalt] Invalid or empty Turnstile token received");
       return null;
     }
 
+    console.log("[Cobalt] Exchanging Turnstile token at:", `${apiBase}/session`);
     const sessionRes = await axios.post(
       `${apiBase}/session`,
       {},
@@ -202,14 +219,15 @@ async function getOrRefreshCobaltJwt(
     const jwt = sessionRes.data?.token;
     if (jwt) {
       const expSec = sessionRes.data?.exp || 600;
+      console.log(`[Cobalt] Successfully acquired session JWT, expires in ${expSec}s`);
       await kvStore?.set("cobalt_jwt_session", {
         token: jwt,
         expiresAt: Date.now() + expSec * 1000,
       });
       return jwt;
     }
-  } catch (err) {
-    console.error("Cobalt WAF solving or session token exchange failed:", err);
+  } catch (err: any) {
+    console.error("Cobalt WAF solving or session token exchange failed:", err?.response?.data || err?.message || err);
   }
 
   return null;
