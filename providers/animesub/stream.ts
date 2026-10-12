@@ -1,6 +1,7 @@
 import { Stream, ProviderContext, SkipInterval, TextTracks } from "../types";
 import { throwProviderError } from "../providerErrors";
 import { fetchTheIntroDbSkipTimings } from "../theintrodb";
+import { fetchAnimeSkipTimings, resolveKitsuIdFromMal } from "../aniskip";
 
 const DEFAULT_TOKEN = "u_mFxNX2Pva_iYMF-kz9CsNA";
 const DEFAULT_INSTANCE_URL = "https://animesub.duckdns.org";
@@ -526,6 +527,7 @@ export const getStream = async ({
         return {
           imdbId: id.startsWith("tt") ? id : undefined,
           kitsuId: id.startsWith("kitsu:") ? id : undefined,
+          malId: id.startsWith("mal:") ? id.replace("mal:", "") : undefined,
         };
       }
     })();
@@ -534,13 +536,19 @@ export const getStream = async ({
       payload.kitsuId ?? (typeof id === "string" && id.startsWith("kitsu:") ? id : "");
     let imdbId: string =
       payload.imdbId ?? (typeof id === "string" && id.startsWith("tt") ? id : "");
+    const malId: string =
+      payload.malId ?? (typeof id === "string" && id.startsWith("mal:") ? id.replace("mal:", "") : "");
     const title: string = payload.title ?? "";
     const season: string = payload.season ?? "";
     const episode: string = payload.episode ?? "";
     const effectiveType: string = payload.type ?? type ?? "series";
 
-    if (!imdbId && !kitsuId) {
-      console.warn("AnimeSub: missing both imdbId and kitsuId in link payload");
+    if (!kitsuId && malId) {
+      kitsuId = (await resolveKitsuIdFromMal(malId, providerContext)) || "";
+    }
+
+    if (!imdbId && !kitsuId && !title) {
+      console.warn("AnimeSub: missing imdbId, kitsuId, and title in link payload");
       return [];
     }
 
@@ -551,13 +559,26 @@ export const getStream = async ({
     const skipTimingsEnabled = skipTimings ?? true;
 
     let streamSkip: SkipInterval[] | undefined = undefined;
-    if (skipTimingsEnabled && effectiveType === "series" && imdbId && season && episode) {
-      streamSkip = await fetchTheIntroDbSkipTimings({
-        imdbId,
-        season: Number(season),
-        episode: Number(episode),
-        providerContext,
-      });
+    if (skipTimingsEnabled && effectiveType === "series" && episode) {
+      const epNum = Number(episode);
+      if (epNum > 0) {
+        streamSkip = await fetchAnimeSkipTimings({
+          kitsuId,
+          malId: malId || undefined,
+          title,
+          episode: epNum,
+          providerContext,
+        });
+
+        if ((!streamSkip || streamSkip.length === 0) && imdbId && season) {
+          streamSkip = await fetchTheIntroDbSkipTimings({
+            imdbId,
+            season: Number(season),
+            episode: epNum,
+            providerContext,
+          });
+        }
+      }
       if (!streamSkip?.length) streamSkip = undefined;
     }
 

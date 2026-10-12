@@ -1,65 +1,77 @@
 export const catalog = [
   {
-    title: "Most Popular Anime",
-    filter: "/catalog/anime/kitsu-anime-popular.json",
+    title: "Top Airing",
+    filter: "mal:topanime:airing",
   },
   {
-    title: "Top Airing Anime",
-    filter: "/catalog/anime/kitsu-anime-airing.json",
+    title: "Current Season",
+    filter: "mal:season:current",
   },
   {
-    title: "Highest Rated Anime",
-    filter: "/catalog/anime/kitsu-anime-rating.json",
+    title: "Most Popular",
+    filter: "mal:topanime:bypopularity",
+  },
+  {
+    title: "Most Favorited",
+    filter: "mal:topanime:favorite",
   },
 ];
 
 export const genres = [
   {
     title: "Action",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Action.json",
+    filter: "mal:genre:1:Action",
   },
   {
     title: "Adventure",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Adventure.json",
+    filter: "mal:genre:2:Adventure",
   },
   {
     title: "Comedy",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Comedy.json",
+    filter: "mal:genre:4:Comedy",
   },
   {
     title: "Drama",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Drama.json",
+    filter: "mal:genre:8:Drama",
   },
   {
     title: "Fantasy",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Fantasy.json",
+    filter: "mal:genre:10:Fantasy",
   },
   {
     title: "Horror",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Horror.json",
+    filter: "mal:genre:14:Horror",
   },
   {
     title: "Mystery",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Mystery.json",
+    filter: "mal:genre:7:Mystery",
   },
   {
     title: "Psychological",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Psychological.json",
+    filter: "mal:genre:40:Psychological",
   },
   {
     title: "Romance",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Romance.json",
+    filter: "mal:genre:22:Romance",
   },
   {
     title: "Sci-Fi",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Sci-Fi.json",
+    filter: "mal:genre:24:Sci-Fi",
   },
   {
     title: "Slice of Life",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Slice of Life.json",
+    filter: "mal:genre:36:Slice_of_Life",
   },
   {
     title: "Supernatural",
-    filter: "/catalog/anime/kitsu-anime-popular/genre=Supernatural.json",
+    filter: "mal:genre:37:Supernatural",
+  },
+  {
+    title: "Sports",
+    filter: "mal:genre:30:Sports",
+  },
+  {
+    title: "Suspense",
+    filter: "mal:genre:41:Suspense",
   },
 ];

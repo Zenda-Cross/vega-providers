@@ -7,6 +7,10 @@ import {
   getCinemetaMeta,
 } from "../getCinemetaMeta";
 import { enrichEpisodesWithSkipTimings } from "../theintrodb";
+import {
+  enrichAnimeEpisodesWithSkipTimings,
+  resolveKitsuIdFromMal,
+} from "../aniskip";
 import { EpisodeLink, Info, Link, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
 
@@ -86,11 +90,14 @@ async function getCinemetaInfo(
         season,
       );
       if (skipTimings ?? true) {
-        directLinks = await enrichEpisodesWithSkipTimings(
+        directLinks = await enrichAnimeEpisodesWithSkipTimings(
           directLinks,
-          imdbId,
-          season,
-          providerContext,
+          {
+            title: meta.name,
+            imdbId,
+            season,
+            providerContext,
+          },
         );
       }
       linkList.push({
@@ -219,12 +226,16 @@ async function getKitsuInfo(
         ? JSON.parse(firstWithImdb.link).imdbId
         : meta.imdb_id;
 
-      if ((skipTimings ?? true) && seasonImdb) {
-        directLinks = await enrichEpisodesWithSkipTimings(
+      if (skipTimings ?? true) {
+        directLinks = await enrichAnimeEpisodesWithSkipTimings(
           directLinks,
-          seasonImdb,
-          season,
-          providerContext,
+          {
+            kitsuId,
+            title: meta.name,
+            imdbId: seasonImdb,
+            season,
+            providerContext,
+          },
         );
       }
 
@@ -249,6 +260,54 @@ async function getKitsuInfo(
   };
 }
 
+async function getMalInfo(
+  malId: string,
+  title: string | undefined,
+  providerContext: ProviderContext,
+): Promise<Info> {
+  let kitsuId = await resolveKitsuIdFromMal(malId, providerContext);
+  if (!kitsuId && title) {
+    try {
+      const searchRes = await providerContext.axios.get(
+        `https://kitsu.io/api/edge/anime?filter[text]=${encodeURIComponent(title)}&page[limit]=1`,
+        { headers: { Accept: "application/vnd.api+json" }, timeout: 6000 },
+      );
+      kitsuId = searchRes.data?.data?.[0]?.id || null;
+    } catch {}
+  }
+
+  if (kitsuId) {
+    const kitsuMeta = await getKitsuInfo(`kitsu:${kitsuId}`, providerContext);
+    if (kitsuMeta.linkList) {
+      for (const group of kitsuMeta.linkList) {
+        if (group.directLinks) {
+          for (const ep of group.directLinks) {
+            try {
+              const p = JSON.parse(ep.link);
+              p.malId = malId;
+              ep.link = JSON.stringify(p);
+            } catch {}
+          }
+        }
+      }
+    }
+    return kitsuMeta;
+  }
+
+  if (title) {
+    try {
+      const cinemetaSearch = `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(title)}.json`;
+      const cRes = await providerContext.axios.get(cinemetaSearch, { timeout: 6000 });
+      const imdbId = cRes.data?.metas?.[0]?.imdb_id;
+      if (imdbId) {
+        return await getCinemetaInfo(imdbId, providerContext);
+      }
+    } catch {}
+  }
+
+  throw new Error(`Failed to resolve metadata for MAL ID ${malId}`);
+}
+
 export const getMeta = async function ({
   link,
   providerContext,
@@ -257,6 +316,21 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
+    let malId: string | undefined;
+    let title: string | undefined;
+    try {
+      const parsed = JSON.parse(link);
+      if (parsed.malId) malId = String(parsed.malId);
+      if (parsed.title) title = parsed.title;
+    } catch {
+      const malMatch = link.match(/mal:(\d+)/) || link.match(/myanimelist\.net\/anime\/(\d+)/);
+      if (malMatch) malId = malMatch[1];
+    }
+
+    if (malId) {
+      return await getMalInfo(malId, title, providerContext);
+    }
+
     const kitsuMatch = link.match(/kitsu:(\d+)/);
     if (kitsuMatch) {
       return await getKitsuInfo(kitsuMatch[0], providerContext);
