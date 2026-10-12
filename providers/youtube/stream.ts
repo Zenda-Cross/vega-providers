@@ -243,51 +243,69 @@ async function queryCobaltEndpoint(
   signal?: AbortSignal
 ): Promise<Stream[]> {
   const streams: Stream[] = [];
-  const res = await axios.post(
-    `${apiBase}/`,
-    {
-      url: `https://www.youtube.com/watch?v=${videoId}`,
-      videoQuality: quality,
-      downloadMode: "auto",
-    },
-    {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${jwt}`,
-        ...commonHeaders,
+  try {
+    const targetUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    console.log(`[Cobalt] Requesting ${quality}p for URL: ${targetUrl} via ${apiBase}`);
+
+    const res = await axios.post(
+      `${apiBase}/`,
+      {
+        url: targetUrl,
+        videoQuality: quality,
+        downloadMode: "auto",
+        youtubeVideoCodec: "h264",
       },
-      timeout: 20000,
-      signal,
-    }
-  );
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+          ...commonHeaders,
+        },
+        timeout: 25000,
+        signal,
+        validateStatus: () => true,
+      }
+    );
 
-  const data = res.data;
-  if (!data) return streams;
+    console.log(`[Cobalt] Response status ${res.status} for ${quality}p:`, JSON.stringify(res.data));
+    const data = res.data;
+    if (!data) return streams;
 
-  if (data.status === "tunnel" || data.status === "redirect") {
-    if (data.url) {
-      const label = quality === "max" ? "1080" : quality;
-      streams.push({
-        server: `Cobalt (${label}p MP4)`,
-        link: data.url,
-        type: "mp4",
-        quality: label,
-        tag: "Audio + Video",
-      });
-    }
-  } else if (data.status === "picker" && Array.isArray(data.picker)) {
-    for (const item of data.picker) {
-      if (item.url) {
+    if (data.status === "tunnel" || data.status === "redirect") {
+      if (data.url) {
+        const label = quality === "max" ? "1080" : quality;
+        console.log(`[Cobalt] Success! Got ${label}p stream link`);
         streams.push({
-          server: "Cobalt (MP4)",
-          link: item.url,
+          server: `Cobalt (${label}p MP4)`,
+          link: data.url,
           type: "mp4",
-          quality: quality === "max" ? "1080" : quality,
+          quality: label,
           tag: "Audio + Video",
         });
       }
+    } else if (data.status === "picker" && Array.isArray(data.picker)) {
+      console.log(`[Cobalt] Got picker with ${data.picker.length} items`);
+      for (const item of data.picker) {
+        if (item.url) {
+          streams.push({
+            server: "Cobalt (MP4)",
+            link: item.url,
+            type: "mp4",
+            quality: quality === "max" ? "1080" : quality,
+            tag: "Audio + Video",
+          });
+        }
+      }
+    } else if (data.status === "error") {
+      console.warn(`[Cobalt] Error response from API:`, data.error?.code, data.error?.context);
+      if (data.error?.code === "error.api.auth.jwt.invalid") {
+        throw new Error("JWT_INVALID");
+      }
     }
+  } catch (err: any) {
+    console.error(`[Cobalt] Query failed for ${quality}p:`, err?.response?.data || err?.message || err);
+    if (err?.message === "JWT_INVALID") throw err;
   }
 
   return streams;
@@ -308,7 +326,10 @@ async function fetchFromCobalt(
   const webUrl = DEFAULT_COBALT_WEB;
 
   let jwt = await getOrRefreshCobaltJwt(providerContext, apiBase, webUrl, false, allowPrompt);
-  if (!jwt) return [];
+  if (!jwt) {
+    console.warn("[Cobalt] No valid JWT available, skipping Cobalt streams");
+    return [];
+  }
 
   const targetQuality =
     preferredQuality && preferredQuality !== "auto"
@@ -338,12 +359,14 @@ async function fetchFromCobalt(
       }
     }
 
+    console.log(`[Cobalt] Total Cobalt streams retrieved: ${streams.length}`);
     if (streams.length > 0) {
       return streams;
     }
   } catch (err: any) {
-    const errCode = err?.response?.data?.error?.code || "";
-    if (errCode.includes("jwt") || errCode.includes("auth")) {
+    const errCode = err?.response?.data?.error?.code || err?.message || "";
+    if (errCode.includes("jwt") || errCode.includes("auth") || errCode === "JWT_INVALID") {
+      console.warn("[Cobalt] JWT expired/invalid, invalidating cache");
       await kvStore?.delete("cobalt_jwt_session");
       if (allowPrompt) {
         const freshJwt = await getOrRefreshCobaltJwt(providerContext, apiBase, webUrl, true, true);
@@ -579,6 +602,7 @@ export const getStream = async function ({
     }
   }
 
+  console.log(`[YouTube] Cobalt streams: ${cobaltStreams.length}, InnerTube streams: ${innerTubeData.streams.length}`);
   const allStreams: Stream[] = [...cobaltStreams, ...innerTubeData.streams];
   if (allStreams.length === 0) {
     return [];
