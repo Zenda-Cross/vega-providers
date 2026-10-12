@@ -100,7 +100,7 @@ export const getStream = async function ({
           const subName = tMatch[2];
           let subSrc = tMatch[3].replace(/\\\//g, "/");
           const subUrl = fixUrl(subSrc, playerUrl);
-          const proxyUrl = `https://worker.zendax.me/api/fetch?url=${encodeURIComponent(
+          const proxyUrl = `https://fetch.1proxy.workers.dev/fetch?url=${encodeURIComponent(
             subUrl
           )}&headers=${encodeURIComponent(JSON.stringify(hlsHeaders))}`;
 
