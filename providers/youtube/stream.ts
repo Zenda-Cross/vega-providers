@@ -1,5 +1,9 @@
 import { Stream, ProviderContext, TextTracks } from "../types";
 
+const TURNSTILE_DEFAULT_SITEKEY = "0x4AAAAAABBCV3tPrCXT9h2H";
+const DEFAULT_COBALT_API = "https://cobalt-alpha.wolfy.love";
+const DEFAULT_COBALT_WEB = "https://cobalt.canine.tools";
+
 function extractVideoId(link: string): string {
   const match =
     link.match(/(?:v=|\/watch\?v=|\/embed\/|\/v\/|youtu\.be\/|\/shorts\/)([a-zA-Z0-9_-]{11})/i) ||
@@ -17,6 +21,331 @@ const QUALITY_ORDER: Record<string, number> = {
   "240": 7,
   "144": 8,
 };
+
+function getTurnstileInjectJs(sitekey: string): string {
+  return `(function() {
+  if (window.__vega_turnstile_injected) return;
+  window.__vega_turnstile_injected = true;
+
+  function sendToken(token) {
+    if (!token || typeof token !== 'string') return;
+    if (token.length < 20 || token.startsWith('<') || token.startsWith('{')) return;
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        __waf: true,
+        data: token
+      }));
+    }
+  }
+
+  function init() {
+    if (!document.body) {
+      setTimeout(init, 50);
+      return;
+    }
+
+    var existing = document.querySelector('input[name="cf-turnstile-response"]') ||
+                   document.querySelector('[name="cf-turnstile-response"]');
+    if (existing && existing.value && existing.value.length > 20) {
+      sendToken(existing.value);
+      return;
+    }
+
+    var container = document.getElementById('vega-turnstile-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'vega-turnstile-container';
+      container.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999999;background:#18181b;padding:24px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:300px;border:1px solid #333;font-family:system-ui,-apple-system,sans-serif;';
+
+      var title = document.createElement('div');
+      title.innerText = 'Cobalt Verification';
+      title.style.cssText = 'color:#fff;font-size:15px;font-weight:600;margin-bottom:8px;text-align:center;';
+      container.appendChild(title);
+
+      var subtitle = document.createElement('div');
+      subtitle.innerText = 'Please complete verification to load MP4 streams...';
+      subtitle.style.cssText = 'color:#a1a1aa;font-size:13px;margin-bottom:16px;text-align:center;';
+      container.appendChild(subtitle);
+
+      var widget = document.createElement('div');
+      widget.id = 'vega-turnstile-widget';
+      container.appendChild(widget);
+
+      document.body.appendChild(container);
+    }
+
+    function renderWidget() {
+      if (!window.turnstile || typeof window.turnstile.render !== 'function') return false;
+      var widget = document.getElementById('vega-turnstile-widget');
+      if (!widget || widget.children.length > 0) return true;
+      try {
+        window.turnstile.render(widget, {
+          sitekey: '${sitekey}',
+          theme: 'dark',
+          callback: function(token) {
+            sendToken(token);
+          },
+          'error-callback': function() {
+            console.error('Turnstile error');
+          }
+        });
+        return true;
+      } catch (err) {
+        console.error('Turnstile render error', err);
+        return false;
+      }
+    }
+
+    if (window.turnstile && renderWidget()) {
+      // widget already rendered
+    } else if (!document.getElementById('vega-turnstile-script')) {
+      var script = document.createElement('script');
+      script.id = 'vega-turnstile-script';
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+
+    var poll = setInterval(function() {
+      var inp = document.querySelector('input[name="cf-turnstile-response"]') ||
+                document.querySelector('[name="cf-turnstile-response"]');
+      if (inp && inp.value && inp.value.length > 20) {
+        clearInterval(poll);
+        sendToken(inp.value);
+        return;
+      }
+      if (window.turnstile && renderWidget()) {
+        // widget rendered
+      }
+    }, 200);
+    setTimeout(function() { clearInterval(poll); }, 30000);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})(); true;`;
+}
+
+async function getCobaltSitekey(axios: any, apiBase: string): Promise<string> {
+  try {
+    const res = await axios.get(`${apiBase}/`, {
+      headers: { Accept: "application/json" },
+      timeout: 3000,
+    });
+    if (res.data?.cobalt?.turnstileSitekey) {
+      return res.data.cobalt.turnstileSitekey;
+    }
+  } catch {
+    // Fall back to default
+  }
+  return TURNSTILE_DEFAULT_SITEKEY;
+}
+
+interface CachedCobaltSession {
+  token: string;
+  expiresAt: number;
+}
+
+async function getOrRefreshCobaltJwt(
+  providerContext: ProviderContext,
+  apiBase: string,
+  webUrl: string,
+  forceNew = false,
+  allowPrompt = false
+): Promise<string | null> {
+  const { axios, kvStore, commonHeaders } = providerContext;
+
+  // 1. Check existing cached session token
+  if (!forceNew) {
+    const cached = await kvStore?.get<CachedCobaltSession>("cobalt_jwt_session");
+    if (cached?.token && cached.expiresAt > Date.now() + 60000) {
+      return cached.token;
+    }
+  }
+
+  // 2. If no valid cached token and interactive prompt is not allowed (streaming mode with HLS available), do not show captcha
+  if (!allowPrompt || !providerContext.openWebView) {
+    return null;
+  }
+
+  try {
+    const sitekey = await getCobaltSitekey(axios, apiBase);
+    const wafResult = await providerContext.openWebView(webUrl, {
+      title: "Cobalt Verification",
+      description: "Please complete the verification to load MP4 streams",
+      force: true,
+      injectedJavaScript: getTurnstileInjectJs(sitekey),
+    });
+
+    const turnstileToken = wafResult?.data?.trim();
+    if (!turnstileToken || turnstileToken.startsWith("<") || turnstileToken.startsWith("{")) {
+      return null;
+    }
+
+    const sessionRes = await axios.post(
+      `${apiBase}/session`,
+      {},
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "cf-turnstile-response": turnstileToken,
+          ...commonHeaders,
+        },
+        timeout: 15000,
+      }
+    );
+
+    const jwt = sessionRes.data?.token;
+    if (jwt) {
+      const expSec = sessionRes.data?.exp || 600;
+      await kvStore?.set("cobalt_jwt_session", {
+        token: jwt,
+        expiresAt: Date.now() + expSec * 1000,
+      });
+      return jwt;
+    }
+  } catch (err) {
+    console.error("Cobalt WAF solving or session token exchange failed:", err);
+  }
+
+  return null;
+}
+
+async function queryCobaltEndpoint(
+  axios: any,
+  apiBase: string,
+  jwt: string,
+  videoId: string,
+  quality: string,
+  commonHeaders: any,
+  signal?: AbortSignal
+): Promise<Stream[]> {
+  const streams: Stream[] = [];
+  const res = await axios.post(
+    `${apiBase}/`,
+    {
+      url: `https://www.youtube.com/watch?v=${videoId}`,
+      videoQuality: quality,
+      downloadMode: "auto",
+    },
+    {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${jwt}`,
+        ...commonHeaders,
+      },
+      timeout: 20000,
+      signal,
+    }
+  );
+
+  const data = res.data;
+  if (!data) return streams;
+
+  if (data.status === "tunnel" || data.status === "redirect") {
+    if (data.url) {
+      const label = quality === "max" ? "1080" : quality;
+      streams.push({
+        server: `Cobalt (${label}p MP4)`,
+        link: data.url,
+        type: "mp4",
+        quality: label,
+        tag: "Audio + Video",
+      });
+    }
+  } else if (data.status === "picker" && Array.isArray(data.picker)) {
+    for (const item of data.picker) {
+      if (item.url) {
+        streams.push({
+          server: "Cobalt (MP4)",
+          link: item.url,
+          type: "mp4",
+          quality: quality === "max" ? "1080" : quality,
+          tag: "Audio + Video",
+        });
+      }
+    }
+  }
+
+  return streams;
+}
+
+async function fetchFromCobalt(
+  providerContext: ProviderContext,
+  videoId: string,
+  preferredQuality?: string,
+  isDownload?: boolean,
+  allowPrompt?: boolean,
+  signal?: AbortSignal
+): Promise<Stream[]> {
+  const { axios, kvStore, commonHeaders } = providerContext;
+
+  const customApi = ((await kvStore?.get<string>("cobaltApiOverride")) || "").trim();
+  const apiBase = customApi || DEFAULT_COBALT_API;
+  const webUrl = DEFAULT_COBALT_WEB;
+
+  let jwt = await getOrRefreshCobaltJwt(providerContext, apiBase, webUrl, false, allowPrompt);
+  if (!jwt) return [];
+
+  const targetQuality =
+    preferredQuality && preferredQuality !== "auto"
+      ? preferredQuality.replace("p", "")
+      : "1080";
+
+  const qualitiesToQuery = targetQuality === "1080" ? ["1080", "720"] : [targetQuality];
+
+  try {
+    const results = await Promise.allSettled(
+      qualitiesToQuery.map((q) =>
+        queryCobaltEndpoint(axios, apiBase, jwt!, videoId, q, commonHeaders, signal)
+      )
+    );
+
+    const streams: Stream[] = [];
+    const seenUrls = new Set<string>();
+
+    for (const r of results) {
+      if (r.status === "fulfilled") {
+        for (const s of r.value) {
+          if (!seenUrls.has(s.link)) {
+            seenUrls.add(s.link);
+            streams.push(s);
+          }
+        }
+      }
+    }
+
+    if (streams.length > 0) {
+      return streams;
+    }
+  } catch (err: any) {
+    const errCode = err?.response?.data?.error?.code || "";
+    if (errCode.includes("jwt") || errCode.includes("auth")) {
+      await kvStore?.delete("cobalt_jwt_session");
+      if (allowPrompt) {
+        const freshJwt = await getOrRefreshCobaltJwt(providerContext, apiBase, webUrl, true, true);
+        if (freshJwt) {
+          return queryCobaltEndpoint(
+            axios,
+            apiBase,
+            freshJwt,
+            videoId,
+            targetQuality,
+            commonHeaders,
+            signal
+          ).catch(() => []);
+        }
+      }
+    }
+  }
+
+  return [];
+}
 
 async function getVisitorData(axios: any, kvStore: any): Promise<string> {
   const fallback =
@@ -50,14 +379,13 @@ async function fetchFromInnerTube(
   kvStore: any,
   videoId: string,
   signal?: AbortSignal
-): Promise<Stream[]> {
+): Promise<{ streams: Stream[]; subtitles: TextTracks }> {
   const streams: Stream[] = [];
   const subtitles: TextTracks = [];
 
   const visitorData = await getVisitorData(axios, kvStore);
 
   try {
-    // Query VISIONOS (for Master HLS) and ANDROID_VR (for progressive MP4 with audio) in parallel
     const [visionRes, vrRes] = await Promise.allSettled([
       axios.post(
         "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json",
@@ -150,7 +478,7 @@ async function fetchFromInnerTube(
       });
     }
 
-    // 2. Progressive MP4 (Audio + Video muxed, ideal for offline download)
+    // 2. Progressive MP4 (Audio + Video muxed)
     const formats = vrData?.streamingData?.formats || [];
     for (const f of formats) {
       if (f.url) {
@@ -187,14 +515,7 @@ async function fetchFromInnerTube(
     // Return empty on failure
   }
 
-  // Attach subtitles to streams
-  if (subtitles.length > 0) {
-    for (const s of streams) {
-      if (!s.subtitles) s.subtitles = subtitles;
-    }
-  }
-
-  return streams;
+  return { streams, subtitles };
 }
 
 export const getStream = async function ({
@@ -215,23 +536,57 @@ export const getStream = async function ({
   if (!videoId) return [];
 
   const preferredQuality = await kvStore?.get<string>("preferredQuality");
+  const enableCobalt = (await kvStore?.get<boolean>("enableCobalt")) !== false;
 
-  try {
-    const directStreams = await fetchFromInnerTube(
-      axios,
-      kvStore,
-      videoId,
-      signal
-    );
-    if (directStreams && directStreams.length > 0) {
-      sortStreams(directStreams, preferredQuality, isDownload);
-      return directStreams;
+  // 1. Fetch direct YouTube streams
+  const innerTubeData = await fetchFromInnerTube(axios, kvStore, videoId, signal);
+
+  // 2. Fetch Cobalt MP4 if enabled
+  // Only trigger interactive Turnstile challenge if downloading OR direct streams failed
+  // Otherwise use cached session without interrupting video playback
+  let cobaltStreams: Stream[] = [];
+  if (enableCobalt) {
+    const allowPrompt = Boolean(isDownload) || innerTubeData.streams.length === 0;
+    try {
+      cobaltStreams = await fetchFromCobalt(
+        providerContext,
+        videoId,
+        preferredQuality,
+        Boolean(isDownload),
+        allowPrompt,
+        signal
+      );
+    } catch (e) {
+      console.error("Cobalt stream fetch error:", e);
     }
-  } catch {
-    // Return empty if extraction fails
   }
 
-  return [];
+  const allStreams: Stream[] = [...cobaltStreams, ...innerTubeData.streams];
+  if (allStreams.length === 0) {
+    return [];
+  }
+
+  // Deduplicate by URL
+  const seenUrls = new Set<string>();
+  const uniqueStreams: Stream[] = [];
+  for (const s of allStreams) {
+    if (!seenUrls.has(s.link)) {
+      seenUrls.add(s.link);
+      uniqueStreams.push(s);
+    }
+  }
+
+  // Attach subtitles to all streams
+  if (innerTubeData.subtitles.length > 0) {
+    for (const s of uniqueStreams) {
+      if (!s.subtitles) {
+        s.subtitles = innerTubeData.subtitles;
+      }
+    }
+  }
+
+  sortStreams(uniqueStreams, preferredQuality, isDownload);
+  return uniqueStreams;
 };
 
 function sortStreams(
@@ -240,15 +595,29 @@ function sortStreams(
   isDownload?: boolean
 ) {
   streams.sort((a, b) => {
-    // If downloading, sort progressive MP4 ahead of HLS for reliable download
+    // 1. If downloading, strictly prioritize complete MP4s ahead of HLS
     if (isDownload) {
       const aIsMp4 = a.type === "mp4";
       const bIsMp4 = b.type === "mp4";
       if (aIsMp4 && !bIsMp4) return -1;
       if (!aIsMp4 && bIsMp4) return 1;
+
+      // Prefer Cobalt MP4 (complete 1080p/720p audio+video mux) over VR progressive
+      const aIsCobalt = a.server.startsWith("Cobalt");
+      const bIsCobalt = b.server.startsWith("Cobalt");
+      if (aIsCobalt && !bIsCobalt) return -1;
+      if (!aIsCobalt && bIsCobalt) return 1;
     }
 
-    // Quality preference matching
+    // 2. If streaming, strictly prioritize streaming-friendly adaptive HLS first
+    if (!isDownload) {
+      const aIsHls = a.server.includes("Multi-Quality") || a.type === "m3u8";
+      const bIsHls = b.server.includes("Multi-Quality") || b.type === "m3u8";
+      if (aIsHls && !bIsHls) return -1;
+      if (!aIsHls && bIsHls) return 1;
+    }
+
+    // 3. Match user preferred quality
     if (preferredQuality && preferredQuality !== "auto") {
       const cleanPref = preferredQuality.replace("p", "");
       const aMatches = a.quality === cleanPref;
@@ -257,14 +626,7 @@ function sortStreams(
       if (!aMatches && bMatches) return 1;
     }
 
-    // For streaming (default), prioritize Multi-Quality HLS
-    if (!isDownload) {
-      const aIsHls = a.server.includes("Multi-Quality");
-      const bIsHls = b.server.includes("Multi-Quality");
-      if (aIsHls && !bIsHls) return -1;
-      if (!aIsHls && bIsHls) return 1;
-    }
-
+    // 4. Default numerical quality ordering (highest first)
     const orderA = QUALITY_ORDER[a.quality || ""] || 99;
     const orderB = QUALITY_ORDER[b.quality || ""] || 99;
     return orderA - orderB;
