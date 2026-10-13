@@ -135,6 +135,14 @@
     "disabled": false
   },
   {
+    "display_name": "DramaCool",
+    "value": "dramacool",
+    "version": "1.0",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/dramacool.png",
+    "type": "global",
+    "disabled": false
+  },
+  {
     "display_name": "MKVDrama",
     "value": "mkvDrama",
     "version": "1.74",

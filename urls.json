@@ -182,5 +182,13 @@
   "mxplayer": {
     "name": "mxplayer",
     "url": "https://www.mxplayer.in"
+  },
+  "dramacool": {
+    "name": "DramaCool",
+    "url": "https://asianc.id"
+  },
+  "asianc": {
+    "name": "AsianC",
+    "url": "https://asianc.id"
   }
 }
