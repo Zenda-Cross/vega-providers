@@ -3,7 +3,22 @@ import { getBaseUrl } from "../getBaseUrl";
 
 const DEFAULT_BASE_URL = "https://asianc.id";
 
-async function resolveBaseUrl(): Promise<string> {
+async function resolveBaseUrl(
+  providerContext?: ProviderContext
+): Promise<string> {
+  try {
+    if (
+      providerContext &&
+      typeof (providerContext as any).getBaseUrl === "function"
+    ) {
+      const resolved =
+        (await (providerContext as any).getBaseUrl("dramacool")) ||
+        (await (providerContext as any).getBaseUrl("asianc"));
+      if (resolved) {
+        return resolved.replace(/\/+$/, "");
+      }
+    }
+  } catch {}
   try {
     const resolved =
       (await getBaseUrl("dramacool")) || (await getBaseUrl("asianc"));
@@ -73,7 +88,7 @@ export const getPosts = async function ({
 }): Promise<Post[]> {
   try {
     const { axios, cheerio, commonHeaders } = providerContext;
-    const baseUrl = await resolveBaseUrl();
+    const baseUrl = await resolveBaseUrl(providerContext);
     const cleanFilter = filter || "/recently-added";
     const pageParam =
       page > 1
@@ -112,7 +127,7 @@ export const getSearchPosts = async function ({
 }): Promise<Post[]> {
   try {
     const { axios, cheerio, commonHeaders } = providerContext;
-    const baseUrl = await resolveBaseUrl();
+    const baseUrl = await resolveBaseUrl(providerContext);
     const pageParam = page > 1 ? `&page=${page}` : "";
     const url = `${baseUrl}/search?type=drama&keyword=${encodeURIComponent(
       searchQuery

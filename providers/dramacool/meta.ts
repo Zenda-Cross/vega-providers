@@ -3,7 +3,22 @@ import { getBaseUrl } from "../getBaseUrl";
 
 const DEFAULT_BASE_URL = "https://asianc.id";
 
-async function resolveBaseUrl(): Promise<string> {
+async function resolveBaseUrl(
+  providerContext?: ProviderContext
+): Promise<string> {
+  try {
+    if (
+      providerContext &&
+      typeof (providerContext as any).getBaseUrl === "function"
+    ) {
+      const resolved =
+        (await (providerContext as any).getBaseUrl("dramacool")) ||
+        (await (providerContext as any).getBaseUrl("asianc"));
+      if (resolved) {
+        return resolved.replace(/\/+$/, "");
+      }
+    }
+  } catch {}
   try {
     const resolved =
       (await getBaseUrl("dramacool")) || (await getBaseUrl("asianc"));
@@ -30,7 +45,7 @@ export const getMeta = async function ({
 }): Promise<Info> {
   try {
     const { axios, cheerio, commonHeaders } = providerContext;
-    const baseUrl = await resolveBaseUrl();
+    const baseUrl = await resolveBaseUrl(providerContext);
     let currentUrl = link.startsWith("http")
       ? link
       : `${baseUrl}${link.startsWith("/") ? "" : "/"}${link}`;

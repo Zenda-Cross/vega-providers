@@ -4,7 +4,22 @@ import { decryptVidbasicAes } from "./aes";
 
 const DEFAULT_BASE_URL = "https://asianc.id";
 
-async function resolveBaseUrl(): Promise<string> {
+async function resolveBaseUrl(
+  providerContext?: ProviderContext
+): Promise<string> {
+  try {
+    if (
+      providerContext &&
+      typeof (providerContext as any).getBaseUrl === "function"
+    ) {
+      const resolved =
+        (await (providerContext as any).getBaseUrl("dramacool")) ||
+        (await (providerContext as any).getBaseUrl("asianc"));
+      if (resolved) {
+        return resolved.replace(/\/+$/, "");
+      }
+    }
+  } catch {}
   try {
     const resolved =
       (await getBaseUrl("dramacool")) || (await getBaseUrl("asianc"));
@@ -47,7 +62,7 @@ async function extractVidbasicPlayer(
     return null;
   }
 
-  const streamUrl = decryptVidbasicAes(cryptoData);
+  const streamUrl = await decryptVidbasicAes(cryptoData);
   if (!streamUrl || !streamUrl.startsWith("http")) {
     return null;
   }
@@ -57,7 +72,7 @@ async function extractVidbasicPlayer(
     const parsedPlayer = new URL(playerUrl);
     const subParam = parsedPlayer.searchParams.get("sub");
     if (subParam) {
-      const subUrl = decryptVidbasicAes(decodeURIComponent(subParam));
+      const subUrl = await decryptVidbasicAes(decodeURIComponent(subParam));
       if (subUrl && subUrl.startsWith("http")) {
         subtitles.push({
           title: "English",
@@ -96,7 +111,7 @@ export const getStream = async function ({
 }): Promise<Stream[]> {
   try {
     const { axios, cheerio, commonHeaders } = providerContext;
-    const baseUrl = await resolveBaseUrl();
+    const baseUrl = await resolveBaseUrl(providerContext);
     const streamLinks: Stream[] = [];
 
     const headers = {
