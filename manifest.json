@@ -466,7 +466,7 @@
   {
     "display_name": "MovieLinkBD",
     "value": "movielinkdb",
-    "version": "1.0",
+    "version": "1.01",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/movielinkdb.png",
     "type": "india",
     "disabled": false
