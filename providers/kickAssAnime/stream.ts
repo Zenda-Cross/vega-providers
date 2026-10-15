@@ -37,11 +37,18 @@ export const getStream = async function ({
   const { axios } = providerContext;
 
   let epApiUrl = link;
+  let epParsed: { slug?: string; epNum?: string; epSlug?: string; lang?: string } | null = null;
   if (link.startsWith("{")) {
     try {
       const parsed = JSON.parse(link);
-      const { slug, epNum, epSlug } = parsed;
-      epApiUrl = `${BASE_URL}/api/show/${slug}/episode/ep-${epNum}-${epSlug}`;
+      epParsed = parsed;
+      const slug = parsed.slug;
+      const epNum = parsed.epNum;
+      const epSlug = parsed.epSlug;
+      const num = epNum || "1";
+      epApiUrl = epSlug
+        ? `${BASE_URL}/api/show/${slug}/episode/ep-${num}-${epSlug}`
+        : `${BASE_URL}/api/show/${slug}/episode/ep-${num}`;
     } catch {
       // keep as link
     }
@@ -51,7 +58,34 @@ export const getStream = async function ({
   try {
     const srvRes = await axios.get(epApiUrl, { headers: defaultHeaders });
     servers = srvRes.data?.servers || [];
+
+    if (servers.length === 0 && epParsed?.slug && epParsed.lang && epParsed.lang !== "ja-JP") {
+      try {
+        const num = epParsed.epNum || "1";
+        const jaRes = await axios.get(
+          `${BASE_URL}/api/show/${epParsed.slug}/episodes?page=1&lang=ja-JP`,
+          { headers: defaultHeaders }
+        );
+        const jaEps = jaRes.data?.result || [];
+        const matching = jaEps.find(
+          (e: any) => String(e.episode_string) === String(num) || String(e.episode_number) === String(num)
+        );
+        if (matching?.slug) {
+          const fallbackRes = await axios.get(
+            `${BASE_URL}/api/show/${epParsed.slug}/episode/ep-${num}-${matching.slug}`,
+            { headers: defaultHeaders }
+          );
+          servers = fallbackRes.data?.servers || [];
+        }
+      } catch {
+        // fallback failed
+      }
+    }
   } catch {
+    return [];
+  }
+
+  if (servers.length === 0) {
     return [];
   }
 
@@ -60,7 +94,11 @@ export const getStream = async function ({
   for (const srv of servers) {
     if (!srv.src) continue;
     try {
-      const playerUrl = fixUrl(srv.src, BASE_URL);
+      let src = srv.src;
+      if (src.includes("/cat-player/vast")) {
+        src = src.replace("/cat-player/vast", "/cat-player/player");
+      }
+      const playerUrl = fixUrl(src, BASE_URL);
       const playerRes = await axios.get(playerUrl, {
         headers: {
           ...defaultHeaders,
@@ -72,9 +110,13 @@ export const getStream = async function ({
       const cleanHtml = html.replace(/&quot;/g, '"');
 
       // 1. New Player (Manifest-based)
-      const manifestMatch = cleanHtml.match(/manifest":\[0,"(?:https?:)?(\/\/[^"]+)"]/);
-      if (manifestMatch) {
-        let rawManifest = manifestMatch[1];
+      const manifestMatch =
+        cleanHtml.match(/manifest":\[\d+,"(?:https?:)?(\/\/[^"]+)"]/);
+      const directManifestMatch =
+        manifestMatch || cleanHtml.match(/manifest":\[\d+,"([^"]+)"]/);
+
+      if (directManifestMatch) {
+        const rawManifest = directManifestMatch[1].split("\\").join("");
         const manifestUrl = fixUrl(rawManifest, playerUrl);
 
         let origin = "";
@@ -98,16 +140,17 @@ export const getStream = async function ({
         while ((tMatch = trackRegex.exec(cleanHtml)) !== null) {
           const lang = tMatch[1];
           const subName = tMatch[2];
-          let subSrc = tMatch[3].replace(/\\\//g, "/");
+          const subSrc = tMatch[3].split("\\").join("");
           const subUrl = fixUrl(subSrc, playerUrl);
           const proxyUrl = `https://fetch.1proxy.workers.dev/fetch?url=${encodeURIComponent(
             subUrl
           )}&headers=${encodeURIComponent(JSON.stringify(hlsHeaders))}`;
 
+          const isSrt = subUrl.toLowerCase().includes(".srt");
           subtitles.push({
             title: `${subName} (${lang})`,
             language: lang,
-            type: "text/vtt",
+            type: isSrt ? "application/x-subrip" : "text/vtt",
             uri: proxyUrl,
           });
         }
@@ -151,7 +194,7 @@ export const getStream = async function ({
           } catch {
             // Master stream is already present in streams list
           }
-        } else if (manifestUrl.includes(".mpd")) {
+        } else if (manifestUrl.includes(".mpd") || playerUrl.includes("type=dash")) {
           streams.push({
             server: `${srv.name} (DASH)`,
             link: manifestUrl,
@@ -161,9 +204,31 @@ export const getStream = async function ({
             headers: hlsHeaders,
           });
         }
+        continue;
+      }
+
+      // 2. Old Player fallback (JSON source list)
+      const sourcesMatch = cleanHtml.match(/sources:\s*(\[[^\]]+\])/);
+      if (sourcesMatch) {
+        try {
+          const sources = JSON.parse(sourcesMatch[1]);
+          for (const s of sources) {
+            if (s.file) {
+              const streamUrl = fixUrl(s.file, playerUrl);
+              streams.push({
+                server: `${srv.name} (${s.label || "default"})`,
+                link: streamUrl,
+                type: streamUrl.includes(".m3u8") ? "m3u8" : "mp4",
+                quality: s.label || "unknown",
+              });
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
       }
     } catch {
-      // ignore single server failure
+      // server failed, try next
     }
   }
 

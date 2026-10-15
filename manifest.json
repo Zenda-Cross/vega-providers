@@ -435,7 +435,7 @@
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/kickAssAnime.png",
     "display_name": "KickAssAnime",
     "value": "kickAssAnime",
-    "version": "1.5",
+    "version": "1.6",
     "type": "anime",
     "disabled": false
   },
