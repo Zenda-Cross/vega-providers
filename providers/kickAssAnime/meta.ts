@@ -89,6 +89,21 @@ export const getMeta = async function ({
       }
 
       if (episodes.length > 0) {
+        if (lang !== "ja-JP") {
+          try {
+            const firstEp = episodes[0];
+            const checkRes = await axios.get(
+              `${BASE_URL}/api/show/${slug}/episode/ep-${firstEp.episode_string}-${firstEp.slug}`,
+              { headers }
+            );
+            if (!checkRes.data?.servers || checkRes.data.servers.length === 0) {
+              continue;
+            }
+          } catch {
+            // ignore check error
+          }
+        }
+
         const directLinks = episodes.map((ep: any) => {
           const epTitle = `Episode ${ep.episode_string}${ep.title ? ` - ${ep.title}` : ""}`;
           return {
