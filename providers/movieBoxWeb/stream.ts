@@ -65,33 +65,34 @@ async function getCaptions(
   stream: PlayStream,
   referer: string,
 ): Promise<TextTracks> {
-  if (!stream.id || !stream.format) return [];
+  try {
+    if (!stream.id || !stream.format) return [];
 
-  const params = new URLSearchParams({
-    format: stream.format,
-    id: stream.id,
-    subjectId: playback.subjectId,
-    detailPath: playback.detailPath,
-  });
-  const url = absoluteUrl(
-    baseUrl,
-    `/wefeed-h5api-bff/subject/caption?${params}`,
-  );
-  const response = await fetch(url, {
-    headers: { ...requestHeaders, Referer: referer },
-  });
-  if (!response.ok) {
-    throw new Error(
-      `HTTP ${response.status} ${response.statusText} | URL ${url}`,
+    const params = new URLSearchParams({
+      format: stream.format,
+      id: stream.id,
+      subjectId: playback.subjectId,
+      detailPath: playback.detailPath,
+    });
+    const url = absoluteUrl(
+      baseUrl,
+      `/wefeed-h5api-bff/subject/caption?${params}`,
     );
-  }
+    const response = await fetch(url, {
+      headers: { ...requestHeaders, Referer: referer },
+    });
+    if (!response.ok) return [];
 
-  const data = await response.json();
-  return mapCaptions(data?.data?.captions || []);
+    const data = await response.json();
+    return mapCaptions(data?.data?.captions || []);
+  } catch {
+    return [];
+  }
 }
 
 export const getStream = async function ({
   link,
+  providerContext,
 }: {
   link: string;
   providerContext: ProviderContext;
@@ -99,6 +100,14 @@ export const getStream = async function ({
   try {
     const playback = decodeLink(link);
     const baseUrl = await getBaseUrl(providerValue);
+    const userAgent =
+      providerContext?.commonHeaders?.["User-Agent"] ||
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    const streamHeaders = {
+      Referer: `${baseUrl}/`,
+      Origin: baseUrl,
+      "User-Agent": userAgent,
+    };
     const watchParams = new URLSearchParams({
       id: playback.subjectId,
       type: "/movie/detail",
@@ -160,7 +169,7 @@ export const getStream = async function ({
         type: getStreamType(source.format, source.url),
         quality: getQuality(source.resolutions),
         subtitles: await getCaptions(baseUrl, playback, source, referer),
-        headers: { Referer: baseUrl, Origin: baseUrl },
+        headers: streamHeaders,
       })),
     );
   } catch (error) {
