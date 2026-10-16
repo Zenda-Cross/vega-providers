@@ -165,7 +165,21 @@ export function encodeLink(value: PlaybackLink): string {
 }
 
 export function decodeLink(value: string): PlaybackLink {
-  return JSON.parse(value) as PlaybackLink;
+  if (value && typeof value === "object") {
+    return value as PlaybackLink;
+  }
+  try {
+    return JSON.parse(value) as PlaybackLink;
+  } catch {
+    const dp = detailPath(String(value || ""));
+    return {
+      subjectId: "",
+      detailPath: dp,
+      language: "Original",
+      season: 1,
+      episode: 1,
+    };
+  }
 }
 
 export function detailPath(link: string): string {

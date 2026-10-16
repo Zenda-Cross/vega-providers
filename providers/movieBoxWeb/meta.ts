@@ -17,8 +17,11 @@ function buildPlaybackLink(
   dub: MovieBoxDub,
   seasons: MovieBoxResource["seasons"],
 ): string {
+  const isSeries = subject.subjectType === 2;
   const movieSeason =
     seasons?.find((season) => season.se === 0) || seasons?.[0];
+  const firstSeriesSeason =
+    seasons?.find((season) => (season.se || 0) > 0) || seasons?.[0];
   const movieResolution = movieSeason?.resolutions
     ?.filter((item) => (item.epNum || 0) >= 1)
     .sort((a, b) => (b.resolution || 0) - (a.resolution || 0))[0]?.resolution;
@@ -51,9 +54,9 @@ function buildPlaybackLink(
     fallbackSubjectId,
     fallbackDetailPath,
     language: dub.lanName || dub.lanCode || "Original",
-    season: subject.subjectType === 2 ? undefined : movieSeason?.se || 0,
-    episode: subject.subjectType === 2 ? undefined : 1,
-    resolution: subject.subjectType === 2 ? undefined : movieResolution,
+    season: isSeries ? (firstSeriesSeason?.se || 1) : (movieSeason?.se || 0),
+    episode: 1,
+    resolution: isSeries ? undefined : movieResolution,
     seasons,
   });
 }

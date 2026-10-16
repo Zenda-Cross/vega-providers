@@ -158,11 +158,26 @@ export const getStream = async function ({
       Origin: baseUrl,
       "User-Agent": userAgent,
     };
+    const isSeries = Boolean(
+      (playback.season !== undefined && playback.season > 0) ||
+      (playback.seasons && playback.seasons.some((s) => (s.se || 0) > 0))
+    );
+
+    const seasonNumber =
+      playback.season !== undefined
+        ? playback.season
+        : (playback.seasons?.find((s) => (s.se || 0) > 0)?.se || 1);
+
+    const episodeNumber =
+      playback.episode !== undefined
+        ? playback.episode
+        : 1;
+
     const watchParams = new URLSearchParams({
       id: playback.subjectId,
       type: "/movie/detail",
-      detailSe: playback.season ? String(playback.season) : "",
-      detailEp: playback.episode ? String(playback.episode) : "",
+      detailSe: isSeries && seasonNumber > 0 ? String(seasonNumber) : "",
+      detailEp: isSeries && episodeNumber > 0 ? String(episodeNumber) : "",
       lang: "en",
     });
     const referer = absoluteUrl(
@@ -173,9 +188,9 @@ export const getStream = async function ({
       subjectId: playback.subjectId,
       detailPath: playback.detailPath,
     });
-    if (playback.season && playback.episode) {
-      playParams.set("se", String(playback.season));
-      playParams.set("ep", String(playback.episode));
+    if (isSeries && seasonNumber > 0) {
+      playParams.set("se", String(seasonNumber));
+      playParams.set("ep", String(episodeNumber));
     }
 
     let playResult = await fetchPlayData(baseUrl, playParams, referer, userAgent);
@@ -191,15 +206,15 @@ export const getStream = async function ({
         subjectId: fbSubjectId,
         detailPath: fbDetailPath,
       });
-      if (playback.season && playback.episode) {
-        fbParams.set("se", String(playback.season));
-        fbParams.set("ep", String(playback.episode));
+      if (isSeries && seasonNumber > 0) {
+        fbParams.set("se", String(seasonNumber));
+        fbParams.set("ep", String(episodeNumber));
       }
       const fbWatchParams = new URLSearchParams({
         id: fbSubjectId,
         type: "/movie/detail",
-        detailSe: playback.season ? String(playback.season) : "",
-        detailEp: playback.episode ? String(playback.episode) : "",
+        detailSe: isSeries && seasonNumber > 0 ? String(seasonNumber) : "",
+        detailEp: isSeries && episodeNumber > 0 ? String(episodeNumber) : "",
         lang: "en",
       });
       const fbReferer = absoluteUrl(

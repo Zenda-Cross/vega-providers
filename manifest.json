@@ -121,7 +121,7 @@
   {
     "display_name": "MovieBox Web",
     "value": "movieBoxWeb",
-    "version": "2.0",
+    "version": "2.1",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/movieBoxWeb.png",
     "type": "global",
     "disabled": false
