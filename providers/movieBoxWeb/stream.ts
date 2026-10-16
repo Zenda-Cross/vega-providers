@@ -17,8 +17,12 @@ type Caption = {
   url?: string;
 };
 
+const defaultUserAgent =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 const requestHeaders = {
   Accept: "application/json",
+  "User-Agent": defaultUserAgent,
   "x-client-info": JSON.stringify({ timezone: "Asia/Colombo" }),
   "x-source": "",
 };
@@ -64,6 +68,7 @@ async function getCaptions(
   playback: ReturnType<typeof decodeLink>,
   stream: PlayStream,
   referer: string,
+  userAgent: string = defaultUserAgent,
 ): Promise<TextTracks> {
   try {
     if (!stream.id || !stream.format) return [];
@@ -79,7 +84,7 @@ async function getCaptions(
       `/wefeed-h5api-bff/subject/caption?${params}`,
     );
     const response = await fetch(url, {
-      headers: { ...requestHeaders, Referer: referer },
+      headers: { ...requestHeaders, "User-Agent": userAgent, Referer: referer },
     });
     if (!response.ok) return [];
 
@@ -101,8 +106,7 @@ export const getStream = async function ({
     const playback = decodeLink(link);
     const baseUrl = await getBaseUrl(providerValue);
     const userAgent =
-      providerContext?.commonHeaders?.["User-Agent"] ||
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+      providerContext?.commonHeaders?.["User-Agent"] || defaultUserAgent;
     const streamHeaders = {
       Referer: `${baseUrl}/`,
       Origin: baseUrl,
@@ -133,7 +137,7 @@ export const getStream = async function ({
       `/wefeed-h5api-bff/subject/play?${playParams}`,
     );
     const response = await fetch(playUrl, {
-      headers: { ...requestHeaders, Referer: referer },
+      headers: { ...requestHeaders, "User-Agent": userAgent, Referer: referer },
     });
     if (!response.ok) {
       throw new Error(
@@ -168,7 +172,13 @@ export const getStream = async function ({
         link: source.url || "",
         type: getStreamType(source.format, source.url),
         quality: getQuality(source.resolutions),
-        subtitles: await getCaptions(baseUrl, playback, source, referer),
+        subtitles: await getCaptions(
+          baseUrl,
+          playback,
+          source,
+          referer,
+          userAgent,
+        ),
         headers: streamHeaders,
       })),
     );
