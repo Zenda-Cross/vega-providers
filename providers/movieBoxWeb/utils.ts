@@ -5,12 +5,7 @@ export const providerValue = "movieBoxWeb";
 export const defaultBaseUrl = "https://officialmoviebox.com";
 
 export async function getProviderBaseUrl(): Promise<string> {
-  try {
-    const url = await getBaseUrl(providerValue);
-    return url || defaultBaseUrl;
-  } catch {
-    return defaultBaseUrl;
-  }
+  return defaultBaseUrl;
 }
 
 export type MovieBoxSubject = {

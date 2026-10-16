@@ -73,6 +73,8 @@ async function getCaptions(
   stream: PlayStream,
   referer: string,
   userAgent: string = defaultUserAgent,
+  providerContext?: ProviderContext,
+  signal?: AbortSignal,
 ): Promise<TextTracks> {
   try {
     if (!stream.id || !stream.format) return [];
@@ -87,9 +89,22 @@ async function getCaptions(
       baseUrl,
       `/wefeed-h5api-bff/subject/caption?${params}`,
     );
-    const response = await fetch(url, {
-      headers: { ...requestHeaders, "User-Agent": userAgent, Referer: referer },
-    });
+    const headers = { ...requestHeaders, "User-Agent": userAgent, Referer: referer };
+
+    if (providerContext?.axios) {
+      const res = await providerContext.axios.get(url, {
+        headers,
+        signal,
+        timeout: 10000,
+        validateStatus: () => true,
+      });
+      if (res.status >= 200 && res.status < 300) {
+        return mapCaptions(res.data?.data?.captions || []);
+      }
+      return [];
+    }
+
+    const response = await fetch(url, { headers, signal });
     if (!response.ok) return [];
 
     const data = await response.json();
@@ -116,14 +131,41 @@ async function fetchPlayData(
   params: URLSearchParams,
   refererUrl: string,
   ua: string,
+  providerContext?: ProviderContext,
+  signal?: AbortSignal,
 ): Promise<any | null> {
   const playUrl = absoluteUrl(
     apiBase,
     `/wefeed-h5api-bff/subject/play?${params.toString()}`,
   );
+  const headers = {
+    ...requestHeaders,
+    "User-Agent": ua,
+    Referer: refererUrl,
+  };
   try {
+    if (providerContext?.axios) {
+      const res = await providerContext.axios.get(playUrl, {
+        headers,
+        signal,
+        timeout: 15000,
+        validateStatus: () => true,
+      });
+      if (res.status === 406) return { noContent: true };
+      if (res.status < 200 || res.status >= 300) {
+        console.warn(`[movieBoxWeb] Play API HTTP ${res.status} for ${playUrl}`);
+        return null;
+      }
+      const json = res.data;
+      if (json?.code === 406 || json?.message?.includes("find no content")) {
+        return { noContent: true };
+      }
+      return json;
+    }
+
     const response = await fetch(playUrl, {
-      headers: { ...requestHeaders, "User-Agent": ua, Referer: refererUrl },
+      headers,
+      signal,
     });
     if (response.status === 406) {
       return { noContent: true };
@@ -145,10 +187,16 @@ async function fetchPlayData(
 
 export const getStream = async function ({
   link,
+  type,
+  signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
+  type?: string;
+  signal?: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }): Promise<Stream[]> {
   try {
     const playback = decodeLink(link);
@@ -214,7 +262,14 @@ export const getStream = async function ({
       playParams.set("ep", String(episodeNumber));
     }
 
-    let playResult = await fetchPlayData(baseUrl, playParams, referer, userAgent);
+    let playResult = await fetchPlayData(
+      baseUrl,
+      playParams,
+      referer,
+      userAgent,
+      providerContext,
+      signal,
+    );
 
     // If no playable streams found and fallback subjectId/detailPath is available, try fallback
     if (
@@ -242,7 +297,14 @@ export const getStream = async function ({
         baseUrl,
         `/movies/${fbDetailPath}?${fbWatchParams}`,
       );
-      const fbResult = await fetchPlayData(baseUrl, fbParams, fbReferer, userAgent);
+      const fbResult = await fetchPlayData(
+        baseUrl,
+        fbParams,
+        fbReferer,
+        userAgent,
+        providerContext,
+        signal,
+      );
       if (hasPlayableStreams(fbResult)) {
         playResult = fbResult;
       }
@@ -254,7 +316,14 @@ export const getStream = async function ({
         subjectId: playback.subjectId,
         detailPath: playback.detailPath,
       });
-      const cleanResult = await fetchPlayData(baseUrl, cleanParams, referer, userAgent);
+      const cleanResult = await fetchPlayData(
+        baseUrl,
+        cleanParams,
+        referer,
+        userAgent,
+        providerContext,
+        signal,
+      );
       if (hasPlayableStreams(cleanResult)) {
         playResult = cleanResult;
       }
@@ -301,6 +370,8 @@ export const getStream = async function ({
           source,
           referer,
           userAgent,
+          providerContext,
+          signal,
         ),
         headers: streamHeaders,
       })),
