@@ -49,6 +49,8 @@ export type PlaybackLink = {
   episode?: number;
   resolution?: number;
   seasons?: MovieBoxResource["seasons"];
+  fallbackSubjectId?: string;
+  fallbackDetailPath?: string;
 };
 
 export function parseNuxtDetail(

@@ -14,12 +14,23 @@ export const getEpisodes = async function ({
 
     for (const season of playback.seasons || []) {
       const seasonNumber = season.se || 1;
+      const maxEpFromRes = season.resolutions?.length
+        ? Math.max(0, ...season.resolutions.map((r) => r.epNum || 0))
+        : 0;
       const availableEpisodes = season.allEp
         ? season.allEp
             .split(",")
             .map(Number)
             .filter((episode) => episode > 0)
-        : Array.from({ length: season.maxEp || 0 }, (_, index) => index + 1);
+        : Array.from(
+            {
+              length:
+                maxEpFromRes > 0
+                  ? Math.min(season.maxEp || maxEpFromRes, maxEpFromRes)
+                  : season.maxEp || 0,
+            },
+            (_, index) => index + 1,
+          );
 
       for (const episode of availableEpisodes) {
         const resolution = season.resolutions
@@ -27,6 +38,11 @@ export const getEpisodes = async function ({
           .sort(
             (a, b) => (b.resolution || 0) - (a.resolution || 0),
           )[0]?.resolution;
+
+        if (season.resolutions?.length && !resolution) {
+          continue;
+        }
+
         episodes.push({
           title: `S${String(seasonNumber).padStart(2, "0")} E${String(episode).padStart(2, "0")}`,
           link: encodeLink({

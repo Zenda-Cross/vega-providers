@@ -22,9 +22,22 @@ function buildPlaybackLink(
   const movieResolution = movieSeason?.resolutions
     ?.filter((item) => (item.epNum || 0) >= 1)
     .sort((a, b) => (b.resolution || 0) - (a.resolution || 0))[0]?.resolution;
+  const targetSubjectId = dub.subjectId || subject.subjectId || "";
+  const targetDetailPath = dub.detailPath || subject.detailPath || "";
+  const fallbackSubjectId =
+    subject.subjectId && subject.subjectId !== targetSubjectId
+      ? subject.subjectId
+      : undefined;
+  const fallbackDetailPath =
+    subject.detailPath && subject.detailPath !== targetDetailPath
+      ? subject.detailPath
+      : undefined;
+
   return encodeLink({
-    subjectId: dub.subjectId || subject.subjectId || "",
-    detailPath: dub.detailPath || subject.detailPath || "",
+    subjectId: targetSubjectId,
+    detailPath: targetDetailPath,
+    fallbackSubjectId,
+    fallbackDetailPath,
     language: dub.lanName || dub.lanCode || "Original",
     season: subject.subjectType === 2 ? undefined : movieSeason?.se || 0,
     episode: subject.subjectType === 2 ? undefined : 1,

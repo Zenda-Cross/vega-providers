@@ -95,6 +95,40 @@ async function getCaptions(
   }
 }
 
+async function fetchPlayData(
+  apiBase: string,
+  params: URLSearchParams,
+  refererUrl: string,
+  ua: string,
+): Promise<any | null> {
+  const playUrl = absoluteUrl(
+    apiBase,
+    `/wefeed-h5api-bff/subject/play?${params.toString()}`,
+  );
+  const response = await fetch(playUrl, {
+    headers: { ...requestHeaders, "User-Agent": ua, Referer: refererUrl },
+  }).catch(() => null);
+
+  if (!response) return null;
+
+  // HTTP 406 is the server application response when no content representation is available
+  if (response.status === 406) {
+    return { noContent: true };
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `HTTP ${response.status} ${response.statusText} | URL ${playUrl}`,
+    );
+  }
+
+  const json = await response.json().catch(() => null);
+  if (json?.code === 406 || json?.message?.includes("find no content")) {
+    return { noContent: true };
+  }
+  return json;
+}
+
 export const getStream = async function ({
   link,
   providerContext,
@@ -132,28 +166,63 @@ export const getStream = async function ({
       playParams.set("ep", String(playback.episode));
     }
 
-    const playUrl = absoluteUrl(
-      baseUrl,
-      `/wefeed-h5api-bff/subject/play?${playParams}`,
-    );
-    const response = await fetch(playUrl, {
-      headers: { ...requestHeaders, "User-Agent": userAgent, Referer: referer },
-    });
-    if (!response.ok) {
+    let playResult = await fetchPlayData(baseUrl, playParams, referer, userAgent);
+
+    // If no content found and fallback subjectId/detailPath is available, try fallback
+    if (
+      (!playResult || playResult.noContent || playResult.code !== 0) &&
+      (playback.fallbackSubjectId || playback.fallbackDetailPath)
+    ) {
+      const fbSubjectId = playback.fallbackSubjectId || playback.subjectId;
+      const fbDetailPath = playback.fallbackDetailPath || playback.detailPath;
+      const fbParams = new URLSearchParams({
+        subjectId: fbSubjectId,
+        detailPath: fbDetailPath,
+      });
+      if (playback.season && playback.episode) {
+        fbParams.set("se", String(playback.season));
+        fbParams.set("ep", String(playback.episode));
+      }
+      const fbWatchParams = new URLSearchParams({
+        id: fbSubjectId,
+        type: "/movie/detail",
+        detailSe: playback.season ? String(playback.season) : "",
+        detailEp: playback.episode ? String(playback.episode) : "",
+        lang: "en",
+      });
+      const fbReferer = absoluteUrl(
+        baseUrl,
+        `/movies/${fbDetailPath}?${fbWatchParams}`,
+      );
+      const fbResult = await fetchPlayData(baseUrl, fbParams, fbReferer, userAgent).catch(
+        () => null,
+      );
+      if (
+        fbResult &&
+        !fbResult.noContent &&
+        fbResult.code === 0 &&
+        fbResult.data?.streams?.length
+      ) {
+        playResult = fbResult;
+      }
+    }
+
+    if (
+      !playResult ||
+      playResult.noContent ||
+      playResult.data?.hasResource === false
+    ) {
+      return [];
+    }
+
+    if (playResult.code !== 0) {
       throw new Error(
-        `HTTP ${response.status} ${response.statusText} | URL ${playUrl}`,
+        playResult.message || `MovieBox Web play API code ${playResult.code}`,
       );
     }
 
-    const data = await response.json();
-    const playData = data?.data;
-    if (data?.code !== 0) {
-      throw new Error(
-        data?.message || `MovieBox Web play API code ${data?.code}`,
-      );
-    }
-    if (playData?.hasResource === false) return [];
-    if (!playData) throw new Error("MovieBox Web play data was not found");
+    const playData = playResult.data;
+    if (!playData) return [];
 
     const sources = [
       ...(playData.streams || []),
