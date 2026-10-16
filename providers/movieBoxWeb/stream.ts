@@ -79,13 +79,25 @@ async function getCaptions(
       subjectId: playback.subjectId,
       detailPath: playback.detailPath,
     });
-    const url = absoluteUrl(
-      baseUrl,
+    const apiBase =
+      (await getBaseUrl("movieBox").catch(() => null)) ||
+      "https://h5.aoneroom.com";
+    let url = absoluteUrl(
+      apiBase,
       `/wefeed-h5api-bff/subject/caption?${params}`,
     );
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       headers: { ...requestHeaders, "User-Agent": userAgent, Referer: referer },
     });
+    if (!response.ok) {
+      url = absoluteUrl(
+        baseUrl,
+        `/wefeed-h5api-bff/subject/caption?${params}`,
+      );
+      response = await fetch(url, {
+        headers: { ...requestHeaders, "User-Agent": userAgent, Referer: referer },
+      });
+    }
     if (!response.ok) return [];
 
     const data = await response.json();
@@ -132,13 +144,25 @@ export const getStream = async function ({
       playParams.set("ep", String(playback.episode));
     }
 
-    const playUrl = absoluteUrl(
-      baseUrl,
+    const apiBase =
+      (await getBaseUrl("movieBox").catch(() => null)) ||
+      "https://h5.aoneroom.com";
+    let playUrl = absoluteUrl(
+      apiBase,
       `/wefeed-h5api-bff/subject/play?${playParams}`,
     );
-    const response = await fetch(playUrl, {
+    let response = await fetch(playUrl, {
       headers: { ...requestHeaders, "User-Agent": userAgent, Referer: referer },
     });
+    if (!response.ok) {
+      playUrl = absoluteUrl(
+        baseUrl,
+        `/wefeed-h5api-bff/subject/play?${playParams}`,
+      );
+      response = await fetch(playUrl, {
+        headers: { ...requestHeaders, "User-Agent": userAgent, Referer: referer },
+      });
+    }
     if (!response.ok) {
       throw new Error(
         `HTTP ${response.status} ${response.statusText} | URL ${playUrl}`,
