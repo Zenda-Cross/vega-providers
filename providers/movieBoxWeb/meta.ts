@@ -24,14 +24,26 @@ function buildPlaybackLink(
     .sort((a, b) => (b.resolution || 0) - (a.resolution || 0))[0]?.resolution;
   const targetSubjectId = dub.subjectId || subject.subjectId || "";
   const targetDetailPath = dub.detailPath || subject.detailPath || "";
+
+  const alternateDub =
+    subject.dubs?.find(
+      (d) =>
+        d.subjectId &&
+        d.subjectId !== targetSubjectId &&
+        (d.original ||
+          d.lanName?.toLowerCase().includes("original") ||
+          d.lanCode === "en"),
+    ) ||
+    subject.dubs?.find((d) => d.subjectId && d.subjectId !== targetSubjectId);
+
   const fallbackSubjectId =
     subject.subjectId && subject.subjectId !== targetSubjectId
       ? subject.subjectId
-      : undefined;
+      : alternateDub?.subjectId;
   const fallbackDetailPath =
     subject.detailPath && subject.detailPath !== targetDetailPath
       ? subject.detailPath
-      : undefined;
+      : alternateDub?.detailPath;
 
   return encodeLink({
     subjectId: targetSubjectId,

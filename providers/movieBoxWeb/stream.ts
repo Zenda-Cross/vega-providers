@@ -95,6 +95,18 @@ async function getCaptions(
   }
 }
 
+function hasPlayableStreams(result: any): boolean {
+  if (!result || result.noContent || result.code !== 0 || result.data?.hasResource === false) {
+    return false;
+  }
+  const sources = [
+    ...(result.data?.streams || []),
+    ...(result.data?.hls || []),
+    ...(result.data?.dash || []),
+  ] as PlayStream[];
+  return sources.some((s) => Boolean(s?.url && !s?.vipLocked));
+}
+
 async function fetchPlayData(
   apiBase: string,
   params: URLSearchParams,
@@ -168,9 +180,9 @@ export const getStream = async function ({
 
     let playResult = await fetchPlayData(baseUrl, playParams, referer, userAgent);
 
-    // If no content found and fallback subjectId/detailPath is available, try fallback
+    // If no playable streams found and fallback subjectId/detailPath is available, try fallback
     if (
-      (!playResult || playResult.noContent || playResult.code !== 0) &&
+      !hasPlayableStreams(playResult) &&
       (playback.fallbackSubjectId || playback.fallbackDetailPath)
     ) {
       const fbSubjectId = playback.fallbackSubjectId || playback.subjectId;
@@ -197,12 +209,7 @@ export const getStream = async function ({
       const fbResult = await fetchPlayData(baseUrl, fbParams, fbReferer, userAgent).catch(
         () => null,
       );
-      if (
-        fbResult &&
-        !fbResult.noContent &&
-        fbResult.code === 0 &&
-        fbResult.data?.streams?.length
-      ) {
+      if (hasPlayableStreams(fbResult)) {
         playResult = fbResult;
       }
     }
