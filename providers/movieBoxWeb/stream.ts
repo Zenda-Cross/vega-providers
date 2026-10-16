@@ -1,7 +1,11 @@
-import { getBaseUrl } from "../getBaseUrl";
 import { ProviderContext, Stream, TextTracks } from "../types";
 import { throwProviderError } from "../providerErrors";
-import { absoluteUrl, decodeLink, providerValue } from "./utils";
+import {
+  absoluteUrl,
+  decodeLink,
+  getProviderBaseUrl,
+  parseNuxtDetail,
+} from "./utils";
 
 type PlayStream = {
   format?: string;
@@ -117,28 +121,26 @@ async function fetchPlayData(
     apiBase,
     `/wefeed-h5api-bff/subject/play?${params.toString()}`,
   );
-  const response = await fetch(playUrl, {
-    headers: { ...requestHeaders, "User-Agent": ua, Referer: refererUrl },
-  }).catch(() => null);
-
-  if (!response) return null;
-
-  // HTTP 406 is the server application response when no content representation is available
-  if (response.status === 406) {
-    return { noContent: true };
+  try {
+    const response = await fetch(playUrl, {
+      headers: { ...requestHeaders, "User-Agent": ua, Referer: refererUrl },
+    });
+    if (response.status === 406) {
+      return { noContent: true };
+    }
+    if (!response.ok) {
+      console.warn(`[movieBoxWeb] Play API HTTP ${response.status} for ${playUrl}`);
+      return null;
+    }
+    const json = await response.json();
+    if (json?.code === 406 || json?.message?.includes("find no content")) {
+      return { noContent: true };
+    }
+    return json;
+  } catch (err: any) {
+    console.warn(`[movieBoxWeb] Play API fetch error for ${playUrl}:`, err?.message || err);
+    return null;
   }
-
-  if (!response.ok) {
-    throw new Error(
-      `HTTP ${response.status} ${response.statusText} | URL ${playUrl}`,
-    );
-  }
-
-  const json = await response.json().catch(() => null);
-  if (json?.code === 406 || json?.message?.includes("find no content")) {
-    return { noContent: true };
-  }
-  return json;
 }
 
 export const getStream = async function ({
@@ -150,7 +152,7 @@ export const getStream = async function ({
 }): Promise<Stream[]> {
   try {
     const playback = decodeLink(link);
-    const baseUrl = await getBaseUrl(providerValue);
+    const baseUrl = await getProviderBaseUrl();
     const userAgent =
       providerContext?.commonHeaders?.["User-Agent"] || defaultUserAgent;
     const streamHeaders = {
@@ -158,6 +160,25 @@ export const getStream = async function ({
       Origin: baseUrl,
       "User-Agent": userAgent,
     };
+
+    if (!playback.subjectId && playback.detailPath) {
+      try {
+        const detailUrl = absoluteUrl(baseUrl, `/moviesDetail/${playback.detailPath}`);
+        const res = await fetch(detailUrl);
+        if (res.ok) {
+          const detail = parseNuxtDetail(await res.text(), providerContext.cheerio);
+          if (detail?.subject?.subjectId) {
+            playback.subjectId = detail.subject.subjectId;
+            if (!playback.fallbackSubjectId) {
+              playback.fallbackSubjectId = detail.subject.subjectId;
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn("[movieBoxWeb] Failed to resolve missing subjectId:", e?.message || e);
+      }
+    }
+
     const isSeries = Boolean(
       (playback.season !== undefined && playback.season > 0) ||
       (playback.seasons && playback.seasons.some((s) => (s.se || 0) > 0))
@@ -221,11 +242,21 @@ export const getStream = async function ({
         baseUrl,
         `/movies/${fbDetailPath}?${fbWatchParams}`,
       );
-      const fbResult = await fetchPlayData(baseUrl, fbParams, fbReferer, userAgent).catch(
-        () => null,
-      );
+      const fbResult = await fetchPlayData(baseUrl, fbParams, fbReferer, userAgent);
       if (hasPlayableStreams(fbResult)) {
         playResult = fbResult;
+      }
+    }
+
+    // If still no playable streams, try without se/ep
+    if (!hasPlayableStreams(playResult)) {
+      const cleanParams = new URLSearchParams({
+        subjectId: playback.subjectId,
+        detailPath: playback.detailPath,
+      });
+      const cleanResult = await fetchPlayData(baseUrl, cleanParams, referer, userAgent);
+      if (hasPlayableStreams(cleanResult)) {
+        playResult = cleanResult;
       }
     }
 
@@ -234,6 +265,7 @@ export const getStream = async function ({
       playResult.noContent ||
       playResult.data?.hasResource === false
     ) {
+      console.warn("[movieBoxWeb] No playable resource found for:", playback.detailPath);
       return [];
     }
 

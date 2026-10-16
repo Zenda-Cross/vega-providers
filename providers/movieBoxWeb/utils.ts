@@ -1,6 +1,17 @@
+import { getBaseUrl } from "../getBaseUrl";
 import { ProviderContext } from "../types";
 
 export const providerValue = "movieBoxWeb";
+export const defaultBaseUrl = "https://officialmoviebox.com";
+
+export async function getProviderBaseUrl(): Promise<string> {
+  try {
+    const url = await getBaseUrl(providerValue);
+    return url || defaultBaseUrl;
+  } catch {
+    return defaultBaseUrl;
+  }
+}
 
 export type MovieBoxSubject = {
   subjectId?: string;

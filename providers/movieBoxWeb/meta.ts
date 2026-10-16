@@ -1,15 +1,14 @@
-import { getBaseUrl } from "../getBaseUrl";
 import { Info, Link, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
 import {
   absoluteUrl,
   detailPath,
   encodeLink,
+  getProviderBaseUrl,
   MovieBoxDub,
   MovieBoxResource,
   MovieBoxSubject,
   parseNuxtDetail,
-  providerValue,
 } from "./utils";
 
 function buildPlaybackLink(
@@ -69,7 +68,7 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const baseUrl = await getBaseUrl(providerValue);
+    const baseUrl = await getProviderBaseUrl();
     const pageUrl = absoluteUrl(baseUrl, `/moviesDetail/${detailPath(link)}`);
     const response = await fetch(pageUrl);
     if (!response.ok) {
