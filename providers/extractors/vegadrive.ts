@@ -100,7 +100,7 @@ export async function vegadriveExtractor(
               targetLoc.match(/\/u\/([a-zA-Z0-9_-]+)/) || targetLoc.match(/\/file\/([a-zA-Z0-9_-]+)/);
             if (pxMatch) {
               streams.push({
-                server: 'Pixeldrain (VegaDrive)',
+                server: 'Pixeldrain',
                 link: `https://pixeldrain.com/api/file/${pxMatch[1]}`,
                 type: 'mp4',
               });
@@ -111,7 +111,7 @@ export async function vegadriveExtractor(
               const gfStream = await gofileExtractor(gofileMatch[1], axios, ctx);
               if (gfStream && gfStream.link) {
                 streams.push({
-                  server: 'Gofile (VegaDrive)',
+                  server: 'Gofile',
                   link: gfStream.link,
                   type: 'mp4',
                   headers: {
@@ -129,7 +129,7 @@ export async function vegadriveExtractor(
               const ddl = await transferitExtractor(transferId, axios, defaultUserAgent);
               if (ddl) {
                 streams.push({
-                  server: 'Transfer.it (VegaDrive)',
+                  server: 'Transfer.it',
                   link: ddl,
                   type: 'mp4',
                 });

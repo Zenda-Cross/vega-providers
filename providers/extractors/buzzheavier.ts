@@ -39,7 +39,7 @@ export async function buzzheavierExtractor(
     const mediaUrl = new URL(target, pageUrl);
     if (!['https:', 'http:'].includes(mediaUrl.protocol)) return null;
     return {
-      server: 'Buzzheavier (VegaDrive)',
+      server: 'Buzzheavier',
       link: mediaUrl.href,
       type: 'mkv',
       headers: {...ctx.commonHeaders, Referer: pageUrl.href},
