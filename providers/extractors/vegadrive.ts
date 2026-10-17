@@ -2,6 +2,7 @@ import { AxiosInstance } from 'axios';
 import { ProviderContext, Stream } from '../types';
 import { gofileExtractor } from './gofile';
 import { transferitExtractor } from './transferit';
+import { buzzheavierExtractor } from './buzzheavier';
 
 export async function vegadriveExtractor(
   vegadriveUrl: string,
@@ -19,11 +20,25 @@ export async function vegadriveExtractor(
       Referer: vegadriveUrl,
     };
 
-    const pageRes = await axios.get(vegadriveUrl, {
-      headers: baseHeaders,
-      maxRedirects: 5,
-      validateStatus: (s: number) => s >= 200 && s < 400,
-    });
+    // Published app adapters do not all expose the final response URL.
+    // Follow Location ourselves so mirror redirects work without an app update.
+    let finalUrl = vegadriveUrl;
+    let pageRes;
+    for (let redirects = 0; ; redirects++) {
+      pageRes = await axios.get(finalUrl, {
+        headers: baseHeaders,
+        maxRedirects: 0,
+        validateStatus: (status: number) => status >= 200 && status < 400,
+      });
+      const location = pageRes.headers?.location || pageRes.headers?.Location;
+      if (![301, 302, 303, 307, 308].includes(pageRes.status) || !location) break;
+      if (redirects >= 8) throw new Error('Too many VegaDrive mirror redirects');
+      const nextUrl = new URL(String(location), finalUrl);
+      if (!['http:', 'https:'].includes(nextUrl.protocol)) {
+        throw new Error('Invalid VegaDrive mirror redirect');
+      }
+      finalUrl = nextUrl.href;
+    }
 
     const cookieHeader: any = pageRes.headers?.['set-cookie'];
     let cookieStr = '';
@@ -33,7 +48,6 @@ export async function vegadriveExtractor(
       cookieStr = String(cookieHeader).split(';')[0];
     }
 
-    const finalUrl = pageRes.request?.res?.responseUrl || vegadriveUrl;
     const vdBase = new URL(finalUrl).origin;
 
     const reqHeaders: Record<string, string> = {
@@ -79,14 +93,8 @@ export async function vegadriveExtractor(
           if (!targetLoc) return;
 
           if (provider === 'buzzheavier') {
-            const dlUrl = targetLoc.endsWith('/download')
-              ? targetLoc
-              : `${targetLoc.replace(/\/+$/, '')}/download`;
-            streams.push({
-              server: 'Buzzheavier (VegaDrive)',
-              link: dlUrl,
-              type: 'mp4',
-            });
+            const resolved = await buzzheavierExtractor(targetLoc, axios, ctx);
+            if (resolved) streams.push(resolved);
           } else if (provider === 'pixeldrain') {
             const pxMatch =
               targetLoc.match(/\/u\/([a-zA-Z0-9_-]+)/) || targetLoc.match(/\/file\/([a-zA-Z0-9_-]+)/);
@@ -106,6 +114,11 @@ export async function vegadriveExtractor(
                   server: 'Gofile (VegaDrive)',
                   link: gfStream.link,
                   type: 'mp4',
+                  headers: {
+                    'User-Agent': defaultUserAgent,
+                    Referer: 'https://gofile.io/',
+                    Cookie: `accountToken=${gfStream.token}`,
+                  },
                 });
               }
             }
