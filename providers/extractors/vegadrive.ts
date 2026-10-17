@@ -1,6 +1,7 @@
 import { AxiosInstance } from 'axios';
 import { ProviderContext, Stream } from '../types';
 import { gofileExtractor } from './gofile';
+import { transferitExtractor } from './transferit';
 
 export async function vegadriveExtractor(
   vegadriveUrl: string,
@@ -15,13 +16,13 @@ export async function vegadriveExtractor(
 
     const baseHeaders = {
       'User-Agent': defaultUserAgent,
-      Referer: vegadriveUrl
+      Referer: vegadriveUrl,
     };
 
     const pageRes = await axios.get(vegadriveUrl, {
       headers: baseHeaders,
       maxRedirects: 5,
-      validateStatus: (s: number) => s >= 200 && s < 400
+      validateStatus: (s: number) => s >= 200 && s < 400,
     });
 
     const cookieHeader: any = pageRes.headers?.['set-cookie'];
@@ -38,7 +39,7 @@ export async function vegadriveExtractor(
     const reqHeaders: Record<string, string> = {
       ...baseHeaders,
       Referer: finalUrl,
-      ...(cookieStr ? { Cookie: cookieStr } : {})
+      ...(cookieStr ? { Cookie: cookieStr } : {}),
     };
 
     const shareIdMatch = vegadriveUrl.match(/\/s\/([a-zA-Z0-9]+)/);
@@ -54,7 +55,7 @@ export async function vegadriveExtractor(
           const dRes = await axios.get(dUrl, {
             headers: reqHeaders,
             maxRedirects: 0,
-            validateStatus: (s: number) => s >= 200 && s < 400
+            validateStatus: (s: number) => s >= 200 && s < 400,
           });
 
           let targetLoc: string | undefined = dRes.headers?.location || dRes.headers?.Location;
@@ -67,7 +68,7 @@ export async function vegadriveExtractor(
             const bridgeRes = await axios.get(targetLoc, {
               headers: reqHeaders,
               maxRedirects: 0,
-              validateStatus: (s: number) => s >= 200 && s < 400
+              validateStatus: (s: number) => s >= 200 && s < 400,
             });
             targetLoc = bridgeRes.headers?.location || bridgeRes.headers?.Location;
             if (targetLoc && targetLoc.startsWith('/')) {
@@ -84,7 +85,7 @@ export async function vegadriveExtractor(
             streams.push({
               server: 'Buzzheavier (VegaDrive)',
               link: dlUrl,
-              type: 'mp4'
+              type: 'mp4',
             });
           } else if (provider === 'pixeldrain') {
             const pxMatch =
@@ -93,7 +94,7 @@ export async function vegadriveExtractor(
               streams.push({
                 server: 'Pixeldrain (VegaDrive)',
                 link: `https://pixeldrain.com/api/file/${pxMatch[1]}`,
-                type: 'mp4'
+                type: 'mp4',
               });
             }
           } else if (provider === 'gofile') {
@@ -104,7 +105,7 @@ export async function vegadriveExtractor(
                 streams.push({
                   server: 'Gofile (VegaDrive)',
                   link: gfStream.link,
-                  type: 'mp4'
+                  type: 'mp4',
                 });
               }
             }
@@ -112,24 +113,13 @@ export async function vegadriveExtractor(
             const trMatch = targetLoc.match(/\/t\/([a-zA-Z0-9_-]+)/);
             if (trMatch) {
               const transferId = trMatch[1];
-              const metaRes = await axios.get(`https://transfer.it/api/transfers/${transferId}`, {
-                headers: { 'User-Agent': defaultUserAgent }
-              });
-              const fileId = metaRes.data?.files?.[0]?.id;
-              if (fileId) {
-                const dlRes = await axios.get(
-                  `https://transfer.it/api/transfers/${transferId}/files/${fileId}/download`,
-                  {
-                    headers: { 'User-Agent': defaultUserAgent }
-                  }
-                );
-                if (dlRes.data?.url) {
-                  streams.push({
-                    server: 'Transferit (VegaDrive)',
-                    link: dlRes.data.url,
-                    type: 'mp4'
-                  });
-                }
+              const ddl = await transferitExtractor(transferId, axios, defaultUserAgent);
+              if (ddl) {
+                streams.push({
+                  server: 'Transfer.it (VegaDrive)',
+                  link: ddl,
+                  type: 'mp4',
+                });
               }
             }
           }
