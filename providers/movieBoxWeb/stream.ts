@@ -25,6 +25,9 @@ const defaultUserAgent =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 const requestHeaders = {
+  // This provider uses the public anonymous API, not a saved website session.
+  // An explicit empty token overrides that cookie in the app's author jar.
+  Cookie: "token=",
   Accept: "application/json",
   "User-Agent": defaultUserAgent,
   "x-client-info": JSON.stringify({ timezone: "Asia/Colombo" }),
@@ -126,6 +129,16 @@ function hasPlayableStreams(result: any): boolean {
   return sources.some((s) => Boolean(s?.url && !s?.vipLocked));
 }
 
+class MovieBoxPlaybackLimitError extends Error {}
+
+function checkPlaybackLimit(result: any): void {
+  if (result?.data?.limited && !hasPlayableStreams(result)) {
+    throw new MovieBoxPlaybackLimitError(
+      "MovieBox is limiting playback for this session. Please try again later.",
+    );
+  }
+}
+
 async function fetchPlayData(
   apiBase: string,
   params: URLSearchParams,
@@ -151,12 +164,16 @@ async function fetchPlayData(
         timeout: 15000,
         validateStatus: () => true,
       });
+      if (res.status === 429) {
+        throw new MovieBoxPlaybackLimitError("MovieBox is temporarily rate limiting playback. Please try again later.");
+      }
       if (res.status === 406) return { noContent: true };
       if (res.status < 200 || res.status >= 300) {
         console.warn(`[movieBoxWeb] Play API HTTP ${res.status} for ${playUrl}`);
         return null;
       }
       const json = res.data;
+      checkPlaybackLimit(json);
       if (json?.code === 406 || json?.message?.includes("find no content")) {
         return { noContent: true };
       }
@@ -167,6 +184,9 @@ async function fetchPlayData(
       headers,
       signal,
     });
+    if (response.status === 429) {
+      throw new MovieBoxPlaybackLimitError("MovieBox is temporarily rate limiting playback. Please try again later.");
+    }
     if (response.status === 406) {
       return { noContent: true };
     }
@@ -175,11 +195,13 @@ async function fetchPlayData(
       return null;
     }
     const json = await response.json();
+    checkPlaybackLimit(json);
     if (json?.code === 406 || json?.message?.includes("find no content")) {
       return { noContent: true };
     }
     return json;
   } catch (err: any) {
+    if (err instanceof MovieBoxPlaybackLimitError) throw err;
     console.warn(`[movieBoxWeb] Play API fetch error for ${playUrl}:`, err?.message || err);
     return null;
   }
