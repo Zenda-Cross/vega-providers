@@ -1,5 +1,6 @@
 import { ProviderContext, Stream } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
+import { vegadriveExtractor } from "../extractors/vegadrive";
 import { throwProviderError } from "../providerErrors";
 
 const headers = {
@@ -37,6 +38,43 @@ export async function getStream({
   try {
     const streamLinks: Stream[] = [];
     console.log("dotlink", link);
+
+    let hubcloudUrl = link;
+    let vegadriveUrl = "";
+
+    if (link.startsWith("{") && link.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(link);
+        if (parsed.hubcloud) hubcloudUrl = parsed.hubcloud;
+        if (parsed.vegadrive) vegadriveUrl = parsed.vegadrive;
+      } catch (e) {
+        // Ignore json parse error
+      }
+    } else if (link.includes("vegadrive") || link.includes("one.vegadrive")) {
+      vegadriveUrl = link;
+      hubcloudUrl = "";
+    }
+
+    if (vegadriveUrl) {
+      try {
+        const vdStreams = await vegadriveExtractor(vegadriveUrl, axios, providerContext);
+        if (Array.isArray(vdStreams)) {
+          for (const s of vdStreams) {
+            if (!streamLinks.some((existing) => existing.link === s.link)) {
+              streamLinks.push(s);
+            }
+          }
+        }
+      } catch (e: any) {
+        console.log("vegadrive error:", e?.message);
+      }
+    }
+
+    if (!hubcloudUrl) {
+      if (streamLinks.length > 0) return streamLinks;
+    }
+
+    link = hubcloudUrl;
 
     if (!link.includes("cloud")) {
       try {
@@ -80,7 +118,26 @@ export async function getStream({
           }
         }
 
-        // 2. V-Cloud / HubCloud
+        // 2. V-Cloud / HubCloud & VegaDrive
+        const vegadriveAnchor = $(
+          "a:contains('Vega Drive'), a[href*='vegadrive']",
+        );
+        const pageVdLink = vegadriveAnchor.attr("href");
+        if (pageVdLink) {
+          try {
+            const vdStreams = await vegadriveExtractor(pageVdLink, axios, providerContext);
+            if (Array.isArray(vdStreams)) {
+              for (const s of vdStreams) {
+                if (!streamLinks.some((existing) => existing.link === s.link)) {
+                  streamLinks.push(s);
+                }
+              }
+            }
+          } catch (e: any) {
+            console.log("vegadrive dotlink error:", e?.message);
+          }
+        }
+
         const vcloudAnchor = $(
           "a:contains('V-Cloud'), a[href*='vcloud'], a[href*='hubcloud']",
         );

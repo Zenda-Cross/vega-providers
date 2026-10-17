@@ -43,13 +43,21 @@ export const getEpisodes = async function ({
           nextP = nextP.next();
         }
 
-        const link =
-          nextP.find("a[href*='vcloud']").attr("href") ||
-          nextP.find("a[href*='hubcloud']").attr("href") ||
-          nextP.find("a[href*='fastdl']").attr("href") ||
-          nextP.find(".btn-outline").parent().attr("href") ||
-          nextP.find(".btn-outline").attr("href") ||
-          nextP.find("a[href]").first().attr("href");
+        const vcloudLink = nextP.find("a[href*='vcloud'], a[href*='hubcloud']").attr("href");
+        const vegadriveLink = nextP.find("a[href*='vegadrive']").attr("href");
+        let link = "";
+        if (vcloudLink && vegadriveLink) {
+          link = JSON.stringify({ hubcloud: vcloudLink, vegadrive: vegadriveLink });
+        } else {
+          link =
+            vcloudLink ||
+            vegadriveLink ||
+            nextP.find("a[href*='fastdl']").attr("href") ||
+            nextP.find(".btn-outline").parent().attr("href") ||
+            nextP.find(".btn-outline").attr("href") ||
+            nextP.find("a[href]").first().attr("href") ||
+            "";
+        }
 
         if (title && link && !episodes.some((e) => e.title === title)) {
           episodes.push({ title, link });
