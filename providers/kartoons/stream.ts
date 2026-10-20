@@ -577,7 +577,7 @@ export const getStream = async function ({
       streams.push({
         server: item.title || item.server || item.name || "Kartoons",
         link: decryptedUrl,
-        type: decryptedUrl.includes(".m3u8") ? "m3u8" : "mp4",
+        type: /\.m3u8(?:[?#]|$)|\/playlist\//i.test(decryptedUrl) ? "m3u8" : "mp4",
         quality: item.quality || "auto",
         headers: {
           Referer: "https://kartoons.to/",

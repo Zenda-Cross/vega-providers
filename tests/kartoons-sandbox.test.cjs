@@ -111,3 +111,18 @@ test('does not return encrypted garbage as a playable URL', async () => {
   const c = setup({links: () => ({status: 200, data: {data: [{url: 'not-a-playable-url'}]}})});
   assert.equal((await c.run()).length, 0);
 });
+
+test('identifies extensionless worker playlists as HLS while preserving MP4 streams', async () => {
+  const urls = [
+    'https://v178.wkr178x9851.workers.dev/playlist/encrypted-token',
+    'https://cdn.example/video.m3u8?token=example',
+    'https://cdn.example/video.mp4',
+  ];
+  const c = setup({links: () => ({status: 200, data: {data: urls.map(url => ({url: encrypt(url)}))}})});
+  const streams = await c.run();
+  assert.equal(streams.length, 3);
+  streams.forEach((stream, index) => {
+    assert.equal(stream.link, urls[index]);
+    assert.equal(stream.type, index === 2 ? 'mp4' : 'm3u8');
+  });
+});
