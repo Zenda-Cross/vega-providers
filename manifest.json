@@ -506,5 +506,13 @@
     "type": "global",
     "disabled": false,
     "hasSettings": true
+  },
+  {
+    "display_name": "Kartoons",
+    "value": "kartoons",
+    "version": "1.0",
+    "icon": "https://kartoons.to/favicon.ico",
+    "type": "anime",
+    "disabled": false
   }
 ]
