@@ -64,6 +64,15 @@ export const getEpisodes = async function ({
     for (const ep of episodes) {
       const epNum = ep.episodeNumber ?? "";
       const epTitle = ep.title ? `Episode ${epNum}: ${ep.title}` : `Episode ${epNum}`;
+
+      const descParts: string[] = [];
+      if (ep.durationMinutes || ep.duration) {
+        descParts.push(`${ep.durationMinutes || ep.duration}m`);
+      }
+      if (ep.description) {
+        descParts.push(ep.description);
+      }
+
       episodeLinks.push({
         title: epTitle,
         link: JSON.stringify({
@@ -75,7 +84,7 @@ export const getEpisodes = async function ({
           title: ep.title,
         }),
         image: ep.image || "",
-        description: ep.description || "",
+        description: descParts.length > 0 ? descParts.join(" • ") : undefined,
       });
     }
 

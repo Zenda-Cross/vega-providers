@@ -72,14 +72,26 @@ export const getMeta = async function ({
       });
       const movie = res.data?.data || res.data;
 
+      const webUrl = movie.slug
+        ? `https://kartoons.to/movie/${movie.slug}`
+        : `https://kartoons.to/movie/${id}`;
+
+      // coverImage is high-res backdrop; image is portrait poster; hoverImage is transparent logo PNG
+      const backdrop = movie.coverImage || movie.image || "";
+      const poster = movie.image || movie.coverImage || "";
+      const logo = movie.hoverImage || undefined;
+
       return {
         title: movie.title || "Movie",
         synopsis: movie.description || "",
-        image: movie.image || movie.coverImage || "",
+        image: backdrop,
+        poster,
+        logo,
         imdbId: "",
         type: "movie",
-        tags: movie.tags || [],
+        tags: Array.isArray(movie.tags) ? movie.tags : [],
         rating: movie.rating ? String(movie.rating) : "",
+        webUrl,
         linkList: [
           {
             title: movie.title || "Movie",
@@ -92,6 +104,8 @@ export const getMeta = async function ({
                   title: movie.title,
                 }),
                 type: "movie",
+                image: poster,
+                description: movie.description || "",
               },
             ],
           },
@@ -104,6 +118,14 @@ export const getMeta = async function ({
       headers: commonHeaders,
     });
     const show = res.data?.data || res.data;
+
+    const webUrl = show.slug
+      ? `https://kartoons.to/show/${show.slug}`
+      : `https://kartoons.to/show/${id}`;
+
+    const backdrop = show.coverImage || show.image || "";
+    const poster = show.image || show.coverImage || "";
+    const logo = show.hoverImage || undefined;
 
     const seasons = show.seasons || [];
     const linkList: Link[] = seasons.map((season: any) => ({
@@ -119,11 +141,14 @@ export const getMeta = async function ({
     return {
       title: show.title || "Show",
       synopsis: show.description || "",
-      image: show.image || show.coverImage || "",
+      image: backdrop,
+      poster,
+      logo,
       imdbId: "",
       type: "series",
-      tags: show.tags || [],
+      tags: Array.isArray(show.tags) ? show.tags : [],
       rating: show.rating ? String(show.rating) : "",
+      webUrl,
       linkList,
     };
   } catch (error: any) {

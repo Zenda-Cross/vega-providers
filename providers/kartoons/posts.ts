@@ -4,6 +4,11 @@ import { API_BASE, commonHeaders } from "./headers";
 function formatPost(item: any): Post | null {
   if (!item || !item.title) return null;
   const isShow = item.type === "show" || item.seasons !== undefined;
+  const ratingTag = item.rating ? `★ ${item.rating}` : undefined;
+  const cornerTag =
+    item.category ||
+    (item.startYear ? String(item.startYear) : item.releaseYear ? String(item.releaseYear) : undefined);
+
   return {
     title: item.title,
     link: JSON.stringify({
@@ -12,6 +17,8 @@ function formatPost(item: any): Post | null {
       slug: item.slug,
     }),
     image: item.image || item.coverImage || "",
+    tag: ratingTag,
+    cornerTag,
   };
 }
 
