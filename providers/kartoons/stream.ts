@@ -31,6 +31,9 @@ function solvePow(nonce: string, bits: number): string {
 
 function decryptUrl(encryptedUrl: string, keyStr = "bca9e0df1a5abb32906ca3f63ac04cef"): string {
   if (!encryptedUrl || typeof encryptedUrl !== "string") return encryptedUrl;
+  if (encryptedUrl.startsWith("http://") || encryptedUrl.startsWith("https://")) {
+    return encryptedUrl;
+  }
   try {
     let clean = encryptedUrl.replace(/-/g, "+").replace(/_/g, "/");
     const rem = clean.length % 4;
@@ -87,19 +90,24 @@ export const getStream = async function ({
     const powContent = isMovie ? `movie:${contentId}` : `episode:${contentId}`;
 
     let challengeToken: string | null = null;
+    let cachedUserAgent: string | null = null;
+
     try {
       const cached = await kvStore?.get("kartoons_challenge_token");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (!parsed.expires_at || new Date(parsed.expires_at) > new Date()) {
           challengeToken = parsed.token;
+          cachedUserAgent = parsed.userAgent || null;
         }
       }
     } catch {}
 
-    const fetchLinks = async (token?: string | null) => {
+    const fetchLinks = async (token?: string | null, ua?: string | null) => {
+      const activeUa = ua || cachedUserAgent || commonHeaders["user-agent"];
       const reqHeaders: Record<string, string> = {
         ...commonHeaders,
+        "user-agent": activeUa,
       };
       if (token) {
         reqHeaders["X-Challenge-Token"] = token;
@@ -126,12 +134,19 @@ export const getStream = async function ({
       });
     };
 
+    const extractLinksArray = (data: any): any[] => {
+      if (!data) return [];
+      if (Array.isArray(data.data)) return data.data;
+      if (Array.isArray(data.data?.links)) return data.data.links;
+      if (Array.isArray(data.links)) return data.links;
+      if (Array.isArray(data)) return data;
+      return [];
+    };
+
     let linksData: any[] = [];
     try {
       const res = await fetchLinks(challengeToken);
-      if (res.data?.success && Array.isArray(res.data?.data)) {
-        linksData = res.data.data;
-      }
+      linksData = extractLinksArray(res.data);
     } catch (err: any) {
       const isChallengeRequired =
         err.response?.status === 403 || err.response?.data?.challenge_required;
@@ -145,88 +160,199 @@ export const getStream = async function ({
             timeoutMs: 60000,
             injectedJavaScript: `
               (function() {
-                function check() {
-                  var t = localStorage.getItem("challengeToken");
-                  if (t) {
-                    window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ challengeToken: t }));
+                var notified = false;
+                function sendWaf(payload) {
+                  if (notified) return;
+                  try {
+                    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                      notified = true;
+                      window.ReactNativeWebView.postMessage(JSON.stringify({
+                        __waf: true,
+                        data: typeof payload === "string" ? payload : JSON.stringify(payload),
+                        token: typeof payload === "string" ? payload : JSON.stringify(payload)
+                      }));
+                    }
+                  } catch(e) {}
+                }
+
+                // Intercept localStorage.setItem
+                try {
+                  var origSetItem = localStorage.setItem.bind(localStorage);
+                  localStorage.setItem = function(k, v) {
+                    origSetItem(k, v);
+                    if (k === "challengeToken" && v && v.length > 20) {
+                      sendWaf({ challengeToken: v });
+                    }
+                  };
+                } catch(e) {}
+
+                // Intercept fetch to catch /challenge/verify
+                try {
+                  var origFetch = window.fetch;
+                  if (origFetch) {
+                    window.fetch = async function() {
+                      var res = await origFetch.apply(this, arguments);
+                      try {
+                        var clone = res.clone();
+                        var u = clone.url || "";
+                        if (u.includes("/challenge/verify")) {
+                          clone.json().then(function(json) {
+                            if (json && json.token) {
+                              sendWaf({ challengeToken: json.token, expires_at: json.expires_at });
+                            }
+                          }).catch(function() {});
+                        }
+                      } catch(e) {}
+                      return res;
+                    };
+                  }
+                } catch(e) {}
+
+                // Render Turnstile widget if not already visible
+                function ensureTurnstileWidget() {
+                  if (document.getElementById("vega-cf-box")) return;
+                  if (!window.turnstile || typeof window.turnstile.render !== "function") {
+                    setTimeout(ensureTurnstileWidget, 500);
                     return;
                   }
-                  var inp = document.querySelector('input[name="cf-turnstile-response"]');
-                  if (inp && inp.value) {
-                    window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ turnstileToken: inp.value }));
-                    return;
-                  }
-                  if (window.turnstile) {
-                    try {
+                  try {
+                    var box = document.createElement("div");
+                    box.id = "vega-cf-box";
+                    box.style.cssText = "position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);z-index:2147483647;background:#18181b;padding:24px;border-radius:12px;border:1px solid #3f3f46;box-shadow:0 10px 40px rgba(0,0,0,0.8);text-align:center;";
+                    var txt = document.createElement("div");
+                    txt.innerText = "Please complete verification to stream";
+                    txt.style.cssText = "color:#fff;font-size:15px;font-weight:600;margin-bottom:16px;font-family:sans-serif;";
+                    box.appendChild(txt);
+                    var widget = document.createElement("div");
+                    widget.id = "vega-cf-widget";
+                    box.appendChild(widget);
+                    document.body.appendChild(box);
+
+                    window.turnstile.render("#vega-cf-widget", {
+                      sitekey: "0x4AAAAAAFMBI3Lp3ohSsfYm",
+                      callback: function(tok) {
+                        if (tok) {
+                          sendWaf({ turnstileToken: tok });
+                        }
+                      }
+                    });
+                  } catch(e) {}
+                }
+                setTimeout(ensureTurnstileWidget, 1000);
+
+                // Poll storage and Turnstile inputs
+                function poll() {
+                  if (notified) return;
+                  try {
+                    var ct = localStorage.getItem("challengeToken");
+                    if (ct && ct.length > 20) {
+                      sendWaf({ challengeToken: ct });
+                      return;
+                    }
+                    var inp = document.querySelector('input[name="cf-turnstile-response"]');
+                    if (inp && inp.value && inp.value.length > 20) {
+                      sendWaf({ turnstileToken: inp.value });
+                      return;
+                    }
+                    if (window.turnstile) {
                       var r = window.turnstile.getResponse();
-                      if (r) {
-                        window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ turnstileToken: r }));
+                      if (r && r.length > 20) {
+                        sendWaf({ turnstileToken: r });
                         return;
                       }
-                    } catch (e) {}
-                  }
-                  setTimeout(check, 500);
+                    }
+                  } catch (e) {}
+                  setTimeout(poll, 300);
                 }
-                check();
+                poll();
               })();
             `,
           },
         );
 
-        let newChallengeToken: string | null = null;
+        const activeUa = webViewRes?.userAgent || commonHeaders["user-agent"];
+        let tokenToVerify: string | null = null;
+        let challengeTokenReady: string | null = null;
+
         if (webViewRes?.data) {
           try {
-            const parsed =
-              typeof webViewRes.data === "string"
-                ? JSON.parse(webViewRes.data)
-                : webViewRes.data;
+            const raw = webViewRes.data;
+            let parsed: any = null;
+            if (typeof raw === "string" && (raw.startsWith("{") || raw.startsWith("["))) {
+              try { parsed = JSON.parse(raw); } catch {}
+            } else if (typeof raw === "object" && raw !== null) {
+              parsed = raw;
+            }
 
-            if (parsed?.challengeToken) {
-              newChallengeToken = parsed.challengeToken;
-            } else if (parsed?.turnstileToken || (typeof parsed === "string" && parsed.length > 20)) {
-              const turnstileToken = parsed.turnstileToken || parsed;
-              const verifyRes = await axios.post(
-                `${API_BASE}/challenge/verify`,
-                {
-                  turnstile_token: turnstileToken,
-                  fingerprint: commonHeaders["user-agent"],
-                },
-                {
-                  headers: {
-                    ...commonHeaders,
-                    "X-Skip-Challenge": "true",
-                  },
-                },
-              );
-
-              if (verifyRes.data?.success && verifyRes.data?.token) {
-                newChallengeToken = verifyRes.data.token;
-                await kvStore?.set(
-                  "kartoons_challenge_token",
-                  JSON.stringify({
-                    token: newChallengeToken,
-                    expires_at:
-                      verifyRes.data.expires_at ||
-                      new Date(Date.now() + 864e5).toISOString(),
-                  }),
-                );
+            if (parsed) {
+              if (parsed.challengeToken) challengeTokenReady = parsed.challengeToken;
+              else if (parsed.turnstileToken) tokenToVerify = parsed.turnstileToken;
+              else if (parsed.token) challengeTokenReady = parsed.token;
+              else if (parsed.data) {
+                const inner = typeof parsed.data === "string" && parsed.data.startsWith("{") ? JSON.parse(parsed.data) : parsed.data;
+                if (inner?.challengeToken) challengeTokenReady = inner.challengeToken;
+                else if (inner?.turnstileToken) tokenToVerify = inner.turnstileToken;
+                else if (typeof inner === "string" && inner.length > 20) tokenToVerify = inner;
+              }
+            } else if (typeof raw === "string") {
+              if (raw.length > 20 && !raw.includes("<")) {
+                tokenToVerify = raw;
+              } else {
+                const matchToken = raw.match(/"challengeToken"\s*:\s*"([^"]+)"/);
+                const matchCf = raw.match(/name="cf-turnstile-response"\s+value="([^"]+)"/);
+                if (matchToken && matchToken[1]) challengeTokenReady = matchToken[1];
+                else if (matchCf && matchCf[1]) tokenToVerify = matchCf[1];
               }
             }
           } catch {}
         }
 
-        if (newChallengeToken) {
-          const retryRes = await fetchLinks(newChallengeToken);
-          if (retryRes.data?.success && Array.isArray(retryRes.data?.data)) {
-            linksData = retryRes.data.data;
-          }
+        if (tokenToVerify && !challengeTokenReady) {
+          try {
+            const verifyRes = await axios.post(
+              `${API_BASE}/challenge/verify`,
+              {
+                turnstile_token: tokenToVerify,
+                fingerprint: activeUa,
+              },
+              {
+                headers: {
+                  ...commonHeaders,
+                  "user-agent": activeUa,
+                  "X-Skip-Challenge": "true",
+                },
+              },
+            );
+
+            if (verifyRes.data?.success && verifyRes.data?.token) {
+              challengeTokenReady = verifyRes.data.token;
+            }
+          } catch {}
+        }
+
+        if (challengeTokenReady) {
+          await kvStore?.set(
+            "kartoons_challenge_token",
+            JSON.stringify({
+              token: challengeTokenReady,
+              userAgent: activeUa,
+              expires_at: new Date(Date.now() + 864e5).toISOString(),
+            }),
+          );
+
+          try {
+            const retryRes = await fetchLinks(challengeTokenReady, activeUa);
+            linksData = extractLinksArray(retryRes.data);
+          } catch {}
         }
       }
     }
 
     const streams: Stream[] = [];
+    const activeUa = cachedUserAgent || commonHeaders["user-agent"];
+
     for (const item of linksData) {
-      const rawUrl = item.url || item.link;
+      const rawUrl = item.url || item.link || item.file || item.src;
       if (!rawUrl) continue;
       const decryptedUrl = decryptUrl(rawUrl);
       if (!decryptedUrl) continue;
@@ -234,7 +360,8 @@ export const getStream = async function ({
       const subtitles: TextTracks = [];
       if (Array.isArray(item.subtitles)) {
         for (const sub of item.subtitles) {
-          const subUrl = decryptUrl(sub.url || "");
+          const rawSubUrl = sub.url || sub.file || sub.link;
+          const subUrl = decryptUrl(rawSubUrl || "");
           if (subUrl) {
             subtitles.push({
               title: sub.label || sub.language || "Subtitle",
@@ -247,13 +374,13 @@ export const getStream = async function ({
       }
 
       streams.push({
-        server: item.title || item.server || "Kartoons",
+        server: item.title || item.server || item.name || "Kartoons",
         link: decryptedUrl,
         type: decryptedUrl.includes(".m3u8") ? "m3u8" : "mp4",
         quality: item.quality || "auto",
         headers: {
           Referer: "https://kartoons.to/",
-          "User-Agent": commonHeaders["user-agent"],
+          "User-Agent": activeUa,
         },
         subtitles: subtitles.length > 0 ? subtitles : undefined,
       });
