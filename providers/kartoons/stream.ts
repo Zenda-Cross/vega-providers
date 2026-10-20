@@ -204,32 +204,155 @@ function aesDecryptCbcPureJs(cipherBytes: Uint8Array, keyBytes: Uint8Array, ivBy
   return out.subarray(0, out.length - pad);
 }
 
+function decodeBase64Url(encoded: string): Uint8Array {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const clean = encoded.replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
+  if (!/^[A-Za-z0-9+/]+$/.test(clean) || clean.length % 4 === 1) throw new Error("Invalid Kartoons encoded URL");
+  const bytes: number[] = [];
+  let value = 0, bits = 0;
+  for (const ch of clean) {
+    value = (value << 6) | alphabet.indexOf(ch);
+    bits += 6;
+    if (bits >= 8) { bits -= 8; bytes.push((value >>> bits) & 255); }
+  }
+  return new Uint8Array(bytes);
+}
+
+function decodeUtf8(bytes: Uint8Array): string {
+  return decodeURIComponent(Array.from(bytes, b => "%" + ("0" + b.toString(16)).slice(-2)).join(""));
+}
+
 function decryptUrl(encryptedUrl: string, keyStr = "bca9e0df1a5abb32906ca3f63ac04cef"): string {
   if (!encryptedUrl || typeof encryptedUrl !== "string") return "";
   if (encryptedUrl.startsWith("http://") || encryptedUrl.startsWith("https://")) {
     return encryptedUrl;
   }
   try {
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    const clean = encryptedUrl.replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
-    if (!/^[A-Za-z0-9+/]+$/.test(clean)) return "";
-    const bytes: number[] = [];
-    let value = 0, bits = 0;
-    for (const ch of clean) {
-      value = (value << 6) | alphabet.indexOf(ch);
-      bits += 6;
-      if (bits >= 8) { bits -= 8; bytes.push((value >>> bits) & 255); }
-    }
-    const raw = new Uint8Array(bytes);
+    const raw = decodeBase64Url(encryptedUrl);
     if (raw.length < 32 || raw.length % 16 !== 0) return "";
     const key = new Uint8Array(32);
     for (let i = 0; i < 32; i++) key[i] = keyStr.charCodeAt(i) || 32;
     const decoded = aesDecryptCbcPureJs(raw.subarray(16), key, raw.subarray(0, 16));
-    const url = decodeURIComponent(Array.from(decoded, b => "%" + ("0" + b.toString(16)).slice(-2)).join(""));
+    const url = decodeUtf8(decoded);
     return /^https?:\/\//i.test(url) ? url : "";
   } catch {
     return "";
   }
+}
+
+// Kartoons' player uses SHA-256(secret) + AES-256-GCM for enc2 playlist URIs.
+// Reuse the AES key schedule above; no WebCrypto or native modules are needed.
+function aesEncryptBlock(block: Uint8Array, words: Uint32Array): Uint8Array {
+  const state = new Uint8Array(block);
+  for (let round = 0; round <= 14; round++) {
+    if (round > 0) {
+      const prev = new Uint8Array(state);
+      for (let column = 0; column < 4; column++) {
+        for (let row = 0; row < 4; row++) {
+          state[column * 4 + row] = AES_SBOX[prev[((column + row) % 4) * 4 + row]];
+        }
+      }
+      if (round < 14) {
+        for (let column = 0; column < 4; column++) {
+          const i = column * 4;
+          const [a,b,c,d] = state.subarray(i, i + 4);
+          state[i] = aesMul(a,2) ^ aesMul(b,3) ^ c ^ d;
+          state[i+1] = a ^ aesMul(b,2) ^ aesMul(c,3) ^ d;
+          state[i+2] = a ^ b ^ aesMul(c,2) ^ aesMul(d,3);
+          state[i+3] = aesMul(a,3) ^ b ^ c ^ aesMul(d,2);
+        }
+      }
+    }
+    for (let i = 0; i < 16; i++) state[i] ^= (words[round * 4 + (i >>> 2)] >>> (24 - (i % 4) * 8)) & 255;
+  }
+  return state;
+}
+
+function gcmMultiply(x: Uint8Array, h: Uint8Array): Uint8Array {
+  const result = new Uint8Array(16), v = new Uint8Array(h);
+  for (let bit = 0; bit < 128; bit++) {
+    if (x[bit >>> 3] & (128 >>> (bit % 8))) {
+      for (let i = 0; i < 16; i++) result[i] ^= v[i];
+    }
+    const low = v[15] & 1;
+    for (let i = 15; i >= 0; i--) v[i] = (v[i] >>> 1) | (i > 0 ? (v[i-1] & 1) << 7 : 0);
+    if (low) v[0] ^= 0xe1;
+  }
+  return result;
+}
+
+let playlistKey: Uint32Array | undefined;
+function decryptPlaylistUrl(encoded: string): string {
+  if (!encoded.startsWith("enc2:")) return encoded;
+  if (!playlistKey) {
+    const digest = sha256("pmS0CAMG1Ruq49WbMyhE3fh1sOuLYEL9rtFazYYljVI2j4BPSog73hW7A7xMhceHD0iwrPrVVDXLvxyWr");
+    const key = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) key[i] = digest[i >>> 2] >>> (24 - (i % 4) * 8);
+    playlistKey = aesKeyExpansion(key);
+  }
+  const raw = decodeBase64Url(encoded.slice(5));
+  if (raw.length < 29) throw new Error("Kartoons playlist URL is truncated");
+  const ciphertext = raw.subarray(12, raw.length - 16);
+  const counter = new Uint8Array(16);
+  counter.set(raw.subarray(0, 12));
+  counter[15] = 1;
+  const tagMask = aesEncryptBlock(counter, playlistKey);
+  const h = aesEncryptBlock(new Uint8Array(16), playlistKey);
+  let auth = new Uint8Array(16);
+  for (let offset = 0; offset < ciphertext.length; offset += 16) {
+    for (let i = 0; i < 16; i++) auth[i] ^= ciphertext[offset + i] || 0;
+    auth = gcmMultiply(auth, h);
+  }
+  // No additional authenticated data; the final GHASH block holds bit lengths.
+  const bitLength = ciphertext.length * 8;
+  for (let i = 0; i < 4; i++) auth[15-i] ^= (bitLength >>> (i * 8)) & 255;
+  auth = gcmMultiply(auth, h);
+  let invalid = 0;
+  for (let i = 0; i < 16; i++) invalid |= auth[i] ^ tagMask[i] ^ raw[raw.length - 16 + i];
+  if (invalid) throw new Error("Kartoons playlist URL failed authentication");
+  const plain = new Uint8Array(ciphertext.length);
+  for (let offset = 0; offset < ciphertext.length; offset += 16) {
+    for (let i = 15; i >= 12; i--) { counter[i]++; if (counter[i]) break; }
+    const block = aesEncryptBlock(counter, playlistKey);
+    for (let i = 0; i < 16 && offset + i < plain.length; i++) plain[offset+i] = ciphertext[offset+i] ^ block[i];
+  }
+  const url = decodeUtf8(plain);
+  if (!/^https?:\/\//i.test(url)) throw new Error("Kartoons playlist URL is not HTTP");
+  return url;
+}
+
+async function resolveWorkerPlaylist(
+  url: string, providerContext: ProviderContext, headers: Record<string, string>, signal?: AbortSignal,
+  depth = 0, quality = "auto", visited = new Set<string>(),
+): Promise<{link: string; quality: string}[]> {
+  if (depth > 3 || visited.has(url)) throw new Error("Kartoons playlist contains a loop or too many nested playlists");
+  const nextVisited = new Set(visited);
+  nextVisited.add(url);
+  const response = await providerContext.axios.get(url, {
+    headers, signal, responseType: "text", timeout: 20000, maxContentLength: 2097152,
+  });
+  const text = typeof response.data === "string" ? response.data.trim() : "";
+  if (response.status >= 400 || !text.startsWith("#EXTM3U")) throw new Error("Kartoons returned an invalid HLS playlist");
+  // A normal media/master playlist is directly playable; encrypted masters are not.
+  if (!text.includes("enc2:")) return [{link: url, quality}];
+  const lines = text.split(/\r?\n/).map(line => line.trim());
+  const results: {link: string; quality: string}[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith("#EXT-X-STREAM-INF:")) continue;
+    const height = lines[i].match(/RESOLUTION=\d+x(\d+)/i)?.[1];
+    let next = i + 1;
+    while (next < lines.length && (!lines[next] || lines[next].startsWith("#"))) next++;
+    if (next === lines.length) throw new Error("Kartoons playlist is missing its variant URL");
+    const variant = new URL(decryptPlaylistUrl(lines[next]), url).href;
+    results.push(...await resolveWorkerPlaylist(variant, providerContext, headers, signal, depth + 1, height ? `${height}p` : quality, nextVisited));
+    i = next;
+  }
+  if (!results.length) throw new Error("Kartoons media playlist still contains encrypted URLs");
+  // Flattening cannot preserve separate encrypted audio or subtitle playlists.
+  if (lines.some(line => line.startsWith("#EXT-X-MEDIA:") && /URI="enc2:/.test(line))) {
+    throw new Error("Kartoons playlist requires encrypted external media tracks");
+  }
+  return results;
 }
 
 export const getStream = async function ({
@@ -550,6 +673,7 @@ export const getStream = async function ({
     }
 
     const streams: Stream[] = [];
+    const resolutionErrors: string[] = [];
     const activeUa = cachedUserAgent || commonHeaders["user-agent"];
 
     for (const item of linksData) {
@@ -574,19 +698,31 @@ export const getStream = async function ({
         }
       }
 
-      streams.push({
+      const headers = {
+        Referer: "https://kartoons.to/",
+        "User-Agent": activeUa,
+      };
+      let resolved = [{link: decryptedUrl, quality: item.quality || "auto"}];
+      if (/^https?:\/\/[^/]+\.workers\.dev\/playlist\//i.test(decryptedUrl)) {
+        try {
+          resolved = await resolveWorkerPlaylist(decryptedUrl, providerContext, headers, signal);
+        } catch (error: any) {
+          if (signal?.aborted) throw error;
+          resolutionErrors.push(error.message || "Kartoons playlist resolution failed");
+          continue;
+        }
+      }
+      for (const source of resolved) streams.push({
         server: item.title || item.server || item.name || "Kartoons",
-        link: decryptedUrl,
-        type: /\.m3u8(?:[?#]|$)|\/playlist\//i.test(decryptedUrl) ? "m3u8" : "mp4",
-        quality: item.quality || "auto",
-        headers: {
-          Referer: "https://kartoons.to/",
-          "User-Agent": activeUa,
-        },
+        link: source.link,
+        type: /\.m3u8(?:[?#]|$)|\/playlist\//i.test(source.link) ? "m3u8" : "mp4",
+        quality: source.quality === "auto" ? item.quality || "auto" : source.quality,
+        headers,
         subtitles: subtitles.length > 0 ? subtitles : undefined,
       });
     }
 
+    if (!streams.length && resolutionErrors.length) throw new Error(resolutionErrors.join("; "));
     return streams;
   } catch (error) {
     throwProviderError("Kartoons", "getStream", error);

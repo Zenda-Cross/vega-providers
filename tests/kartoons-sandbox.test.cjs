@@ -10,7 +10,7 @@ const code = buildSync({
 }).outputFiles[0].text;
 function load(source = code) {
   const module = {exports: {}};
-  const sandbox = {module, exports: module.exports, Error};
+  const sandbox = {module, exports: module.exports, Error, URL};
   // No require, Buffer, WebCrypto, atob or TextDecoder.
   vm.runInNewContext(source, sandbox);
   return module.exports.getStream;
@@ -20,7 +20,7 @@ function encrypt(value) {
   const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from('bca9e0df1a5abb32906ca3f63ac04cef'), iv);
   return Buffer.concat([iv, cipher.update(value), cipher.final()]).toString('base64url');
 }
-function setup({cached, links, pow, webData, rejectRetry = false} = {}) {
+function setup({cached, links, pow, webData, playlist, rejectRetry = false} = {}) {
   const state = new Map(cached ? [['kartoons_challenge_token', cached]] : []);
   const calls = [], dialogs = [];
   const providerContext = {
@@ -33,6 +33,7 @@ function setup({cached, links, pow, webData, rejectRetry = false} = {}) {
     axios: {
       get: async (url, config) => {
         calls.push({url, config});
+        if (url.includes('.workers.dev/')) return {status: 200, data: playlist ? playlist(url) : '#EXTM3U\n#EXTINF:12,\nhttps://cdn.example/segment.ts\n#EXT-X-ENDLIST'};
         if (url.includes('/challenge/pow')) return {status: 200, data: {data: pow || {enabled: false}}};
         if (links) return links(config, calls);
         const token = config.headers['X-Challenge-Token'];
@@ -69,6 +70,51 @@ test('solves real SHA-256 PoW and decrypts stream/subtitle URLs without Node API
     assert.equal(streams[0].subtitles[0].uri, 'https://cdn.example/en.vtt');
     assert.equal(c.dialogs.length, 0);
   }
+});
+
+function encryptPlaylistUri(url) {
+  const key = crypto.createHash('sha256').update('pmS0CAMG1Ruq49WbMyhE3fh1sOuLYEL9rtFazYYljVI2j4BPSog73hW7A7xMhceHD0iwrPrVVDXLvxyWr').digest();
+  const iv = Buffer.from('0123456789ab');
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const body = Buffer.concat([cipher.update(url), cipher.final()]);
+  return 'enc2:' + Buffer.concat([iv, body, cipher.getAuthTag()]).toString('base64url');
+}
+test('resolves enc2 encrypted masters to verified 720p and 480p media playlists in the sandbox', async () => {
+  const master = 'https://v178.wkr178x9851.workers.dev/playlist/master';
+  const variants = ['https://v178.wkr178x9851.workers.dev/playlist/720', 'https://v178.wkr178x9851.workers.dev/playlist/480'];
+  const c = setup({
+    links: () => ({status: 200, data: {data: [{url: encrypt(master), title: 'Odelu 1'}]}}),
+    playlist: url => url === master
+      ? '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720\n' + encryptPlaylistUri(variants[0]) + '\n#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=852x480\n' + encryptPlaylistUri(variants[1])
+      : '#EXTM3U\n#EXTINF:12,\nhttps://cdn.example/video.ts\n#EXT-X-ENDLIST',
+  });
+  const streams = await c.run();
+  assert.equal(streams.length, 2);
+  streams.forEach((stream, index) => {
+    assert.equal(stream.link, variants[index]);
+    assert.equal(stream.type, 'm3u8');
+    assert.equal(stream.quality, index === 0 ? '720p' : '480p');
+    assert.equal(stream.server, 'Odelu 1');
+  });
+});
+
+test('rejects tampered enc2 payloads before passing a playlist to the player', async () => {
+  const uri = encryptPlaylistUri('https://v178.wkr178x9851.workers.dev/playlist/video');
+  const raw = Buffer.from(uri.slice(5), 'base64url');
+  raw[raw.length - 1] ^= 1;
+  const c = setup({
+    links: () => ({status: 200, data: {data: [{url: 'https://v178.wkr178x9851.workers.dev/playlist/master'}]}}),
+    playlist: () => '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\nenc2:' + raw.toString('base64url'),
+  });
+  await assert.rejects(c.run(), /failed authentication/);
+});
+
+test('rejects encrypted media segments instead of handing enc2 to native players', async () => {
+  const c = setup({
+    links: () => ({status: 200, data: {data: [{url: 'https://v178.wkr178x9851.workers.dev/playlist/media'}]}}),
+    playlist: () => '#EXTM3U\n#EXTINF:12,\n' + encryptPlaylistUri('https://cdn.example/segment.ts'),
+  });
+  await assert.rejects(c.run(), /still contains encrypted URLs/);
 });
 test('replaces rejected cached tokens and preserves the new UA for playback', async () => {
   const c = setup({cached: JSON.stringify({token: 'stale-token', userAgent: 'old UA'})});
