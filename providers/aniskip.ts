@@ -230,6 +230,7 @@ export async function fetchAnimeSkipTimings({
   title,
   malId,
   episode,
+  season,
   providerContext,
   signal,
   timeout,
@@ -238,6 +239,7 @@ export async function fetchAnimeSkipTimings({
   title?: string;
   malId?: string;
   episode?: number;
+  season?: number;
   providerContext: ProviderContext;
   signal?: AbortSignal;
   timeout?: number;
@@ -248,7 +250,8 @@ export async function fetchAnimeSkipTimings({
   if (!resolvedMalId && kitsuId) {
     resolvedMalId = (await resolveMalIdFromKitsu(kitsuId, providerContext)) || undefined;
   }
-  if (!resolvedMalId && title) {
+  // A series title alone usually resolves to the first MAL season.
+  if (!resolvedMalId && !kitsuId && title && (!season || season <= 1)) {
     resolvedMalId = (await resolveMalIdFromTitle(title, providerContext)) || undefined;
   }
 
@@ -272,6 +275,7 @@ export async function enrichAnimeEpisodesWithSkipTimings<T extends EpisodeLink>(
   episodes: T[],
   options: {
     kitsuId?: string;
+    malId?: string;
     title?: string;
     imdbId?: string;
     season?: number;
@@ -281,19 +285,25 @@ export async function enrichAnimeEpisodesWithSkipTimings<T extends EpisodeLink>(
 ): Promise<T[]> {
   const { kitsuId, title, imdbId, season, providerContext, signal } = options;
 
-  let malId: string | null = null;
-  if (kitsuId) {
+  let malId: string | null = options.malId || null;
+  if (!malId && kitsuId) {
     malId = await resolveMalIdFromKitsu(kitsuId, providerContext);
   }
-  if (!malId && title) {
+  if (!malId && !kitsuId && title && (!season || season <= 1)) {
     malId = await resolveMalIdFromTitle(title, providerContext);
   }
 
   const promises = episodes.map(async (ep) => {
     let epNum: number | undefined;
+    let animeEpNum: number | undefined;
+    let epSeason = season;
+    let epMalId = malId;
     try {
       const parsed = JSON.parse(ep.link);
       epNum = Number(parsed.episode);
+      animeEpNum = Number(parsed.animeEpisode || parsed.kitsuId?.match(/^kitsu:\d+:(\d+)$/)?.[1] || parsed.episode);
+      epSeason = Number(parsed.season) || season;
+      epMalId = parsed.malId || malId;
     } catch {
       epNum = season ? getEpisodeNumber(ep.title, season) : undefined;
     }
@@ -303,14 +313,14 @@ export async function enrichAnimeEpisodesWithSkipTimings<T extends EpisodeLink>(
     }
 
     let skipTimings: SkipInterval[] = [];
-    if (malId) {
-      skipTimings = await fetchAniSkipTimings(malId, epNum, providerContext, signal);
+    if (epMalId) {
+      skipTimings = await fetchAniSkipTimings(epMalId, animeEpNum || epNum, providerContext, signal);
     }
 
-    if ((!skipTimings || skipTimings.length === 0) && imdbId && season) {
+    if ((!skipTimings || skipTimings.length === 0) && imdbId && epSeason) {
       skipTimings = await fetchTheIntroDbSkipTimings({
         imdbId,
-        season,
+        season: epSeason,
         episode: epNum,
         providerContext,
         signal,

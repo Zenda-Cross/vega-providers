@@ -442,7 +442,7 @@
   {
     "display_name": "AnimeSub+",
     "value": "animesub",
-    "version": "1.5",
+    "version": "1.7",
     "icon": "https://animesub.duckdns.org/assets/logo.png",
     "type": "anime",
     "disabled": false,

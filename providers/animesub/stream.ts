@@ -148,6 +148,62 @@ function extractSizeBytes(text: string, s?: any): { label: string; bytes: number
   return { label: "", bytes: 0 };
 }
 
+function fileSizeBytes(s: any): number {
+  const value = s?.behaviorHints?.fileSize ?? s?.fileSize;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function torrentHash(s: any): string {
+  return String(s.infoHash || s.url?.match(/urn:btih:([a-f0-9]{40})/i)?.[1] || "").toLowerCase();
+}
+
+function filename(s: any): string {
+  return String(s.behaviorHints?.filename || "").split(/[\\/]/).pop()?.trim().toLowerCase() || "";
+}
+
+async function getEpisodeFileSizes(
+  streams: any[], imdbId: string, season: string, episode: string,
+  providerContext: ProviderContext,
+): Promise<Map<any, {label: string; bytes: number}>> {
+  const sizes = new Map<any, {label: string; bytes: number}>();
+  for (const stream of streams) {
+    const bytes = fileSizeBytes(stream);
+    if (bytes) sizes.set(stream, {label: formatBytes(bytes), bytes});
+  }
+  if (!/^tt\d+$/.test(imdbId) || !/^\d+$/.test(season) || !/^\d+$/.test(episode)) return sizes;
+  if (!streams.some(s => torrentHash(s) && !sizes.has(s))) return sizes;
+  try {
+    // AnimeSub's videoSize and description can contain the whole pack size.
+    // Torrentio reports per-file sizes. Use only the same hash AND file identity.
+    const response = await providerContext.axios.get(
+      `https://torrentio.strem.fun/stream/series/${imdbId}:${season}:${episode}.json`,
+      {headers: providerContext.commonHeaders, timeout: 5000},
+    );
+    const candidates: any[] = Array.isArray(response.data?.streams) ? response.data.streams : [];
+    for (const stream of streams) {
+      if (sizes.has(stream)) continue;
+      const hash = torrentHash(stream);
+      if (!hash) continue;
+      const matches = candidates.filter(candidate => {
+        if (torrentHash(candidate) !== hash) return false;
+        const index = stream.fileIdx, candidateIndex = candidate.fileIdx;
+        if (Number.isInteger(index) && index >= 0 && Number.isInteger(candidateIndex) && candidateIndex >= 0) {
+          return index === candidateIndex;
+        }
+        const name = filename(stream);
+        return /\.(mkv|mp4|avi|webm|m4v|ts)$/i.test(name) && name === filename(candidate);
+      });
+      if (!matches.length) continue;
+      const selected = matches[0];
+      const size = extractSizeBytes(`${selected.description || ""} ${selected.title || ""}`, selected);
+      if (size.bytes > 0) sizes.set(stream, size);
+    }
+  } catch {
+    // Optional enrichment must not hide playable streams or report a pack as a file.
+  }
+  return sizes;
+}
+
 function parseCustomManifest(manifestUrl: string): { baseUrl: string; token: string } | null {
   const clean = manifestUrl.trim().replace(/^stremio:\/\//i, "https://");
   const match = clean.match(/^(https?:\/\/[^\/]+)\/(u_[a-zA-Z0-9_-]+)/);
@@ -394,6 +450,7 @@ function extractUploader(s: any): string {
 function parseStreamItem(
   s: any,
   streamSkip?: SkipInterval[],
+  episodeSize?: {label: string; bytes: number},
 ): { stream: Stream; seederCount: number; sizeBytes: number } | null {
   const combinedText = `${s.name || ""} ${s.description || ""} ${s.title || ""}`;
   const quality = extractQuality(combinedText);
@@ -410,7 +467,7 @@ function parseStreamItem(
   if (!link) return null;
 
   const { label: seedersLabel, count: seederCount } = extractSeeders(combinedText, s);
-  const { label: sizeLabel, bytes: sizeBytes } = extractSizeBytes(combinedText, s);
+  const { label: sizeLabel, bytes: sizeBytes } = episodeSize ?? extractSizeBytes(combinedText, s);
   const formatTags = extractFormatTags(combinedText);
   const language = getLanguageCodes(combinedText);
 
@@ -541,6 +598,8 @@ export const getStream = async ({
     const title: string = payload.title ?? "";
     const season: string = payload.season ?? "";
     const episode: string = payload.episode ?? "";
+    const animeEpisode: string = payload.animeEpisode ??
+      kitsuId.match(/^kitsu:\d+:(\d+)$/)?.[1] ?? episode;
     const effectiveType: string = payload.type ?? type ?? "series";
 
     if (!kitsuId && malId) {
@@ -566,7 +625,8 @@ export const getStream = async ({
           kitsuId,
           malId: malId || undefined,
           title,
-          episode: epNum,
+          episode: Number(animeEpisode),
+          season: Number(season),
           providerContext,
         });
 
@@ -597,8 +657,8 @@ export const getStream = async ({
 
     if (kitsuId) {
       let targetKitsu = kitsuId;
-      if (effectiveType === "series" && !kitsuId.includes(":") && episode) {
-        targetKitsu = `${kitsuId}:${episode}`;
+      if (effectiveType === "series" && /^(?:kitsu:)?\d+$/.test(kitsuId) && animeEpisode) {
+        targetKitsu = `${kitsuId}:${animeEpisode}`;
       }
       const streamType = effectiveType === "movie" ? "movie" : "anime";
       const kitsuUrl = `${baseUrl}/${token}/stream/${streamType}/${targetKitsu}.json`;
@@ -642,9 +702,12 @@ export const getStream = async ({
       );
     }
 
+    const episodeSizes = effectiveType === "series"
+      ? await getEpisodeFileSizes(rawStreams, imdbId, season, episode, providerContext)
+      : undefined;
     const parsedItems: { stream: Stream; seederCount: number; sizeBytes: number }[] = [];
     for (const s of rawStreams) {
-      const parsed = parseStreamItem(s, streamSkip);
+      const parsed = parseStreamItem(s, streamSkip, episodeSizes ? episodeSizes.get(s) || {label: "", bytes: 0} : undefined);
       if (parsed && isQualityAllowed(parsed.stream.quality, qualityFilter)) {
         parsedItems.push(parsed);
       }

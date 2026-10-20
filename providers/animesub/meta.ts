@@ -90,14 +90,9 @@ async function getCinemetaInfo(
         season,
       );
       if (skipTimings ?? true) {
-        directLinks = await enrichAnimeEpisodesWithSkipTimings(
+        directLinks = await enrichEpisodesWithSkipTimings(
           directLinks,
-          {
-            title: meta.name,
-            imdbId,
-            season,
-            providerContext,
-          },
+          imdbId, season, providerContext,
         );
       }
       linkList.push({
@@ -135,6 +130,7 @@ async function getCinemetaInfo(
 async function getKitsuInfo(
   kitsuId: string,
   providerContext: ProviderContext,
+  malId?: string,
 ): Promise<Info> {
   const url = `https://anime-kitsu.strem.fun/meta/anime/${kitsuId}.json`;
   const res = await providerContext.axios.get(url, {
@@ -178,8 +174,9 @@ async function getKitsuInfo(
     const seasons = new Map<number, EpisodeLink[]>();
     const now = Date.now();
     for (const video of meta.videos || []) {
-      const season = video.season || 1;
-      const episode = video.episode ?? video.number ?? 1;
+      const animeEpisode = video.episode ?? video.number ?? 1;
+      const season = Number(video.imdbSeason) > 0 ? Number(video.imdbSeason) : video.season || 1;
+      const episode = Number(video.imdbEpisode) > 0 ? Number(video.imdbEpisode) : animeEpisode;
 
       const releaseStr = video.released;
       if (releaseStr) {
@@ -199,7 +196,9 @@ async function getKitsuInfo(
         title: epTitle,
         link: JSON.stringify({
           title: meta.name,
-          kitsuId: video.id || `${meta.id}:${episode}`,
+          kitsuId: video.id || `${meta.id}:${animeEpisode}`,
+          malId,
+          animeEpisode: String(animeEpisode),
           imdbId,
           season: String(season),
           episode: String(episode),
@@ -231,6 +230,7 @@ async function getKitsuInfo(
           directLinks,
           {
             kitsuId,
+            malId,
             title: meta.name,
             imdbId: seasonImdb,
             season,
@@ -277,21 +277,7 @@ async function getMalInfo(
   }
 
   if (kitsuId) {
-    const kitsuMeta = await getKitsuInfo(`kitsu:${kitsuId}`, providerContext);
-    if (kitsuMeta.linkList) {
-      for (const group of kitsuMeta.linkList) {
-        if (group.directLinks) {
-          for (const ep of group.directLinks) {
-            try {
-              const p = JSON.parse(ep.link);
-              p.malId = malId;
-              ep.link = JSON.stringify(p);
-            } catch {}
-          }
-        }
-      }
-    }
-    return kitsuMeta;
+    return await getKitsuInfo(`kitsu:${kitsuId}`, providerContext, malId);
   }
 
   if (title) {
