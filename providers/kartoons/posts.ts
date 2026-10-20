@@ -36,9 +36,31 @@ export const getPosts = async function ({
 }): Promise<Post[]> {
   try {
     const { axios } = providerContext;
-    const cleanFilter = filter || "/shows?page=";
-    const delimiter = cleanFilter.includes("?") ? "&" : "?";
-    const url = `${API_BASE}${cleanFilter}${page}${delimiter}limit=20`;
+    const cleanFilter = filter || "/shows";
+
+    // Handle non-paginated featured endpoints
+    if (cleanFilter.includes("/featured")) {
+      if (page > 1) return [];
+      const res = await axios.get(`${API_BASE}${cleanFilter}`, {
+        headers: commonHeaders,
+        signal,
+      });
+      const items = res.data?.data || [];
+      const posts: Post[] = [];
+      for (const item of items) {
+        const post = formatPost(item);
+        if (post) posts.push(post);
+      }
+      return posts;
+    }
+
+    let url: string;
+    if (cleanFilter.includes("page=")) {
+      url = `${API_BASE}${cleanFilter}${page}&limit=20`;
+    } else {
+      const sep = cleanFilter.includes("?") ? "&" : "?";
+      url = `${API_BASE}${cleanFilter}${sep}page=${page}&limit=20`;
+    }
 
     const res = await axios.get(url, {
       headers: commonHeaders,
