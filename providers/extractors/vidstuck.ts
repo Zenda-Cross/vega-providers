@@ -1,6 +1,6 @@
 import { ProviderContext, Stream, TextTracks } from "../types";
 
-const BASE_URL = "https://vidstuck.xyz";
+const BASE_URL = "https://vidstuck.cc";
 const AES_KEY =
   "7f4c9e2a81d63b05c4f7a9e8126d3b50e1a8c7f23d9465ab0c6e9f1d4a7b832c";
 
@@ -11,10 +11,11 @@ interface VidstuckServerConfig {
 }
 
 const VIDSTUCK_SERVERS: VidstuckServerConfig[] = [
-  { id: "andromeda", displayName: "Vidstuck - Andromeda (1080p)", quality: "1080" },
   { id: "orion", displayName: "Vidstuck - Orion (Multi-Audio)", quality: "1080" },
-  { id: "centaurus", displayName: "Vidstuck - Centaurus (Multi-Audio)", quality: "1080" },
+  { id: "andromeda", displayName: "Vidstuck - Andromeda (1080p)", quality: "1080" },
   { id: "atlas", displayName: "Vidstuck - Atlas", quality: "1080" },
+  { id: "daedalus", displayName: "Vidstuck - Daedalus", quality: "1080" },
+  { id: "ursa", displayName: "Vidstuck - Ursa", quality: "1080" },
 ];
 
 /* ================================================================== */
@@ -728,25 +729,47 @@ export async function extractVidstuckStreams({
   };
 
   const API_KEYS = {
-    tmdbId: "a7f39c821d604e5b9c1f36e1547b",
-    mediaType: "c28f91ab306d28147a35632e816b",
-    server: "6b491e725ad84d392e7561a9384c",
-    season: "d8427b59c30684a2f957c3613e85b",
-    episode: "91c6e4a728503d1f785c92346b713d",
-    ts: "61d9a5274c8e3b29fd6384c291e6",
-    token: "c492f7a183d602b1e7436c538a716d",
-    title: "5e28c9147a306d1e829f3674b392a1",
-    year: "b731e6c94f0869d725f8341c306e",
-    date: "e1649320216a39e5814b3027",
-    imdbId: "f35a8c19674b3265e871c4933a725f",
+    tmdbId: "a7f39c821d604e5b9c1e547b",
+    mediaType: "c281b306d28147a35632e816b",
+    server: "6b491e7258d392e7561a9384c",
+    season: "d8427b59c38a2f957c3613e85b",
+    episode: "91c6e4a753d1f785c92346b713d",
+    ts: "61d9a5274c8e3b29f38c291e6",
+    token: "c492f7a183d601e436c538a716d",
+    title: "5e28c9147a306d1e29f3674b392a1",
+    year: "b731e6c94f08675f8341c306e",
+    date: "e1649321a39e5814b3027",
+    imdbId: "f35a8c1943265e871c4933a725f",
   };
+
+  const effectiveDate = date || (year ? `${year}-01-01` : "2020-01-01");
 
   // 1. Fetch subtitles in background
   const subPromise = (async (): Promise<TextTracks> => {
     try {
+      const subTokenRes = await axios.post(
+        `${BASE_URL}/backend/vidstuck`,
+        {
+          [API_KEYS.tmdbId]: Number(tmdbId),
+          [API_KEYS.mediaType]: mediaType,
+          [API_KEYS.server]: "subtitle",
+          ...(!isMovie && {
+            [API_KEYS.season]: Number(season || 1),
+            [API_KEYS.episode]: Number(episode || 1),
+          }),
+        },
+        { headers, timeout: 4000, signal }
+      );
+      const subToken = subTokenRes.data || {};
+      if (!subToken.token || !subToken.ts) return [];
+
       const subParams = new URLSearchParams({
         [API_KEYS.tmdbId]: String(tmdbId),
         [API_KEYS.mediaType]: mediaType,
+        [API_KEYS.server]: "subtitle",
+        [API_KEYS.ts]: String(subToken.ts),
+        [API_KEYS.token]: subToken.token,
+        [API_KEYS.date]: effectiveDate,
       });
       if (title) subParams.set(API_KEYS.title, title);
       if (year) subParams.set(API_KEYS.year, year);
@@ -776,7 +799,6 @@ export async function extractVidstuckStreams({
   })();
 
   const streams: Stream[] = [];
-  const effectiveDate = date || (year ? `${year}-01-01` : "2020-01-01");
 
   // 2. Query Vidstuck servers in parallel
   const tasks = VIDSTUCK_SERVERS.map(async (srv) => {
@@ -792,7 +814,7 @@ export async function extractVidstuckStreams({
       }
 
       const tokenRes = await axios.post(
-        `${BASE_URL}/backend/fuckoffniggawtaf`,
+        `${BASE_URL}/backend/vidstuck`,
         postPayload,
         { headers, timeout: 4500, signal }
       );
@@ -837,7 +859,12 @@ export async function extractVidstuckStreams({
           : `${BASE_URL}${decrypted}`;
 
         const isDash = item.type === "dash" || finalUrl.includes("database/andromeda");
-        const isM3u8 = item.type === "hls" || finalUrl.includes(".m3u8") || finalUrl.includes("atlas");
+        const isM3u8 =
+          item.type === "hls" ||
+          finalUrl.includes(".m3u8") ||
+          finalUrl.includes("atlas") ||
+          finalUrl.includes("ursa") ||
+          finalUrl.includes("daedalus");
 
         const hasMultiAudio = Array.isArray(srvRes.data?.dubs) && srvRes.data.dubs.length > 1;
         const serverName = hasMultiAudio && !srv.displayName.includes("Multi-Audio")
