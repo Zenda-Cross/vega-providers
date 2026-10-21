@@ -22,6 +22,7 @@ function encrypt(value) {
 }
 function setup({cached, links, pow, webData, playlist, rejectRetry = false} = {}) {
   const state = new Map(cached ? [['kartoons_challenge_token', cached]] : []);
+  state.set('kartoons_auth_session', {accessToken:'account-token',userAgent:'WebView UA'});
   const calls = [], dialogs = [];
   const providerContext = {
     commonHeaders: {Accept: '*/*'},
@@ -32,6 +33,7 @@ function setup({cached, links, pow, webData, playlist, rejectRetry = false} = {}
     },
     axios: {
       get: async (url, config) => {
+        if (url.endsWith('/auth/me')) return {status:200,data:{data:{id:'user-1'}}};
         calls.push({url, config});
         if (url.includes('.workers.dev/')) return {status: 200, data: playlist ? playlist(url) : '#EXTM3U\n#EXTINF:12,\nhttps://cdn.example/segment.ts\n#EXT-X-ENDLIST'};
         if (url.includes('/challenge/pow')) return {status: 200, data: {data: pow || {enabled: false}}};
@@ -149,7 +151,10 @@ test('uses a valid cached token without opening verification', async () => {
 });
 test('reports network failures without opening a challenge dialog', async () => {
   const c = setup();
-  c.providerContext.axios.get = async () => {throw new Error('Network unavailable');};
+  c.providerContext.axios.get = async (url) => {
+    if (url.endsWith('/auth/me')) return {status:200,data:{data:{id:'user-1'}}};
+    throw new Error('Network unavailable');
+  };
   await assert.rejects(c.run(), /Network unavailable/);
   assert.equal(c.dialogs.length, 0);
 });

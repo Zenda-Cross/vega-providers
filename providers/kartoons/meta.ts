@@ -1,5 +1,5 @@
 import { Info, Link, ProviderContext } from "../types";
-import { API_BASE, commonHeaders } from "./headers";
+import { API_BASE, commonHeaders, withKartoonsAuth } from "./headers";
 
 interface ParsedLink {
   type: "show" | "movie";
@@ -63,7 +63,7 @@ export const getMeta = async function ({
   providerContext: ProviderContext;
 }): Promise<Info> {
   try {
-    const { axios } = providerContext;
+    const { axios } = await withKartoonsAuth(providerContext);
     const { type, id } = await resolveLink(link, axios);
 
     if (type === "movie") {

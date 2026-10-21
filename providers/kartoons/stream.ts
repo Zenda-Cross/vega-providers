@@ -1,6 +1,6 @@
 import { ProviderContext, Stream, TextTracks } from "../types";
 import { throwProviderError } from "../providerErrors";
-import { API_BASE, commonHeaders } from "./headers";
+import { API_BASE, commonHeaders, withKartoonsAuth } from "./headers";
 
 // Pure JavaScript: the app sandbox has neither Node crypto nor Buffer.
 const SHA256_K = [
@@ -367,6 +367,7 @@ export const getStream = async function ({
   providerContext: ProviderContext;
 }): Promise<Stream[]> {
   try {
+    providerContext = await withKartoonsAuth(providerContext, signal);
     const { axios, kvStore } = providerContext;
     let contentId = link;
     let isMovie = type === "movie";

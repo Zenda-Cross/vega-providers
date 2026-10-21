@@ -1,5 +1,6 @@
 import { EpisodeLink, ProviderContext } from "../types";
-import { API_BASE, commonHeaders } from "./headers";
+import { API_BASE, commonHeaders, withKartoonsAuth } from "./headers";
+import { throwProviderError } from "../providerErrors";
 
 export const getEpisodes = async function ({
   url,
@@ -10,7 +11,7 @@ export const getEpisodes = async function ({
   providerContext: ProviderContext;
 }): Promise<EpisodeLink[]> {
   try {
-    const { axios } = providerContext;
+    const { axios } = await withKartoonsAuth(providerContext);
     let showId = "";
     let seasonId = "";
 
@@ -90,6 +91,6 @@ export const getEpisodes = async function ({
 
     return episodeLinks;
   } catch (error) {
-    return [];
+    throwProviderError("Kartoons", "getEpisodes", error);
   }
 };

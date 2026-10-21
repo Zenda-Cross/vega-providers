@@ -1,5 +1,6 @@
 import { Post, ProviderContext } from "../types";
-import { API_BASE, commonHeaders } from "./headers";
+import { API_BASE, commonHeaders, withKartoonsAuth } from "./headers";
+import { throwProviderError } from "../providerErrors";
 
 function formatPost(item: any): Post | null {
   if (!item || !item.title) return null;
@@ -35,7 +36,7 @@ export const getPosts = async function ({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const { axios } = providerContext;
+    const { axios } = await withKartoonsAuth(providerContext, signal);
     const cleanFilter = filter || "/shows";
 
     // Handle non-paginated featured endpoints
@@ -77,7 +78,7 @@ export const getPosts = async function ({
 
     return posts;
   } catch (error) {
-    return [];
+    throwProviderError("Kartoons", "getPosts", error);
   }
 };
 
@@ -94,7 +95,7 @@ export const getSearchPosts = async function ({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const { axios } = providerContext;
+    const { axios } = await withKartoonsAuth(providerContext, signal);
     const q = encodeURIComponent(searchQuery);
 
     const [showsRes, moviesRes] = await Promise.all([
@@ -102,14 +103,12 @@ export const getSearchPosts = async function ({
         .get(`${API_BASE}/shows?search=${q}&page=${page}&limit=20`, {
           headers: commonHeaders,
           signal,
-        })
-        .catch(() => ({ data: { data: [] } })),
+        }),
       axios
         .get(`${API_BASE}/movies?search=${q}&page=${page}&limit=20`, {
           headers: commonHeaders,
           signal,
-        })
-        .catch(() => ({ data: { data: [] } })),
+        }),
     ]);
 
     const shows = showsRes.data?.data || [];
@@ -124,6 +123,6 @@ export const getSearchPosts = async function ({
 
     return posts;
   } catch (error) {
-    return [];
+    throwProviderError("Kartoons", "getSearchPosts", error);
   }
 };
