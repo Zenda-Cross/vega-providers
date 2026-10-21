@@ -41,24 +41,6 @@ function sha256(value: string): Uint32Array {
   }
   return h;
 }
-function solvePow(nonce: string, bits: number, signal?: AbortSignal): string {
-  if (!Number.isInteger(bits) || bits < 0 || bits > 256) throw new Error("Kartoons returned an invalid proof difficulty");
-  const deadline = Date.now() + 20000;
-  for (let counter = 0; ; counter++) {
-    if (counter % 1024 === 0) {
-      if (signal?.aborted) throw new Error("Kartoons request aborted");
-      if (Date.now() > deadline) throw new Error("Kartoons proof-of-work timed out");
-    }
-    const hash = sha256(nonce + ":" + counter);
-    let zeroBits = 0;
-    for (const word of hash) {
-      zeroBits += Math.clz32(word);
-      if (word !== 0) break;
-    }
-    if (zeroBits >= bits) return String(counter);
-  }
-}
-
 const AES_SBOX = [
   0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
   0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -368,7 +350,7 @@ export const getStream = async function ({
 }): Promise<Stream[]> {
   try {
     providerContext = await withKartoonsAuth(providerContext, signal);
-    const { axios, kvStore } = providerContext;
+    const { axios } = providerContext;
     let contentId = link;
     let isMovie = type === "movie";
 
@@ -382,300 +364,16 @@ export const getStream = async function ({
     }
 
     const endpoint = isMovie
-      ? `/movies/${contentId}/links`
-      : `/shows/episode/${contentId}/links`;
-    const powContent = isMovie ? `movie:${contentId}` : `episode:${contentId}`;
-
-    let challengeToken: string | null = null;
-    let cachedUserAgent: string | null = null;
-
-    try {
-      const cached = await kvStore?.get<any>("kartoons_challenge_token");
-      if (cached) {
-        const parsed = typeof cached === "string" ? JSON.parse(cached) : cached;
-        if (!parsed.expires_at || new Date(parsed.expires_at) > new Date()) {
-          challengeToken = typeof parsed.token === "string" ? parsed.token : null;
-          cachedUserAgent = parsed.userAgent || null;
-        }
-      }
-    } catch {}
-
-    const fetchLinks = async (token?: string | null, ua?: string | null) => {
-      const activeUa = ua || cachedUserAgent || commonHeaders["user-agent"];
-      const reqHeaders: Record<string, string> = {
-        ...providerContext.commonHeaders,
-        ...commonHeaders,
-        "user-agent": activeUa,
-      };
-      delete reqHeaders["User-Agent"];
-      if (token) {
-        reqHeaders["X-Challenge-Token"] = token;
-      }
-
-      // Check and solve PoW challenge
-      try {
-        const powRes = await axios.get(
-          `${API_BASE}/challenge/pow?content=${encodeURIComponent(powContent)}`,
-          { headers: reqHeaders, signal },
-        );
-        const powData = powRes.data?.data;
-        if (powData?.enabled && powData.nonce && powData.bits !== undefined) {
-          const solution = solvePow(powData.nonce, Number(powData.bits), signal);
-          reqHeaders["X-Pow-Nonce"] = powData.nonce;
-          reqHeaders["X-Pow-Solution"] = solution;
-          reqHeaders["X-Challenge-Retry"] = "true";
-        }
-      } catch (error: any) {
-        // Older mirrors may not expose PoW. Do not hide proof or auth failures.
-        if (error.response?.status !== 404) throw error;
-      }
-
-      const response = await axios.get(`${API_BASE}${endpoint}`, {
-        headers: reqHeaders,
-        signal,
-        validateStatus: () => true,
-      });
-      if (response.status >= 400 || response.data?.challenge_required || response.data?.data?.challenge_required) {
-        const error: any = new Error(`Kartoons links request failed (HTTP ${response.status})`);
-        error.response = response;
-        throw error;
-      }
-      return response;
-    };
-
-    const extractLinksArray = (data: any): any[] => {
-      if (!data) return [];
-      if (Array.isArray(data.data)) return data.data;
-      if (Array.isArray(data.data?.links)) return data.data.links;
-      if (Array.isArray(data.links)) return data.links;
-      if (Array.isArray(data)) return data;
-      return [];
-    };
-
-    let linksData: any[] = [];
-    try {
-      const res = await fetchLinks(challengeToken);
-      linksData = extractLinksArray(res.data);
-    } catch (err: any) {
-      const isChallengeRequired =
-        err.response?.status === 403 || err.response?.status === 401 ||
-        err.response?.data?.challenge_required || err.response?.data?.data?.challenge_required;
-
-      if (isChallengeRequired && providerContext.openWebView) {
-        await kvStore?.delete("kartoons_challenge_token");
-        challengeToken = null;
-        cachedUserAgent = null;
-        const webViewRes = await providerContext.openWebView(
-          "https://kartoons.to/home",
-          {
-            title: "Kartoons Verification",
-            force: true,
-            description: "Please complete verification in the browser to unlock streams",
-            timeoutMs: 60000,
-            injectedJavaScript: `
-              (function() {
-                if (window.__vegaKartoonsVerification) return;
-                window.__vegaKartoonsVerification = true;
-                // A token rejected by the API must not immediately close this dialog.
-                try { localStorage.removeItem("challengeToken"); } catch(e) {}
-                var notified = false;
-                function sendWaf(payload) {
-                  if (notified) return;
-                  try {
-                    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                      notified = true;
-                      window.ReactNativeWebView.postMessage(JSON.stringify({
-                        __waf: true,
-                        data: typeof payload === "string" ? payload : JSON.stringify(payload),
-                        token: typeof payload === "string" ? payload : JSON.stringify(payload)
-                      }));
-                    }
-                  } catch(e) {}
-                }
-
-                // Intercept localStorage.setItem
-                try {
-                  var origSetItem = localStorage.setItem.bind(localStorage);
-                  localStorage.setItem = function(k, v) {
-                    origSetItem(k, v);
-                    if (k === "challengeToken" && v && v.length > 20) {
-                      sendWaf({ challengeToken: v });
-                    }
-                  };
-                } catch(e) {}
-
-                // Intercept fetch to catch /challenge/verify
-                try {
-                  var origFetch = window.fetch;
-                  if (origFetch) {
-                    window.fetch = async function() {
-                      var res = await origFetch.apply(this, arguments);
-                      try {
-                        var clone = res.clone();
-                        var u = clone.url || "";
-                        if (u.includes("/challenge/verify")) {
-                          clone.json().then(function(json) {
-                            if (json && json.token) {
-                              sendWaf({ challengeToken: json.token, expires_at: json.expires_at });
-                            }
-                          }).catch(function() {});
-                        }
-                      } catch(e) {}
-                      return res;
-                    };
-                  }
-                } catch(e) {}
-
-                // Render Turnstile widget if not already visible
-                function ensureTurnstileWidget() {
-                  if (document.getElementById("vega-cf-box")) return;
-                  if (!window.turnstile || typeof window.turnstile.render !== "function") {
-                    setTimeout(ensureTurnstileWidget, 500);
-                    return;
-                  }
-                  try {
-                    var box = document.createElement("div");
-                    box.id = "vega-cf-box";
-                    box.style.cssText = "position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);z-index:2147483647;background:#18181b;padding:24px;border-radius:12px;border:1px solid #3f3f46;box-shadow:0 10px 40px rgba(0,0,0,0.8);text-align:center;";
-                    var txt = document.createElement("div");
-                    txt.innerText = "Please complete verification to stream";
-                    txt.style.cssText = "color:#fff;font-size:15px;font-weight:600;margin-bottom:16px;font-family:sans-serif;";
-                    box.appendChild(txt);
-                    var widget = document.createElement("div");
-                    widget.id = "vega-cf-widget";
-                    box.appendChild(widget);
-                    document.body.appendChild(box);
-
-                    window.turnstile.render("#vega-cf-widget", {
-                      sitekey: "0x4AAAAAAFMBI3Lp3ohSsfYm",
-                      callback: function(tok) {
-                        if (tok) {
-                          sendWaf({ turnstileToken: tok });
-                        }
-                      }
-                    });
-                  } catch(e) {}
-                }
-                setTimeout(ensureTurnstileWidget, 1000);
-
-                // Poll storage and Turnstile inputs
-                function poll() {
-                  if (notified) return;
-                  try {
-                    var ct = localStorage.getItem("challengeToken");
-                    if (ct && ct.length > 20) {
-                      sendWaf({ challengeToken: ct });
-                      return;
-                    }
-                    var inp = document.querySelector('input[name="cf-turnstile-response"]');
-                    if (inp && inp.value && inp.value.length > 20) {
-                      sendWaf({ turnstileToken: inp.value });
-                      return;
-                    }
-                    if (window.turnstile) {
-                      var r = window.turnstile.getResponse();
-                      if (r && r.length > 20) {
-                        sendWaf({ turnstileToken: r });
-                        return;
-                      }
-                    }
-                  } catch (e) {}
-                  setTimeout(poll, 300);
-                }
-                poll();
-              })();
-            `,
-          },
-        );
-
-        const activeUa = webViewRes?.userAgent || commonHeaders["user-agent"];
-        let tokenToVerify: string | null = null;
-        let challengeTokenReady: string | null = null;
-        let tokenExpiry: string | undefined;
-
-        if (webViewRes?.data) {
-          try {
-            const raw = webViewRes.data;
-            let parsed: any = null;
-            if (typeof raw === "string" && (raw.startsWith("{") || raw.startsWith("["))) {
-              try { parsed = JSON.parse(raw); } catch {}
-            } else if (typeof raw === "object" && raw !== null) {
-              parsed = raw;
-            }
-
-            if (parsed) {
-              tokenExpiry = parsed.expires_at;
-              if (parsed.challengeToken) challengeTokenReady = parsed.challengeToken;
-              else if (parsed.turnstileToken) tokenToVerify = parsed.turnstileToken;
-              else if (parsed.data) {
-                const inner = typeof parsed.data === "string" && parsed.data.startsWith("{") ? JSON.parse(parsed.data) : parsed.data;
-                if (inner?.challengeToken) challengeTokenReady = inner.challengeToken;
-                else if (inner?.turnstileToken) tokenToVerify = inner.turnstileToken;
-                else if (inner?.token) challengeTokenReady = inner.token;
-                else if (typeof inner === "string" && inner.length > 20) tokenToVerify = inner;
-                tokenExpiry = inner?.expires_at || tokenExpiry;
-              } else if (parsed.token) challengeTokenReady = parsed.token;
-            } else if (typeof raw === "string") {
-              if (raw.length > 20 && !raw.includes("<")) {
-                tokenToVerify = raw;
-              } else {
-                const matchToken = raw.match(/"challengeToken"\s*:\s*"([^"]+)"/);
-                const matchCf = raw.match(/name="cf-turnstile-response"\s+value="([^"]+)"/);
-                if (matchToken && matchToken[1]) challengeTokenReady = matchToken[1];
-                else if (matchCf && matchCf[1]) tokenToVerify = matchCf[1];
-              }
-            }
-          } catch {}
-        }
-
-        if (tokenToVerify && !challengeTokenReady) {
-          const verifyRes = await axios.post(
-            `${API_BASE}/challenge/verify`,
-            {
-              turnstile_token: tokenToVerify,
-              fingerprint: activeUa,
-            },
-            {
-              headers: {
-                ...providerContext.commonHeaders,
-                ...commonHeaders,
-                "user-agent": activeUa,
-                "X-Skip-Challenge": "true",
-              },
-              signal,
-            },
-          );
-
-          if (verifyRes.data?.success && verifyRes.data?.token) {
-            challengeTokenReady = verifyRes.data.token;
-            tokenExpiry = verifyRes.data.expires_at;
-          }
-        }
-
-        if (challengeTokenReady) {
-          // Cache only after the API accepts this token and the matching UA.
-          const retryRes = await fetchLinks(challengeTokenReady, activeUa);
-          linksData = extractLinksArray(retryRes.data);
-          cachedUserAgent = activeUa;
-          await kvStore?.set(
-            "kartoons_challenge_token",
-            JSON.stringify({
-              token: challengeTokenReady,
-              userAgent: activeUa,
-              expires_at: tokenExpiry || new Date(Date.now() + 864e5).toISOString(),
-            }),
-          );
-        } else {
-          throw new Error("Kartoons verification did not return a usable challenge token");
-        }
-      } else {
-        throw err;
-      }
-    }
+      ? `/movie/${contentId}/links`
+      : `/episode/${contentId}/links`;
+    const res = await axios.get(API_BASE + endpoint, {headers:commonHeaders,signal});
+    const data = res.data;
+    const linksData: any[] = Array.isArray(data?.data?.links) ? data.data.links
+      : Array.isArray(data?.data) ? data.data : Array.isArray(data?.links) ? data.links : [];
 
     const streams: Stream[] = [];
     const resolutionErrors: string[] = [];
-    const activeUa = cachedUserAgent || commonHeaders["user-agent"];
+    const activeUa = providerContext.commonHeaders["user-agent"] || commonHeaders["user-agent"];
 
     for (const item of linksData) {
       const rawUrl = item.url || item.link || item.file || item.src;
@@ -684,14 +382,15 @@ export const getStream = async function ({
       if (!decryptedUrl) continue;
 
       const subtitles: TextTracks = [];
-      if (Array.isArray(item.subtitles)) {
-        for (const sub of item.subtitles) {
+      const subtitleItems = item.subtitles || data?.data?.subtitles || data?.subtitles;
+      if (Array.isArray(subtitleItems)) {
+        for (const sub of subtitleItems) {
           const rawSubUrl = sub.url || sub.file || sub.link;
           const subUrl = decryptUrl(rawSubUrl || "");
           if (subUrl) {
             subtitles.push({
-              title: sub.label || sub.language || "Subtitle",
-              language: sub.language || "en",
+              title: sub.label || sub.lang || sub.language || "Subtitle",
+              language: sub.lang || sub.language || "en",
               type: subUrl.endsWith(".vtt") ? "text/vtt" : "application/x-subrip",
               uri: subUrl,
             });

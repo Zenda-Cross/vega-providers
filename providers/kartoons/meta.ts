@@ -39,16 +39,16 @@ async function resolveLink(
 
   // Otherwise search by slug / keywords
   const searchTerm = slugOrId.split("-")[0] || slugOrId;
-  const searchUrl = `${API_BASE}/${type === "movie" ? "movies" : "shows"}?search=${encodeURIComponent(searchTerm)}`;
+  const searchUrl = `${API_BASE}/search?q=${encodeURIComponent(searchTerm)}`;
   const searchRes = await axios.get(searchUrl, { headers: commonHeaders });
   const items = searchRes.data?.data || [];
 
   const matched =
-    items.find((it: any) => it.slug === slugOrId || it._id === slugOrId) ||
-    items[0];
+    items.find((it: any) => it.slug === slugOrId || (it._id || it.id) === slugOrId) ||
+    items.find((it: any) => it.type === type);
 
-  if (matched?._id) {
-    return { type, id: matched._id, slug: matched.slug };
+  if (matched?._id || matched?.id) {
+    return { type, id: matched._id || matched.id, slug: matched.slug };
   }
 
   return { type, id: slugOrId, slug: slugOrId };
@@ -67,7 +67,7 @@ export const getMeta = async function ({
     const { type, id } = await resolveLink(link, axios);
 
     if (type === "movie") {
-      const res = await axios.get(`${API_BASE}/movies/${id}`, {
+      const res = await axios.get(`${API_BASE}/movie/${id}`, {
         headers: commonHeaders,
       });
       const movie = res.data?.data || res.data;
@@ -114,7 +114,7 @@ export const getMeta = async function ({
     }
 
     // Series / Show
-    const res = await axios.get(`${API_BASE}/shows/${id}`, {
+    const res = await axios.get(`${API_BASE}/show/${id}`, {
       headers: commonHeaders,
     });
     const show = res.data?.data || res.data;

@@ -14,12 +14,14 @@ export const getEpisodes = async function ({
     const { axios } = await withKartoonsAuth(providerContext);
     let showId = "";
     let seasonId = "";
+    let seasonSlug = "";
 
     if (url.startsWith("{")) {
       try {
         const parsed = JSON.parse(url);
         showId = parsed.showId;
         seasonId = parsed.seasonId;
+        seasonSlug = parsed.slug || (parsed.seasonNumber ? `season-${parsed.seasonNumber}` : "");
       } catch {}
     }
 
@@ -27,19 +29,19 @@ export const getEpisodes = async function ({
       // If full URL was provided e.g. https://kartoons.to/show/slug?season=season-1
       const urlObj = new URL(url.startsWith("http") ? url : `https://kartoons.to/${url}`);
       const slug = urlObj.pathname.split("/").filter(Boolean).pop() || "";
-      const seasonSlug = urlObj.searchParams.get("season") || "";
+      seasonSlug = urlObj.searchParams.get("season") || "";
 
       const searchRes = await axios.get(
-        `${API_BASE}/shows?search=${encodeURIComponent(slug.split("-")[0] || slug)}`,
+        `${API_BASE}/search?q=${encodeURIComponent(slug.split("-")[0] || slug)}`,
         { headers: commonHeaders },
       );
       const showItem =
-        (searchRes.data?.data || []).find((s: any) => s.slug === slug || s._id === slug) ||
+        (searchRes.data?.data || []).find((s: any) => s.slug === slug || (s._id || s.id) === slug) ||
         searchRes.data?.data?.[0];
 
-      if (showItem?._id) {
-        showId = showItem._id;
-        const showDetail = await axios.get(`${API_BASE}/shows/${showId}`, {
+      if (showItem?._id || showItem?.id) {
+        showId = showItem._id || showItem.id;
+        const showDetail = await axios.get(`${API_BASE}/show/${showId}`, {
           headers: commonHeaders,
         });
         const seasons = showDetail.data?.data?.seasons || showDetail.data?.seasons || [];
@@ -47,6 +49,7 @@ export const getEpisodes = async function ({
           seasons.find((s: any) => s.slug === seasonSlug || `season-${s.seasonNumber}` === seasonSlug) ||
           seasons[0];
         seasonId = matchedSeason?._id || "";
+        seasonSlug = matchedSeason?.slug || `season-${matchedSeason?.seasonNumber || 1}`;
       }
     }
 
@@ -54,8 +57,14 @@ export const getEpisodes = async function ({
       return [];
     }
 
+    if (!seasonSlug) {
+      const detail = await axios.get(`${API_BASE}/show/${showId}`, {headers:commonHeaders});
+      const season = (detail.data?.data?.seasons || []).find((s:any) => (s._id || s.id) === seasonId);
+      if (!season) throw new Error("Kartoons season not found. Reopen the show to refresh its seasons.");
+      seasonSlug = season.slug || `season-${season.seasonNumber}`;
+    }
     const res = await axios.get(
-      `${API_BASE}/shows/${showId}/season/${seasonId}/all-episodes`,
+      `${API_BASE}/show/${showId}/season/${encodeURIComponent(seasonSlug)}/episodes`,
       { headers: commonHeaders },
     );
 

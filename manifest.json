@@ -510,7 +510,7 @@
   {
     "display_name": "Kartoons",
     "value": "kartoons",
-    "version": "1.5",
+    "version": "1.7",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/kartoons.png",
     "type": "anime",
     "disabled": false
