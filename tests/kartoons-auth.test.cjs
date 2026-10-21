@@ -14,12 +14,18 @@ function setup(options={}){
 }
 test('links using the official device-code flow and persists the returned device token',async()=>{
  const c=setup();c.state.set('kartoons_auth_session',{accessToken:'old-website-token'});
- await load('posts').getPosts({filter:'/catalog/show',page:1,providerContext:c.ctx});
+ const catalogs=await load('catalog').catalog({providerContext:c.ctx});
+ assert.equal(catalogs.length,4);
  assert.equal(c.calls[0].url,base+'/device/code');
- assert.equal(c.dialogs[0].url,'https://kartoons.to/cloudstream/link?code=ABC123');
+ const loginUrl=new URL(c.dialogs[0].url);
+ assert.equal(loginUrl.pathname,'/login');
+ assert.equal(loginUrl.searchParams.get('redirect'),'/cloudstream/link?code=ABC123');
  assert.match(c.dialogs[0].config.description,/ABC123/);
  assert.equal(c.state.get(key).token,'device-token');
  assert.equal(c.state.has('kartoons_auth_session'),false);
+ await load('posts').getPosts({filter:'/catalog/show',page:1,providerContext:c.ctx});
+ assert.equal(c.dialogs.length,1);
+ assert.equal(c.state.get(key).token,'device-token');
  assert.equal(new URL(c.calls[1].url).searchParams.get('token'),'device-token');
  assert.equal(c.calls[1].config.headers.Authorization,undefined);
  assert.ok(!c.calls.some(c=>c.url.includes('/auth/me')||c.url.includes('/auth/refresh')));
@@ -35,18 +41,21 @@ test('reuses linked device tokens without making profile requests or opening dia
 });
 test('old website tokens do not masquerade as official device tokens',async()=>{
  const c=setup();c.state.set('kartoons_auth_session',{accessToken:'website-jwt',refreshToken:'refresh'});
- await load('headers').withKartoonsAuth(c.ctx);
+ await load('catalog').catalog({providerContext:c.ctx});
  assert.equal(c.dialogs.length,1);assert.equal(c.state.get(key).token,'device-token');
 });
-test('all entry points stop after cancelled device approval',async()=>{
+test('catalog is the sole entry point that opens the device-link dialog',async()=>{
+ const c=setup({cancel:true});
+ await assert.rejects(load('catalog').catalog({providerContext:c.ctx}),/WAF_DIALOG_CANCELLED/);
+ assert.equal(c.calls.length,1);assert.equal(c.calls[0].url,base+'/device/code');assert.equal(c.state.has(key),false);
  for(const [name,fn,args] of [['posts','getPosts',{filter:'/catalog/show',page:1}],['posts','getSearchPosts',{searchQuery:'test',page:1}],['meta','getMeta',{link:'{}'}],['episodes','getEpisodes',{url:'{}'}],['stream','getStream',{link:'{}',type:'movie'}]]){
-  const c=setup({cancel:true});await assert.rejects(load(name)[fn]({...args,providerContext:c.ctx}),/WAF_DIALOG_CANCELLED/);
-  assert.equal(c.calls.length,1);assert.equal(c.calls[0].url,base+'/device/code');assert.equal(c.state.has(key),false);
+  const noLink=setup();await assert.rejects(load(name)[fn]({...args,providerContext:noLink.ctx}),/Open the Kartoons catalog/);
+  assert.equal(noLink.dialogs.length,0);
  }
 });
 test('rejects account tokens, unrelated device codes and incomplete approval',async()=>{
  for(const payload of [{kartoonsAuth:true,accessToken:'jwt'},{kartoonsDevice:true,code:'OTHER1',token:'wrong'},{}]){
-  const c=setup({payload:JSON.stringify(payload)});await assert.rejects(load('headers').withKartoonsAuth(c.ctx),/not linked/);assert.equal(c.state.has(key),false);
+  const c=setup({payload:JSON.stringify(payload)});await assert.rejects(load('catalog').catalog({providerContext:c.ctx}),/not linked/);assert.equal(c.state.has(key),false);
  }
 });
 test('network and server failures preserve a linked device without reopening login',async()=>{
@@ -55,18 +64,18 @@ test('network and server failures preserve a linked device without reopening log
   await assert.rejects(ctx.axios.get(base+'/catalog/show'),/kept/);assert.equal(c.dialogs.length,0);assert.equal(c.state.get(key).token,'saved-device');
  }
 });
-test('explicit auth_required triggers a new link and one retry',async()=>{
- const c=setup({saved:{token:'expired-device',userAgent:'UA'},reply:url=>({status:200,data:new URL(url).searchParams.get('token')==='expired-device'?{auth_required:true}:{data:[]}})});
- const ctx=await load('headers').withKartoonsAuth(c.ctx);await ctx.axios.get(base+'/catalog/show');
- assert.equal(c.dialogs.length,1);assert.equal(c.calls.filter(c=>c.url.includes('/catalog/show')).length,2);assert.equal(c.state.get(key).token,'device-token');
+test('auth_required clears a rejected device link and requires catalog relinking',async()=>{
+ const c=setup({saved:{token:'expired-device',userAgent:'UA'},reply:()=>({status:200,data:{auth_required:true}})});
+ const ctx=await load('headers').withKartoonsAuth(c.ctx);await assert.rejects(ctx.axios.get(base+'/catalog/show'),/Open the Kartoons catalog/);
+ assert.equal(c.dialogs.length,0);assert.equal(c.calls.filter(c=>c.url.includes('/catalog/show')).length,1);assert.equal(c.state.has(key),false);
 });
-test('a second authentication rejection clears the bad device token without looping',async()=>{
+test('an authentication rejection clears the bad device token without opening another dialog',async()=>{
  const c=setup({saved:{token:'expired-device',userAgent:'UA'},reply:()=>({status:401,data:{auth_required:true}})});
- const ctx=await load('headers').withKartoonsAuth(c.ctx);await assert.rejects(ctx.axios.get(base+'/catalog/show'),/rejected the device link/);assert.equal(c.dialogs.length,1);assert.equal(c.state.has(key),false);
+ const ctx=await load('headers').withKartoonsAuth(c.ctx);await assert.rejects(ctx.axios.get(base+'/catalog/show'),/Open the Kartoons catalog/);assert.equal(c.dialogs.length,0);assert.equal(c.state.has(key),false);
 });
 test('coalesced dialogs can share a linked device after server confirmation',async()=>{
  const c=setup({payload:JSON.stringify({kartoonsDevice:true,code:'SHARED',token:'shared-device'}),reply:()=>({status:200,data:{status:'linked',token:'shared-device'}})});
- await load('headers').withKartoonsAuth(c.ctx);
+ await load('catalog').catalog({providerContext:c.ctx});
  assert.equal(c.state.get(key).token,'shared-device');
  assert.ok(c.calls.some(c=>c.url.endsWith('/device/status?code=SHARED')));
 });
@@ -96,4 +105,36 @@ test('seasons use the official slug-based episode route rather than a MongoDB se
  const eps=await load('episodes').getEpisodes({url:JSON.stringify({showId:'show-id',seasonId:'mongo-id',slug:'season-2',seasonNumber:2}),providerContext:c.ctx});
  assert.equal(new URL(c.calls[0].url).pathname,'/api/cloudstream/show/show-id/season/season-2/episodes');
  assert.equal(JSON.parse(eps[0].link).id,'ep-1');
+});
+test('settings expose a credential reset without clearing an existing link just by opening settings',async()=>{
+ const c=setup({saved:{token:'saved-device',userAgent:'UA'}});
+ const fields=await load('settings').getSettingsSchema({providerContext:c.ctx});
+ assert.equal(fields[0].key,'kartoons_clear_credentials');
+ assert.equal(fields[0].type,'toggle');
+ assert.equal(fields[0].defaultValue,false);
+ assert.equal(c.state.get(key).token,'saved-device');
+ assert.equal(c.calls.length,0);assert.equal(c.dialogs.length,0);
+});
+test('saved reset clears device and legacy credentials once while preserving other preferences',async()=>{
+ const c=setup({saved:{token:'saved-device',userAgent:'UA'}});
+ c.state.set('kartoons_clear_credentials',true);
+ c.state.set('kartoons_auth_session',{accessToken:'old-account-token'});
+ c.state.set('kartoons_challenge_token','old-challenge');
+ c.state.set('unrelatedPreference','keep');
+ await load('catalog').catalog({providerContext:c.ctx});
+ assert.equal(c.state.get(key).token,'device-token');
+ assert.equal(c.state.has('kartoons_auth_session'),false);
+ assert.equal(c.state.has('kartoons_challenge_token'),false);
+ assert.equal(c.state.get('kartoons_clear_credentials'),false);
+ assert.equal(c.state.get('unrelatedPreference'),'keep');
+ await load('catalog').catalog({providerContext:c.ctx});
+ assert.equal(c.dialogs.length,1);
+});
+test('reset is also applied when settings are reopened, without automatically starting a new login',async()=>{
+ const c=setup({saved:{token:'saved-device',userAgent:'UA'}});
+ c.state.set('kartoons_clear_credentials',true);
+ await load('settings').getSettingsSchema({providerContext:c.ctx});
+ assert.equal(c.state.has(key),false);
+ assert.equal(c.state.get('kartoons_clear_credentials'),false);
+ assert.equal(c.dialogs.length,0);
 });

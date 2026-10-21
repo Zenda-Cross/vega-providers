@@ -14,6 +14,15 @@ const SESSION_KEY = "kartoons_device_session";
 interface DeviceSession { token: string; userAgent: string }
 const pendingSessions = new WeakMap<ProviderContext, Promise<DeviceSession>>();
 
+export async function applyCredentialReset(context: ProviderContext): Promise<void> {
+  if (await context.kvStore?.get("kartoons_clear_credentials") !== true) return;
+  for (const key of [SESSION_KEY, "kartoons_auth_session", "kartoons_challenge_token"]) {
+    await context.kvStore.delete(key);
+  }
+  await context.kvStore.set("kartoons_clear_credentials", false);
+  pendingSessions.delete(context);
+}
+
 // Matches the official Cloudstream plugin: generate a code, link the device on
 // the website, and persist the device-status token. Account JWTs stay in the site.
 export function deviceLoginScript(code: string, intervalMs: number): string {
@@ -46,6 +55,7 @@ export function deviceLoginScript(code: string, intervalMs: number): string {
 }
 
 async function getSession(context: ProviderContext, signal?: AbortSignal, force = false): Promise<DeviceSession> {
+  await applyCredentialReset(context);
   const pending = pendingSessions.get(context);
   if (pending) return pending;
   const request = (async () => {
@@ -72,7 +82,8 @@ async function getSession(context: ProviderContext, signal?: AbortSignal, force 
     const expiresMs = Math.max(1000, Math.min(600000, (Number(data.expires_in) || 600) * 1000));
     const expiresAt = Date.now() + expiresMs;
     const intervalMs = Math.max(5000, Math.min(30000, (Number(data.poll_interval) || 5) * 1000));
-    const result = await context.openWebView(`${SITE_BASE}/cloudstream/link?code=${encodeURIComponent(code)}`, {
+    const redirect = `/cloudstream/link?code=${encodeURIComponent(code)}`;
+    const result = await context.openWebView(`${SITE_BASE}/login?redirect=${encodeURIComponent(redirect)}`, {
       title:"Link your Kartoons account",
       description:`Sign in and approve code ${code} to link Vega to your Kartoons account.`,
       force:true, timeoutMs:Math.min(300000,expiresMs), injectedJavaScript:deviceLoginScript(code,intervalMs),
@@ -115,8 +126,19 @@ async function getSession(context: ProviderContext, signal?: AbortSignal, force 
   finally { if (pendingSessions.get(context) === request) pendingSessions.delete(context); }
 }
 
+/** Start or reuse the device link from catalog initialization only. */
+export async function initializeKartoons(context: ProviderContext, signal?: AbortSignal): Promise<void> {
+  await getSession(context,signal);
+}
+
 export async function withKartoonsAuth(context: ProviderContext, signal?: AbortSignal): Promise<ProviderContext> {
-  let session = await getSession(context,signal);
+  await applyCredentialReset(context);
+  let saved: any = await context.kvStore?.get(SESSION_KEY);
+  try { if (typeof saved === "string") saved = JSON.parse(saved); } catch { saved = null; }
+  if (typeof saved?.token !== "string" || !saved.token.trim()) {
+    throw new Error("Open the Kartoons catalog to link your account before using this provider.");
+  }
+  let session: DeviceSession = {token:saved.token.trim(),userAgent:saved.userAgent || commonHeaders["user-agent"]};
   const request = async (method:"get"|"post", url:string, data:any, config:any = {}) => {
     if (!url.startsWith(API_BASE + "/")) {
       return method === "get" ? context.axios.get(url,config) : context.axios.post(url,data,config);
@@ -139,12 +161,7 @@ export async function withKartoonsAuth(context: ProviderContext, signal?: AbortS
     let response = await send();
     if (rejected(response)) {
       await context.kvStore?.delete(SESSION_KEY);
-      session = await getSession(context,config.signal || signal,true);
-      response = await send();
-      if (rejected(response)) {
-        await context.kvStore?.delete(SESSION_KEY);
-        throw new Error("Kartoons rejected the device link. Please link your account again.");
-      }
+      throw new Error("Kartoons rejected the device link. Open the Kartoons catalog to link your account again.");
     }
     if (response.status >= 400) throw new Error(`Kartoons request failed (HTTP ${response.status}). Your linked account has been kept.`);
     return response;
