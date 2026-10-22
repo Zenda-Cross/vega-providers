@@ -515,5 +515,14 @@
     "type": "anime",
     "disabled": false,
     "hasSettings": true
+  },
+  {
+    "display_name": "RareAnimes",
+    "value": "rareanimes",
+    "version": "1.0",
+    "icon": "",
+    "type": "anime",
+    "disabled": false,
+    "hasSettings": false
   }
 ]
