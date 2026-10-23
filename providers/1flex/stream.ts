@@ -105,7 +105,7 @@ export const getStream = async function ({
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   };
 
-  // 1. Fetch metadata if title/year/imdbId are missing
+  // 1. Fetch metadata in background (only needed for third-party scrapers)
   let title = parsed.title || "";
   let year = parsed.year || "";
   let imdbId = parsed.imdbId || "";
@@ -117,7 +117,7 @@ export const getStream = async function ({
         const metaUrl = `${DB_BASE}/${isMovie ? "movie" : "tv"}/${tmdbId}`;
         const res = await axios.get(metaUrl, {
           signal,
-          timeout: 3000,
+          timeout: 2000,
           headers: {
             ...providerContext.commonHeaders,
             Referer: "https://www.1flex.org/",
@@ -127,27 +127,21 @@ export const getStream = async function ({
         const d = res.data;
         if (d) {
           if (!title) title = d.title || d.name || "";
-          if (!year) {
-            year = (d.release_date || d.first_air_date || "").slice(0, 4);
-          }
+          if (!year) year = (d.release_date || d.first_air_date || "").slice(0, 4);
           if (!imdbId && d.imdb_id) imdbId = d.imdb_id;
-          if (!releaseDate) {
-            releaseDate = d.release_date || d.first_air_date || "";
-          }
+          if (!releaseDate) releaseDate = d.release_date || d.first_air_date || "";
         }
-      } catch {
-        // ignore metadata lookup failure
-      }
+      } catch {}
     }
   })();
 
-  // 2. Vidzee Subtitles task (strict 3s timeout)
+  // 2. Subtitles in parallel
   const subsEndpoint = isMovie
     ? `${CORE_BASE}/subs/movie/${tmdbId}`
     : `${CORE_BASE}/subs/tv/${tmdbId}/${season}/${episode}`;
 
   const subsPromise = axios
-    .get(subsEndpoint, { signal, timeout: 3500, headers })
+    .get(subsEndpoint, { signal, timeout: 2000, headers })
     .then((res: any) => {
       if (Array.isArray(res.data)) {
         return res.data.map((sub: any) => ({
@@ -161,7 +155,27 @@ export const getStream = async function ({
     })
     .catch(() => [] as TextTracks);
 
-  // 3. Vidzee Servers to query in parallel
+  // 3. Native Viduki streams (Fastest, direct player backend)
+  const vidukiPromise = extractVidukiStreams({
+    tmdbId,
+    season: Number(season),
+    episode: Number(episode),
+    isMovie,
+    axios,
+    signal,
+  })
+    .then((vStreams) =>
+      vStreams.map((v) => ({
+        server: v.server,
+        link: v.url,
+        type: v.type,
+        quality: v.quality,
+        headers: v.headers,
+      }))
+    )
+    .catch(() => [] as Stream[]);
+
+  // 4. Native Vidzee streams (FastCloud)
   const vidzeeServers = [
     { id: "dcloud", name: "1Flex - FastCloud (1080p)" },
     { id: "tik", name: "1Flex - TikCloud (Backup)" },
@@ -175,7 +189,7 @@ export const getStream = async function ({
 
       const res = await axios.get(streamEndpoint, {
         signal,
-        timeout: 4000,
+        timeout: 2500,
         headers,
       });
 
@@ -183,9 +197,7 @@ export const getStream = async function ({
       const encrypted = res.data?.c;
       if (!streamUrl && encrypted) {
         const decrypted = await decryptStreamPayload(encrypted);
-        if (decrypted?.url) {
-          streamUrl = decrypted.url;
-        }
+        if (decrypted?.url) streamUrl = decrypted.url;
       }
 
       if (streamUrl) {
@@ -202,90 +214,80 @@ export const getStream = async function ({
           },
         };
       }
-    } catch {
-      // server failed
-    }
+    } catch {}
     return null;
   };
 
-  // 4. Primary Viduki Extractor (Direct 1Flex Player backend)
-  const vidukiPromise = extractVidukiStreams({
-    tmdbId,
-    season: Number(season),
-    episode: Number(episode),
-    isMovie,
-    axios,
-    signal,
-  }).then((vStreams) =>
-    vStreams.map((v) => ({
-      server: v.server,
-      link: v.url,
-      type: v.type,
-      quality: v.quality,
-      headers: v.headers,
-    }))
-  ).catch(() => [] as Stream[]);
+  const vidzeePromise = Promise.all(
+    vidzeeServers.map((s) => fetchVidzeeServerStream(s))
+  ).then((res) => res.filter((s): s is NonNullable<typeof s> => s !== null));
 
-  // 5. Multi-source fallback extraction (Cinejoy, Movy, Vidstuck)
-  await metaPromise.catch(() => {});
-
-  const cinejoyPromise = extractCinejoyStreams({
-    tmdbId,
-    season: Number(season),
-    episode: Number(episode),
-    type: effectiveType,
-    providerContext,
-    signal,
-  }).catch(() => [] as Stream[]);
-
-  const movyPromise = extractMovyStreams({
-    tmdbId,
-    imdbId,
-    title,
-    year,
-    season: Number(season),
-    episode: Number(episode),
-    type: effectiveType,
-    providerContext,
-    signal,
-  }).catch(() => [] as Stream[]);
-
-  const vidstuckPromise = extractVidstuckStreams({
-    tmdbId,
-    imdbId,
-    title,
-    year,
-    date: releaseDate,
-    season: Number(season),
-    episode: Number(episode),
-    type: effectiveType,
-    providerContext,
-    signal,
-  }).catch(() => [] as Stream[]);
-
-  const [subtitles, vidukiStreams, vidzeeStreams, cjStreams, movyStreams, vsStreams] =
-    await Promise.all([
-      subsPromise,
-      vidukiPromise,
-      Promise.all(vidzeeServers.map((s) => fetchVidzeeServerStream(s))),
-      cinejoyPromise,
-      movyPromise,
-      vidstuckPromise,
+  // 5. Fallback scrapers (Cinejoy, Movy, Vidstuck)
+  const fallbackScrapersPromise = (async () => {
+    await metaPromise.catch(() => {});
+    const [cj, mv, vs] = await Promise.all([
+      extractCinejoyStreams({
+        tmdbId,
+        season: Number(season),
+        episode: Number(episode),
+        type: effectiveType,
+        providerContext,
+        signal,
+      }).catch(() => [] as Stream[]),
+      extractMovyStreams({
+        tmdbId,
+        imdbId,
+        title,
+        year,
+        season: Number(season),
+        episode: Number(episode),
+        type: effectiveType,
+        providerContext,
+        signal,
+      }).catch(() => [] as Stream[]),
+      extractVidstuckStreams({
+        tmdbId,
+        imdbId,
+        title,
+        year,
+        date: releaseDate,
+        season: Number(season),
+        episode: Number(episode),
+        type: effectiveType,
+        providerContext,
+        signal,
+      }).catch(() => [] as Stream[]),
     ]);
+    return [...(cj || []), ...(mv || []), ...(vs || [])];
+  })();
 
-  const validVidzee = vidzeeStreams.filter(
-    (s): s is NonNullable<typeof s> => s !== null
-  );
+  // Fast-Path: Await native high-speed streams (Viduki + Vidzee)
+  const [subtitles, vidukiStreams, vidzeeStreams] = await Promise.all([
+    subsPromise,
+    vidukiPromise,
+    vidzeePromise,
+  ]);
 
-  const streams: Stream[] = [
+  const nativeStreams: Stream[] = [
     ...(vidukiStreams || []),
-    ...validVidzee,
-    ...(cjStreams || []),
-    ...(movyStreams || []),
-    ...(vsStreams || []),
+    ...(vidzeeStreams || []),
   ];
 
-  return streams.map((s) => ({
+  // If native streams are found, race a brief 1000ms window for fallback scrapers.
+  // If native streams are not found, wait fully for fallback scrapers.
+  let extraStreams: Stream[] = [];
+  if (nativeStreams.length > 0) {
+    const briefGracePeriod = new Promise<Stream[]>((resolve) =>
+      setTimeout(() => resolve([]), 1000)
+    );
+    extraStreams = await Promise.race([fallbackScrapersPromise, briefGracePeriod]);
+  } else {
+    extraStreams = await fallbackScrapersPromise;
+  }
+
+  const allStreams = [...nativeStreams, ...(extraStreams || [])];
+
+  return allStreams.map((s) => ({
     ...s,
     subtitles:
       s.subtitles && s.subtitles.length > 0
