@@ -1,5 +1,5 @@
 import { Stream, ProviderContext, TextTracks } from "../types";
-import { decryptStreamPayload } from "./crypto";
+import { decryptStreamPayload, extractVidukiStreams } from "./crypto";
 import { extractCinejoyStreams } from "../extractors/cinejoy";
 import { extractMovyStreams } from "../extractors/movy";
 import { extractVidstuckStreams } from "../extractors/vidstuck";
@@ -105,7 +105,7 @@ export const getStream = async function ({
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   };
 
-  // 1. Fetch metadata if title/year/imdbId are missing (needed for Movy/Vidstuck extractors)
+  // 1. Fetch metadata if title/year/imdbId are missing
   let title = parsed.title || "";
   let year = parsed.year || "";
   let imdbId = parsed.imdbId || "";
@@ -161,7 +161,7 @@ export const getStream = async function ({
     })
     .catch(() => [] as TextTracks);
 
-  // 3. Vidzee Servers to query in parallel (strict 4s timeout)
+  // 3. Vidzee Servers to query in parallel
   const vidzeeServers = [
     { id: "dcloud", name: "1Flex - FastCloud (1080p)" },
     { id: "tik", name: "1Flex - TikCloud (Backup)" },
@@ -208,8 +208,25 @@ export const getStream = async function ({
     return null;
   };
 
-  // 4. Parallel Multi-source extraction (Cinejoy, Movy, Vidstuck)
-  // Ensure metadata lookup finishes first or in parallel
+  // 4. Primary Viduki Extractor (Direct 1Flex Player backend)
+  const vidukiPromise = extractVidukiStreams({
+    tmdbId,
+    season: Number(season),
+    episode: Number(episode),
+    isMovie,
+    axios,
+    signal,
+  }).then((vStreams) =>
+    vStreams.map((v) => ({
+      server: v.server,
+      link: v.url,
+      type: v.type,
+      quality: v.quality,
+      headers: v.headers,
+    }))
+  ).catch(() => [] as Stream[]);
+
+  // 5. Multi-source fallback extraction (Cinejoy, Movy, Vidstuck)
   await metaPromise.catch(() => {});
 
   const cinejoyPromise = extractCinejoyStreams({
@@ -246,9 +263,10 @@ export const getStream = async function ({
     signal,
   }).catch(() => [] as Stream[]);
 
-  const [subtitles, vidzeeStreams, cjStreams, movyStreams, vsStreams] =
+  const [subtitles, vidukiStreams, vidzeeStreams, cjStreams, movyStreams, vsStreams] =
     await Promise.all([
       subsPromise,
+      vidukiPromise,
       Promise.all(vidzeeServers.map((s) => fetchVidzeeServerStream(s))),
       cinejoyPromise,
       movyPromise,
@@ -260,13 +278,13 @@ export const getStream = async function ({
   );
 
   const streams: Stream[] = [
+    ...(vidukiStreams || []),
     ...validVidzee,
     ...(cjStreams || []),
     ...(movyStreams || []),
     ...(vsStreams || []),
   ];
 
-  // Attach subtitles to streams that don't already have them
   return streams.map((s) => ({
     ...s,
     subtitles:
