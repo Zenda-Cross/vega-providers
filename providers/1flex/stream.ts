@@ -1,13 +1,20 @@
 import { Stream, ProviderContext, TextTracks } from "../types";
 import { decryptStreamPayload } from "./crypto";
+import { extractCinejoyStreams } from "../extractors/cinejoy";
+import { extractMovyStreams } from "../extractors/movy";
+import { extractVidstuckStreams } from "../extractors/vidstuck";
 
 const CORE_BASE = "https://core.vidzee.wtf";
+const DB_BASE = "https://db.1flex.org";
 
 interface StreamRequestParams {
   id: string;
   type: string;
   season?: number;
   episode?: number;
+  title?: string;
+  year?: string;
+  imdbId?: string;
 }
 
 function parseStreamLink(link: string, defaultType: string): StreamRequestParams {
@@ -15,14 +22,17 @@ function parseStreamLink(link: string, defaultType: string): StreamRequestParams
     if (link.startsWith("{")) {
       const parsed = JSON.parse(link);
       return {
-        id: String(parsed.id),
+        id: String(parsed.id || parsed.tmdbId || ""),
         type: parsed.type || defaultType,
         season: parsed.season ? Number(parsed.season) : undefined,
         episode: parsed.episode ? Number(parsed.episode) : undefined,
+        title: parsed.title,
+        year: parsed.year ? String(parsed.year).slice(0, 4) : undefined,
+        imdbId: parsed.imdbId,
       };
     }
     const u = new URL(link);
-    let id = u.searchParams.get("id") || "";
+    let id = u.searchParams.get("id") || u.searchParams.get("tmdbId") || "";
     let type = u.searchParams.get("type") || defaultType;
     let season = u.searchParams.get("season")
       ? Number(u.searchParams.get("season"))
@@ -44,7 +54,7 @@ function parseStreamLink(link: string, defaultType: string): StreamRequestParams
     }
     return { id, type, season, episode };
   } catch {
-    const idMatch = link.match(/id=([^&]+)/);
+    const idMatch = link.match(/(?:id|tmdbId)=([^&]+)/);
     const typeMatch = link.match(/type=([^&]+)/);
     const sMatch = link.match(/season=([^&]+)/);
     const eMatch = link.match(/episode=([^&]+)/);
@@ -80,11 +90,12 @@ export const getStream = async function ({
   isDownload?: boolean;
 }): Promise<Stream[]> {
   const { axios } = providerContext;
-  console.error("[1flex-debug] getStream called link=" + link + " type=" + type);
   const parsed = parseStreamLink(link, type);
+  const tmdbId = parsed.id;
   const isMovie = parsed.type === "movie";
   const season = parsed.season || 1;
   const episode = parsed.episode || 1;
+  const effectiveType = parsed.type || "movie";
 
   const headers = {
     ...providerContext.commonHeaders,
@@ -94,13 +105,49 @@ export const getStream = async function ({
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   };
 
-  // 1. Subtitles task
+  // 1. Fetch metadata if title/year/imdbId are missing (needed for Movy/Vidstuck extractors)
+  let title = parsed.title || "";
+  let year = parsed.year || "";
+  let imdbId = parsed.imdbId || "";
+  let releaseDate = "";
+
+  const metaPromise = (async () => {
+    if (tmdbId && (!title || !year || !imdbId)) {
+      try {
+        const metaUrl = `${DB_BASE}/${isMovie ? "movie" : "tv"}/${tmdbId}`;
+        const res = await axios.get(metaUrl, {
+          signal,
+          timeout: 3000,
+          headers: {
+            ...providerContext.commonHeaders,
+            Referer: "https://www.1flex.org/",
+            Origin: "https://www.1flex.org",
+          },
+        });
+        const d = res.data;
+        if (d) {
+          if (!title) title = d.title || d.name || "";
+          if (!year) {
+            year = (d.release_date || d.first_air_date || "").slice(0, 4);
+          }
+          if (!imdbId && d.imdb_id) imdbId = d.imdb_id;
+          if (!releaseDate) {
+            releaseDate = d.release_date || d.first_air_date || "";
+          }
+        }
+      } catch {
+        // ignore metadata lookup failure
+      }
+    }
+  })();
+
+  // 2. Vidzee Subtitles task (strict 3s timeout)
   const subsEndpoint = isMovie
-    ? `${CORE_BASE}/subs/movie/${parsed.id}`
-    : `${CORE_BASE}/subs/tv/${parsed.id}/${season}/${episode}`;
+    ? `${CORE_BASE}/subs/movie/${tmdbId}`
+    : `${CORE_BASE}/subs/tv/${tmdbId}/${season}/${episode}`;
 
   const subsPromise = axios
-    .get(subsEndpoint, { signal, timeout: 6000, headers })
+    .get(subsEndpoint, { signal, timeout: 3500, headers })
     .then((res: any) => {
       if (Array.isArray(res.data)) {
         return res.data.map((sub: any) => ({
@@ -114,21 +161,21 @@ export const getStream = async function ({
     })
     .catch(() => [] as TextTracks);
 
-  // 2. Servers to query in parallel
-  const servers = [
-    { id: "dcloud", name: "FastCloud (Main)" },
-    { id: "tik", name: "TikCloud (Backup)" },
+  // 3. Vidzee Servers to query in parallel (strict 4s timeout)
+  const vidzeeServers = [
+    { id: "dcloud", name: "1Flex - FastCloud (1080p)" },
+    { id: "tik", name: "1Flex - TikCloud (Backup)" },
   ];
 
-  const fetchServerStream = async (s: { id: string; name: string }) => {
+  const fetchVidzeeServerStream = async (s: { id: string; name: string }) => {
     try {
       const streamEndpoint = isMovie
-        ? `${CORE_BASE}/streams/movie/${parsed.id}?s=${s.id}&e=1`
-        : `${CORE_BASE}/streams/tv/${parsed.id}/${season}/${episode}?s=${s.id}&e=1`;
+        ? `${CORE_BASE}/streams/movie/${tmdbId}?s=${s.id}&e=1`
+        : `${CORE_BASE}/streams/tv/${tmdbId}/${season}/${episode}?s=${s.id}&e=1`;
 
       const res = await axios.get(streamEndpoint, {
         signal,
-        timeout: 8000,
+        timeout: 4000,
         headers,
       });
 
@@ -161,18 +208,72 @@ export const getStream = async function ({
     return null;
   };
 
-  const [subtitles, ...rawStreams] = await Promise.all([
-    subsPromise,
-    ...servers.map((s) => fetchServerStream(s)),
-  ]);
+  // 4. Parallel Multi-source extraction (Cinejoy, Movy, Vidstuck)
+  // Ensure metadata lookup finishes first or in parallel
+  await metaPromise.catch(() => {});
 
-  const validStreams = rawStreams.filter(
+  const cinejoyPromise = extractCinejoyStreams({
+    tmdbId,
+    season: Number(season),
+    episode: Number(episode),
+    type: effectiveType,
+    providerContext,
+    signal,
+  }).catch(() => [] as Stream[]);
+
+  const movyPromise = extractMovyStreams({
+    tmdbId,
+    imdbId,
+    title,
+    year,
+    season: Number(season),
+    episode: Number(episode),
+    type: effectiveType,
+    providerContext,
+    signal,
+  }).catch(() => [] as Stream[]);
+
+  const vidstuckPromise = extractVidstuckStreams({
+    tmdbId,
+    imdbId,
+    title,
+    year,
+    date: releaseDate,
+    season: Number(season),
+    episode: Number(episode),
+    type: effectiveType,
+    providerContext,
+    signal,
+  }).catch(() => [] as Stream[]);
+
+  const [subtitles, vidzeeStreams, cjStreams, movyStreams, vsStreams] =
+    await Promise.all([
+      subsPromise,
+      Promise.all(vidzeeServers.map((s) => fetchVidzeeServerStream(s))),
+      cinejoyPromise,
+      movyPromise,
+      vidstuckPromise,
+    ]);
+
+  const validVidzee = vidzeeStreams.filter(
     (s): s is NonNullable<typeof s> => s !== null
   );
 
-  console.error("[1flex-debug] validStreams found=" + validStreams.length);
-  return validStreams.map((s) => ({
+  const streams: Stream[] = [
+    ...validVidzee,
+    ...(cjStreams || []),
+    ...(movyStreams || []),
+    ...(vsStreams || []),
+  ];
+
+  // Attach subtitles to streams that don't already have them
+  return streams.map((s) => ({
     ...s,
-    subtitles: subtitles.length > 0 ? subtitles : undefined,
+    subtitles:
+      s.subtitles && s.subtitles.length > 0
+        ? s.subtitles
+        : subtitles.length > 0
+        ? subtitles
+        : undefined,
   }));
 };
