@@ -80,6 +80,7 @@ export const getStream = async function ({
   isDownload?: boolean;
 }): Promise<Stream[]> {
   const { axios } = providerContext;
+  console.error("[1flex-debug] getStream called link=" + link + " type=" + type);
   const parsed = parseStreamLink(link, type);
   const isMovie = parsed.type === "movie";
   const season = parsed.season || 1;
@@ -169,6 +170,7 @@ export const getStream = async function ({
     (s): s is NonNullable<typeof s> => s !== null
   );
 
+  console.error("[1flex-debug] validStreams found=" + validStreams.length);
   return validStreams.map((s) => ({
     ...s,
     subtitles: subtitles.length > 0 ? subtitles : undefined,
