@@ -132,7 +132,10 @@ function a(w: string) {
 
 async function l() {
   try {
-    const w = await WebAssembly.compile(a(R));
+    if (typeof WebAssembly === "undefined" || !WebAssembly.compile) return null;
+    const bytes = a(R);
+    if (!bytes.length) return null;
+    const w = await WebAssembly.compile(bytes);
     const inst = await f(w, { env: {} });
     return inst;
   } catch {
@@ -278,6 +281,7 @@ const _ = {
 async function getVidukiWasm(): Promise<any> {
   if (vidukiInstance) return vidukiInstance;
   try {
+    if (typeof WebAssembly === "undefined" || !WebAssembly.instantiate) return null;
     const bytes = base64ToUint8Array(MAKIMA_WASM_BASE64);
     const { instance } = await WebAssembly.instantiate(bytes, {
       env: {

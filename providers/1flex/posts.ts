@@ -17,7 +17,12 @@ export const getPosts = async function ({
 }): Promise<Post[]> {
   const { axios } = providerContext;
 
-  const url = `${DB_BASE}${filter}${filter.includes("?") ? "&" : "?"}page=${page}`;
+  const cleanFilter = filter
+    ? filter.startsWith("/")
+      ? filter
+      : `/${filter}`
+    : "/discover/movie?sort_by=popularity.desc&vote_count.gte=500";
+  const url = `${DB_BASE}${cleanFilter}${cleanFilter.includes("?") ? "&" : "?"}page=${page}`;
   const response = await axios.get(url, {
     signal,
     headers: {

@@ -3,7 +3,7 @@
     "display_name": "1Flex",
     "value": "1flex",
     "version": "1.0.5",
-    "icon": "https://www.1flex.org/favicons/nobg.png",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/1flex.png",
     "type": "global",
     "disabled": false
   },
