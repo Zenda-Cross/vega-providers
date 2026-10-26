@@ -15,7 +15,11 @@ const formatSize = (bytes?: string): string => {
   return n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(2)} GB` : `${Math.round(n / 1024 ** 2)} MB`;
 };
 
-const toStream = (identifier: string, file: ArchiveFile): Stream => {
+// Names a version by its upload, e.g. "NightOfTheLivingDead iPod.mp4" -> "NightOfTheLivingDead iPod".
+const versionName = (original: string): string =>
+  original.replace(/^.*\//, "").replace(/\.[^.]+$/, "").replace(/_+/g, " ").trim();
+
+const toStream = (identifier: string, file: ArchiveFile, version?: string): Stream => {
   const ext = extensionOf(file.name);
   const height = Number(file.height) || 0;
   const tags = [
@@ -24,8 +28,9 @@ const toStream = (identifier: string, file: ArchiveFile): Stream => {
     file.source === "original" ? "Original" : "",
     formatSize(file.size),
   ].filter(Boolean);
+  const format = file.format || ext.slice(1).toUpperCase();
   return {
-    server: file.format || ext.slice(1).toUpperCase(),
+    server: version ? `${format} · ${version}` : format,
     link: fileUrl(identifier, file.name),
     type: ext === ".m3u8" ? "m3u8" : "mp4",
     quality: height ? String(height) : undefined,
@@ -50,7 +55,19 @@ export const getStream = async function ({
   const { files } = await fetchItem(identifier, providerContext, signal);
   const groups = groupVideos(files);
 
-  const videos = fileName ? groups.get(fileName) || [] : [...groups.values()][0] || [];
+  // An episode link plays its own upload; a movie offers every version of the
+  // film the item holds.
+  const versions = fileName
+    ? [[fileName, groups.get(fileName) || []] as const]
+    : [...groups.entries()];
+  const labelled = versions.length > 1;
+  const versionOf = new Map<ArchiveFile, string | undefined>();
+  for (const [original, files] of versions) {
+    for (const file of files) {
+      versionOf.set(file, labelled ? versionName(original) : undefined);
+    }
+  }
+  const videos = [...versionOf.keys()];
   if (videos.length === 0) {
     throw new Error(`No playable video in Internet Archive item: ${identifier}`);
   }
@@ -66,5 +83,5 @@ export const getStream = async function ({
       ? Number(b.size || 0) - Number(a.size || 0)
       : rank(a) - rank(b) || Number(b.height || 0) - Number(a.height || 0),
   );
-  return sorted.map((file) => toStream(identifier, file));
+  return sorted.map((file) => toStream(identifier, file, versionOf.get(file)));
 };

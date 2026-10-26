@@ -1,5 +1,13 @@
 import { Info, Link, ProviderContext } from "../types";
-import { fetchItem, firstValue, groupVideos, imageUrl, parseLink, IA_BASE } from "./api";
+import {
+  fetchItem,
+  firstValue,
+  groupVideos,
+  imageUrl,
+  isEpisodeList,
+  parseLink,
+  IA_BASE,
+} from "./api";
 
 const toPlainText = (html: string, providerContext: ProviderContext): string => {
   if (!html) return "";
@@ -34,7 +42,7 @@ export const getMeta = async function ({
     JSON.stringify([metadata["external-identifier"], metadata.imdb]).match(/tt\d{7,}/)?.[0] || "";
 
   const groups = [...groupVideos(files).keys()];
-  const isSeries = groups.length > 1;
+  const isSeries = isEpisodeList(groups, metadata);
 
   const linkList: Link[] = [
     {

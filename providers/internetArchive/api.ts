@@ -102,8 +102,26 @@ export const isVideoFile = (file: ArchiveFile): boolean => {
   return VIDEO_EXTENSIONS.some((ext) => name.endsWith(ext));
 };
 
+const EPISODE_NAME = /s\d{1,2}\s*e\d{1,3}|\bep(isode)?[\s._-]*\d+|\bpart[\s._-]*\d+|\bchapter[\s._-]*\d+|\b\d{1,2}x\d{2}\b/i;
+const TV_COLLECTIONS = ["classic_tv", "television"];
+
+// An item with several uploads is either a show (one upload per episode) or
+// one film uploaded in several versions (e.g. "iPod" and "PS3" encodes).
+export const isEpisodeList = (
+  originals: string[],
+  metadata: Record<string, any>,
+): boolean => {
+  if (originals.length < 2) return false;
+  const collections = ([] as string[]).concat(metadata.collection || []);
+  if (collections.some((c) => TV_COLLECTIONS.some((tv) => c.startsWith(tv)))) {
+    return true;
+  }
+  const named = originals.filter((name) => EPISODE_NAME.test(name)).length;
+  return named >= Math.ceil(originals.length / 2);
+};
+
 // Groups an item's video files by the original upload they come from, so each
-// group is one movie or episode with all its derived formats.
+// group is one movie, episode or version with all its derived formats.
 export const groupVideos = (files: ArchiveFile[]): Map<string, ArchiveFile[]> => {
   const groups = new Map<string, ArchiveFile[]>();
   for (const file of files.filter(isVideoFile)) {
