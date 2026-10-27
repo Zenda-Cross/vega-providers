@@ -136,8 +136,8 @@
     "display_name": "MovieBox Web",
     "value": "movieBoxWeb",
     "version": "2.6",
-    "hasSettings": true,
     "moduleVersionHeader": true,
+    "hasSettings": true,
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/movieBoxWeb.png",
     "type": "global",
     "disabled": false
@@ -591,10 +591,10 @@
     "display_name": "Internet Archive",
     "value": "internetArchive",
     "version": "1.0",
+    "moduleVersionHeader": true,
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/internetArchive.png",
     "type": "global",
     "disabled": false,
-    "hasSettings": true,
-    "moduleVersionHeader": true
+    "hasSettings": true
   }
 ]
