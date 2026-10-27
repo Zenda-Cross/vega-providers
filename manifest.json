@@ -594,6 +594,7 @@
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/internetArchive.png",
     "type": "global",
     "disabled": false,
-    "hasSettings": true
+    "hasSettings": true,
+    "moduleVersionHeader": true
   }
 ]
