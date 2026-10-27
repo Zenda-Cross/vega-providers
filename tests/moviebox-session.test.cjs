@@ -45,3 +45,20 @@ test('keeps VIP-locked sources excluded',async()=>{
  const streams=await load()({link:JSON.stringify(playback),providerContext:c.providerContext});
  assert.equal(streams.length,0);
 });
+
+test('quick downloads prefer exact or nearest quality and preserve every source',async()=>{
+ for(const [preferred,expected] of [['720','720'],['480','360'],['2160','1080'],['highest','1080']]){
+  const c=context({status:200,data:{code:0,data:{streams:[360,1080,720].map(q=>({format:'MP4',resolutions:String(q),url:`https://cdn.example/${q}.mp4`}))}}});
+  c.providerContext.kvStore={get:async()=>preferred};
+  const streams=await load()({link:JSON.stringify(playback),providerContext:c.providerContext,isDownload:true});
+  assert.equal(streams[0].quality,expected);
+  assert.equal(streams.length,3);
+ }
+});
+
+test('normal playback keeps upstream source ordering despite download preference',async()=>{
+ const c=context({status:200,data:{code:0,data:{streams:[360,1080].map(q=>({format:'MP4',resolutions:String(q),url:`https://cdn.example/${q}.mp4`}))}}});
+ c.providerContext.kvStore={get:async()=> '1080'};
+ const streams=await load()({link:JSON.stringify(playback),providerContext:c.providerContext});
+ assert.equal(streams[0].quality,'360');
+});

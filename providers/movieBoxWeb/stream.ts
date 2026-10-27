@@ -379,7 +379,7 @@ export const getStream = async function ({
     );
 
     console.log("MovieBox Web stream sources", availableSources);
-    return Promise.all(
+    const streams = await Promise.all(
       availableSources.map(async (source) => ({
         server:
           `${playback.language} ${source.resolutions || source.format || ""}`.trim(),
@@ -398,6 +398,19 @@ export const getStream = async function ({
         headers: streamHeaders,
       })),
     );
+    if (isDownload) {
+      const preferred = await providerContext.kvStore?.get<string>("downloadQuality");
+      const target = preferred === "highest" || !preferred ? 0 : Number(preferred);
+      streams.sort((a, b) => {
+        const qa = Number(a.quality) || 0;
+        const qb = Number(b.quality) || 0;
+        if (!qa || !qb) return Number(Boolean(qb)) - Number(Boolean(qa));
+        return target > 0
+          ? Math.abs(qa - target) - Math.abs(qb - target) || qb - qa
+          : qb - qa;
+      });
+    }
+    return streams;
   } catch (error) {
     throwProviderError("MovieBox Web", "stream", error);
   }
