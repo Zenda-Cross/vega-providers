@@ -585,5 +585,14 @@
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/1flex.png",
     "type": "global",
     "disabled": false
+  },
+  {
+    "display_name": "Internet Archive",
+    "value": "internetArchive",
+    "version": "1.0",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/internetArchive.png",
+    "type": "global",
+    "disabled": false,
+    "hasSettings": true
   }
 ]
