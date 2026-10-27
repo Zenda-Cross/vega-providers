@@ -1,5 +1,5 @@
 import { ProviderContext, Stream } from "../types";
-import { ArchiveFile, fetchItem, fileUrl, groupVideos, parseLink } from "./api";
+import { ArchiveFile, fetchItem, fileUrl, groupVideos, parseLink, subtitleTracks } from "./api";
 
 // Players handle these best; the rest are listed after them.
 const FORMAT_RANK = [".mp4", ".m4v", ".webm", ".mkv", ".ogv", ".mov", ".avi", ".mpeg", ".mpg"];
@@ -19,7 +19,12 @@ const formatSize = (bytes?: string): string => {
 const versionName = (original: string): string =>
   original.replace(/^.*\//, "").replace(/\.[^.]+$/, "").replace(/_+/g, " ").trim();
 
-const toStream = (identifier: string, file: ArchiveFile, version?: string): Stream => {
+const toStream = (
+  identifier: string,
+  file: ArchiveFile,
+  subtitles: Stream["subtitles"],
+  version?: string,
+): Stream => {
   const ext = extensionOf(file.name);
   const height = Number(file.height) || 0;
   const tags = [
@@ -36,6 +41,7 @@ const toStream = (identifier: string, file: ArchiveFile, version?: string): Stre
     quality: height ? String(height) : undefined,
     tags,
     tag: tags.join(" • "),
+    ...(subtitles?.length ? { subtitles } : {}),
   };
 };
 
@@ -83,5 +89,7 @@ export const getStream = async function ({
       ? Number(b.size || 0) - Number(a.size || 0)
       : rank(a) - rank(b) || Number(b.height || 0) - Number(a.height || 0),
   );
-  return sorted.map((file) => toStream(identifier, file, versionOf.get(file)));
+  // An episode gets the subtitles named after it; a film gets all of them.
+  const subtitles = subtitleTracks(identifier, files, fileName);
+  return sorted.map((file) => toStream(identifier, file, subtitles, versionOf.get(file)));
 };
