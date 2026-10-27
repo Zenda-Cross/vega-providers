@@ -223,13 +223,6 @@ async function buildAll() {
   // Build all providers
   const results = await Promise.all(providerDirs.map(buildProvider));
 
-  // Advertise required stamps only after every provider has built successfully.
-  if (manifest.some(entry => providerHeaders.has(entry.value) && entry.moduleVersionHeader !== true)) {
-    const versionedManifest = manifest.map(entry => providerHeaders.has(entry.value)
-      ? {...entry, moduleVersionHeader: true} : entry);
-    fs.writeFileSync(path.join(__dirname, "manifest.json"), JSON.stringify(versionedManifest, null, 2) + "\n");
-  }
-
   const totalModules = results.reduce((sum, r) => sum + r.modules.length, 0);
   const totalSize = results.reduce(
     (sum, r) => sum + r.modules.reduce((s, m) => s + m.size, 0),
