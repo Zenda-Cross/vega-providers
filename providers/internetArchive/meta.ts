@@ -19,6 +19,14 @@ const toPlainText = (html: string, providerContext: ProviderContext): string => 
 const episodeTitle = (fileName: string): string =>
   fileName.replace(/^.*\//, "").replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").trim();
 
+const episodeNumbers = (fileName: string): { season: number; episode: number } => {
+  const name = fileName.replace(/^.*\//, "");
+  const match = name.match(/s(\d{1,2})[\s._-]*e(\d{1,3})/i) || name.match(/\b(\d{1,2})x(\d{2,3})\b/i);
+  if (match) return { season: Number(match[1]), episode: Number(match[2]) };
+  const episode = name.match(/\bep(?:isode)?[\s._-]*(\d+)/i);
+  return { season: 1, episode: episode ? Number(episode[1]) : Number.MAX_SAFE_INTEGER };
+};
+
 export const getMeta = async function ({
   link,
   providerContext,
@@ -44,18 +52,30 @@ export const getMeta = async function ({
   const groups = [...groupVideos(files).keys()];
   const isSeries = isEpisodeList(groups, metadata);
 
-  const linkList: Link[] = [
-    {
-      title: isSeries ? title : "Movie",
-      directLinks: isSeries
-        ? groups.map((original) => ({
+  const linkList: Link[] = [];
+  if (isSeries) {
+    const seasons = new Map<number, string[]>();
+    for (const original of groups) {
+      const { season } = episodeNumbers(original);
+      const episodes = seasons.get(season) || [];
+      episodes.push(original);
+      seasons.set(season, episodes);
+    }
+    for (const [season, episodes] of [...seasons.entries()].sort(([a], [b]) => a - b)) {
+      linkList.push({
+        title: `Season ${season}`,
+        directLinks: episodes
+          .sort((a, b) => episodeNumbers(a).episode - episodeNumbers(b).episode || a.localeCompare(b, undefined, { numeric: true }))
+          .map((original) => ({
             title: episodeTitle(original),
-            link: `${identifier}/${original}`,
+            link: `${encodeURIComponent(identifier)}/${original.split("/").map(encodeURIComponent).join("/")}`,
             type: "series" as const,
-          }))
-        : [{ title: "Movie", link: identifier, type: "movie" as const }],
-    },
-  ];
+          })),
+      });
+    }
+  } else {
+    linkList.push({ title: "Movie", directLinks: [{ title: "Movie", link: encodeURIComponent(identifier), type: "movie" }] });
+  }
 
   return {
     title,
