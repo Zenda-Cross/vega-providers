@@ -164,7 +164,7 @@
   {
     "display_name": "Movies4U",
     "value": "movies4u",
-    "version": "1.30",
+    "version": "1.31",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/movies4u.png",
     "type": "global",
     "disabled": false,
