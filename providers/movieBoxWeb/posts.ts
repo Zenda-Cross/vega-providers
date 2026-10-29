@@ -1,5 +1,5 @@
 import { Post, ProviderContext } from "../types";
-import { absoluteUrl, getProviderBaseUrl, parseNuxtData } from "./utils";
+import { absoluteUrl, getProviderBaseUrl, parseNuxtData, posterUrl } from "./utils";
 
 type SubjectPreview = {
   detailPath?: string;
@@ -106,7 +106,7 @@ async function fetchPosts(
       title,
       link: href,
       image:
-        image.attr("data-src") || subject?.coverUrl || image.attr("src") || "",
+        posterUrl(image.attr("data-src") || subject?.coverUrl || image.attr("src")),
     });
   });
   return posts;
@@ -122,7 +122,7 @@ function mapSubjects(subjects: SubjectPreview[]): Post[] {
     .map((subject) => ({
       title: subject.title || "",
       link: `/moviesDetail/${subject.detailPath}`,
-      image: subject.coverUrl || "",
+      image: posterUrl(subject.coverUrl),
     }));
 }
 

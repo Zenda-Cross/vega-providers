@@ -9,6 +9,7 @@ import {
   MovieBoxResource,
   MovieBoxSubject,
   parseNuxtDetail,
+  posterUrl,
 } from "./utils";
 
 function buildPlaybackLink(
@@ -124,7 +125,7 @@ export const getMeta = async function ({
 
     return {
       title: subject.title || "",
-      image: subject.cover?.url || "",
+      image: posterUrl(subject.cover?.url, 900),
       synopsis: subject.description || "",
       imdbId: "",
       type: isSeries ? "series" : "movie",
