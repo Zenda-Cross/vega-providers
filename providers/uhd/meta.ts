@@ -1,3 +1,4 @@
+import { formatSeasonLinks } from "../formatSeasonLinks";
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
@@ -169,7 +170,7 @@ export const getMeta = async function ({
       imdbId: "",
       synopsis: cleanTitle || rawTitle,
       type: isSeries ? "series" : "movie",
-      linkList: episodes,
+      linkList: formatSeasonLinks(episodes),
       webUrl: url,
     };
   } catch (error) {

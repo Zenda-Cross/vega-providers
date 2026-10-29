@@ -1,3 +1,4 @@
+import { formatSeasonLinks } from "../formatSeasonLinks";
 import { EpisodeLink, Info, Link, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
 
@@ -92,7 +93,7 @@ export const getMeta = async function ({
       )}&css=%7B%22background%22%3A%22%20-webkit-gradient(linear%2C%20left%20bottom%2C%20left%20top%2C%20from(%233f3b3b)%2C%20to(%23000000))%22%2C%22text-transform%22%3A%22%20capitalize%22%7D`,
       imdbId: "",
       type: type,
-      linkList: links,
+      linkList: formatSeasonLinks(links),
     };
   } catch (err) {
     throwProviderError("111477", "metadata", err);

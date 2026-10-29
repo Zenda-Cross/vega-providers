@@ -1,3 +1,4 @@
+import { formatSeasonLinks } from "../formatSeasonLinks";
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
@@ -244,7 +245,7 @@ export const getMeta = async function ({
       tags,
       cast,
       rating,
-      linkList,
+      linkList: formatSeasonLinks(linkList),
       webUrl: pageUrl,
     };
     if (!imdbId) return websiteInfo;

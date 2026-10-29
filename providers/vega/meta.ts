@@ -1,3 +1,4 @@
+import { formatSeasonLinks } from "../formatSeasonLinks";
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { CinemetaMeta, getCinemetaMeta } from "../getCinemetaMeta";
@@ -319,7 +320,7 @@ export const getMeta = async ({
       imdbId: imdbId || "",
       type,
       quickDownload: quickDownload ?? true,
-      linkList: links,
+      linkList: formatSeasonLinks(links),
       webUrl: url,
     };
     if (!imdbId) return websiteInfo;

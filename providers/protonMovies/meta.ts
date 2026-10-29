@@ -1,3 +1,4 @@
+import { formatSeasonLinks } from "../formatSeasonLinks";
 import { EpisodeLink, Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 
@@ -91,7 +92,7 @@ export const getMeta = async function ({
     return {
       image: image || "",
       imdbId: "",
-      linkList: links,
+      linkList: formatSeasonLinks(links),
       title: title || "",
       synopsis: synopsis,
       tags: tags,

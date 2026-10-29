@@ -1,3 +1,4 @@
+import { formatSeasonLinks } from "../formatSeasonLinks";
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
@@ -163,7 +164,7 @@ export const getMeta = async function ({
         uniqueLinks.set(href, link);
       }
     });
-    result.linkList = Array.from(uniqueLinks.values());
+    result.linkList = formatSeasonLinks(Array.from(uniqueLinks.values()));
     result.webUrl = url;
     const quickDownload = await providerContext.kvStore?.get<boolean>("movies4u_quickDownload");
     result.quickDownload = quickDownload ?? true;

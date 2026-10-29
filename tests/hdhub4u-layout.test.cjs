@@ -6,6 +6,11 @@ const cheerio = require('cheerio');
 function load() {
   const module = {exports: {}};
   new Function('module', 'exports', 'require', transformSync(fs.readFileSync('providers/hdhub4u/meta.ts', 'utf8'), {loader: 'ts', format: 'cjs'}).code)(module, module.exports, key => {
+    if (key === '../formatSeasonLinks') {
+      const helper = {exports: {}};
+      new Function('module', 'exports', transformSync(fs.readFileSync('providers/formatSeasonLinks.ts', 'utf8'), {loader: 'ts', format: 'cjs'}).code)(helper, helper.exports);
+      return helper.exports;
+    }
     if (key === '../getBaseUrl') return {getBaseUrl: async () => 'https://example.com'};
     if (key === '../providerErrors') return {throwProviderError: (_p, _f, e) => {throw e;}};
     if (key === '../getCinemetaMeta') return {getCinemetaMeta: async () => null};

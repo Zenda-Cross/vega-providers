@@ -8,6 +8,11 @@ function load(name) {
   const module = {exports: {}};
   const code = transformSync(fs.readFileSync(`providers/movies4u/${name}.ts`, 'utf8'), {loader: 'ts', format: 'cjs'}).code;
   new Function('module', 'exports', 'require', code)(module, module.exports, key => {
+    if (key === '../formatSeasonLinks') {
+      const helper = {exports: {}};
+      new Function('module', 'exports', transformSync(fs.readFileSync('providers/formatSeasonLinks.ts', 'utf8'), {loader: 'ts', format: 'cjs'}).code)(helper, helper.exports);
+      return helper.exports;
+    }
     if (key === '../getBaseUrl') return {getBaseUrl: async () => 'https://movies4u.nf'};
     if (key === '../providerErrors') return {throwProviderError: (_p, _f, err) => {throw err;}};
     if (key === '../getCinemetaMeta') return {readCinemetaContext: url => ({requestUrl: url})};

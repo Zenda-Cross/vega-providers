@@ -1,3 +1,4 @@
+import { formatSeasonLinks } from "../formatSeasonLinks";
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
@@ -90,7 +91,7 @@ export const getMeta = async function ({
       imdbId,
       type,
       quickDownload: quickDownload ?? true,
-      linkList: links,
+      linkList: formatSeasonLinks(links),
       webUrl: url,
     };
   } catch (err) {
