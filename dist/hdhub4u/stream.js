@@ -636,10 +636,10 @@ function resolveHubdriveToHubcloud(hubdriveUrl, signal, axios, cheerio, headers)
       const meta = text.match(
         /<META HTTP-EQUIV="refresh"\s+content="0;\s*url=([^"]+)">/i
       );
-      if (meta == null ? void 0 : meta[1]) return meta[1];
+      if ((meta == null ? void 0 : meta[1]) && meta[1] !== hubdriveUrl) return meta[1];
       const $ = cheerio.load(text);
       const href = $(".btn.btn-primary.btn-user.btn-success1.m-1").attr("href") || $(".btn.btn-primary.btn-user.btn-success1").attr("href") || $('a[href*="hubcloud"], a[href*="/drive/"]').attr("href");
-      return href || null;
+      return href && href !== hubdriveUrl ? href : null;
     } catch (e) {
       return null;
     }
@@ -664,6 +664,10 @@ function resolveLink(link, quality, signal, providerContext, isDownload) {
       if (hc) return resolveLink(hc, quality, signal, providerContext, isDownload);
       return [];
     }
+    const applyQuality = /* @__PURE__ */ __name((s) => __spreadProps(__spreadValues({}, s), {
+      quality: quality !== "Unknown" ? quality : s.quality || "Unknown",
+      server: s.server || "HubCloud"
+    }), "applyQuality");
     if (lower.includes("hubcloud") || lower.includes("/drive/")) {
       try {
         const streams = yield hubcloudExtractor(
@@ -676,10 +680,7 @@ function resolveLink(link, quality, signal, providerContext, isDownload) {
           isDownload,
           "hdhub4u"
         );
-        return normalizeStreams(streams).map((s) => __spreadProps(__spreadValues({}, s), {
-          quality: quality !== "Unknown" ? quality : s.quality || "Unknown",
-          server: s.server || "HubCloud"
-        }));
+        return normalizeStreams(streams).map(applyQuality);
       } catch (e) {
         return [];
       }
@@ -695,10 +696,7 @@ function resolveLink(link, quality, signal, providerContext, isDownload) {
         isDownload,
         "hdhub4u"
       );
-      return normalizeStreams(streams).map((s) => __spreadProps(__spreadValues({}, s), {
-        quality: quality !== "Unknown" ? quality : s.quality || "Unknown",
-        server: s.server || "HubCloud"
-      }));
+      return normalizeStreams(streams).map(applyQuality);
     } catch (e) {
       return [];
     }
@@ -716,7 +714,7 @@ function getStream(_0) {
     var _a, _b, _c;
     const { axios, cheerio, commonHeaders: headers } = providerContext;
     if (link.includes("hubcloud") || link.includes("/drive/")) {
-      return yield hubcloudExtractor(
+      const streams = yield hubcloudExtractor(
         link,
         signal,
         axios,
@@ -725,6 +723,12 @@ function getStream(_0) {
         providerContext,
         isDownload,
         "hdhub4u"
+      );
+      return dedupeByLink(
+        normalizeStreams(streams).map((s) => __spreadProps(__spreadValues({}, s), {
+          quality: s.quality || "Unknown",
+          server: s.server || "HubCloud"
+        }))
       );
     }
     if (link.includes("hubdrive")) {
@@ -741,6 +745,7 @@ function getStream(_0) {
           "stream",
           new Error("No streams resolved from hubdrive link")
         );
+        return [];
       }
       return dedupeByLink(streams);
     }
@@ -782,26 +787,34 @@ function getStream(_0) {
       if (!href) return;
       const score = getLinkScore(href);
       if (score === 0) return;
-      let ctx = $(el).closest("h1, h2, h3, h4, h5, h6, p, li, tr");
-      if (!ctx.length) {
-        ctx = $(el).parent();
-        if (ctx.is("body, article, .entry-content, main, section")) {
-          ctx = $(el);
+      const ownText = $(el).text().trim();
+      let quality = parseQualityFromText(ownText);
+      if (quality === "Unknown") {
+        let ctx = $(el).closest("h1, h2, h3, h4, h5, h6, p, li, tr");
+        if (!ctx.length) {
+          ctx = $(el).parent();
+          if (ctx.is("body, article, .entry-content, main, section")) {
+            ctx = $(el);
+          }
         }
+        quality = parseQualityFromText(ctx.text().trim());
       }
-      const contextText = `${ctx.text().trim()} ${$(el).text().trim()}`;
-      const quality = parseQualityFromText(contextText);
       const existing = candidates.get(quality);
       if (!existing || score > existing.score) {
         candidates.set(quality, { link: href, score });
       }
     });
     if (candidates.size === 0) {
-      const directCdn = $('a[href*="r2.dev"], a[href*="hubcdn"]').attr("href");
-      if (directCdn) {
-        return [
-          { server: "HubCDN", link: directCdn, type: "mkv", quality: "Unknown" }
-        ];
+      const directCdns = $('a[href*="r2.dev"], a[href*="hubcdn"]').toArray().map((el) => $(el).attr("href")).filter((h) => !!h);
+      if (directCdns.length) {
+        return dedupeByLink(
+          directCdns.map((cdn) => ({
+            server: "HubCDN",
+            link: cdn,
+            type: "mkv",
+            quality: "Unknown"
+          }))
+        );
       }
       const regexMatch = text.match(
         /href="(https:\/\/(?:hubcloud|hubdrive)\.[^\/]+\/(?:drive|file)\/[^"]+)"/i
@@ -831,6 +844,7 @@ function getStream(_0) {
         "stream",
         new Error("No stream links found on page")
       );
+      return [];
     }
     const ordered = Array.from(candidates.entries()).map(([quality, c]) => __spreadValues({ quality }, c)).sort(
       (a, b) => {
@@ -855,6 +869,7 @@ function getStream(_0) {
         "stream",
         new Error("All quality links failed to resolve")
       );
+      return [];
     }
     return dedupeByLink(allStreams);
   });
