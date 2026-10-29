@@ -555,13 +555,10 @@ __name(hubcloudExtractor, "hubcloudExtractor");
 
 // providers/hdhub4u/stream.ts
 function rot13(str) {
-  return str.replace(/[a-zA-Z]/g, function(char) {
-    const charCode = char.charCodeAt(0);
-    const isUpperCase = char <= "Z";
-    const baseCharCode = isUpperCase ? 65 : 97;
-    return String.fromCharCode(
-      (charCode - baseCharCode + 13) % 26 + baseCharCode
-    );
+  return str.replace(/[a-zA-Z]/g, (char) => {
+    const code = char.charCodeAt(0);
+    const base = char <= "Z" ? 65 : 97;
+    return String.fromCharCode((code - base + 13) % 26 + base);
   });
 }
 __name(rot13, "rot13");
@@ -592,83 +589,21 @@ function normalizeStreams(result) {
   return [];
 }
 __name(normalizeStreams, "normalizeStreams");
-function dedupeByLink(streams) {
+function deduplicateStreams(streams) {
   const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const s of streams) {
-    if (!s || !s.link) continue;
-    if (seen.has(s.link)) continue;
+  return streams.filter((s) => {
+    if (!s || !s.link) return false;
+    if (seen.has(s.link)) return false;
     seen.add(s.link);
-    out.push(s);
-  }
-  return out;
-}
-__name(dedupeByLink, "dedupeByLink");
-var QUALITY_ORDER = {
-  "4k": 4,
-  "1080p": 3,
-  "720p": 2,
-  "480p": 1,
-  Unknown: 0
-};
-function parseQualityFromText(text) {
-  const t = (text || "").toLowerCase();
-  if (t.includes("2160p") || t.includes("4k")) return "4k";
-  if (t.includes("1080p")) return "1080p";
-  if (t.includes("720p")) return "720p";
-  if (t.includes("480p")) return "480p";
-  return "Unknown";
-}
-__name(parseQualityFromText, "parseQualityFromText");
-function getLinkScore(url) {
-  const lower = url.toLowerCase();
-  if (lower.includes("hubcloud") || lower.includes("/drive/")) return 3;
-  if (lower.includes("hubdrive")) return 2;
-  if (lower.includes("hubcdn") || lower.includes("r2.dev")) return 1;
-  return 0;
-}
-__name(getLinkScore, "getLinkScore");
-function resolveHubdriveToHubcloud(hubdriveUrl, signal, axios, cheerio, headers) {
-  return __async(this, null, function* () {
-    try {
-      const res = yield axios.get(hubdriveUrl, { headers, signal });
-      const text = res.data || "";
-      const meta = text.match(
-        /<META HTTP-EQUIV="refresh"\s+content="0;\s*url=([^"]+)">/i
-      );
-      if ((meta == null ? void 0 : meta[1]) && meta[1] !== hubdriveUrl) return meta[1];
-      const $ = cheerio.load(text);
-      const href = $(".btn.btn-primary.btn-user.btn-success1.m-1").attr("href") || $(".btn.btn-primary.btn-user.btn-success1").attr("href") || $('a[href*="hubcloud"], a[href*="/drive/"]').attr("href");
-      return href && href !== hubdriveUrl ? href : null;
-    } catch (e) {
-      return null;
-    }
+    return true;
   });
 }
-__name(resolveHubdriveToHubcloud, "resolveHubdriveToHubcloud");
+__name(deduplicateStreams, "deduplicateStreams");
 function resolveLink(link, quality, signal, providerContext, isDownload) {
   return __async(this, null, function* () {
     const { axios, cheerio, commonHeaders: headers } = providerContext;
-    const lower = link.toLowerCase();
-    if (lower.includes("r2.dev") || lower.includes("hubcdn")) {
-      return [{ server: "HubCDN", link, type: "mkv", quality }];
-    }
-    if (lower.includes("hubdrive")) {
-      const hc = yield resolveHubdriveToHubcloud(
-        link,
-        signal,
-        axios,
-        cheerio,
-        headers
-      );
-      if (hc) return resolveLink(hc, quality, signal, providerContext, isDownload);
-      return [];
-    }
-    const applyQuality = /* @__PURE__ */ __name((s) => __spreadProps(__spreadValues({}, s), {
-      quality: quality !== "Unknown" ? quality : s.quality || "Unknown",
-      server: s.server || "HubCloud"
-    }), "applyQuality");
-    if (lower.includes("hubcloud") || lower.includes("/drive/")) {
+    const lowerLink = link.toLowerCase();
+    if (lowerLink.includes("hubcloud") || lowerLink.includes("/drive/")) {
       try {
         const streams = yield hubcloudExtractor(
           link,
@@ -680,10 +615,38 @@ function resolveLink(link, quality, signal, providerContext, isDownload) {
           isDownload,
           "hdhub4u"
         );
-        return normalizeStreams(streams).map(applyQuality);
+        const normalized = normalizeStreams(streams);
+        return normalized.map((s) => __spreadProps(__spreadValues({}, s), {
+          quality: quality !== "Unknown" ? quality : s.quality || "Unknown",
+          server: s.server || "HubCloud"
+        }));
       } catch (e) {
         return [];
       }
+    }
+    if (lowerLink.includes("hubdrive")) {
+      try {
+        const res = yield axios.get(link, { headers, signal });
+        const text = res.data;
+        const metaRefresh = text.match(/<META HTTP-EQUIV="refresh" content="0; url=([^"]+)">/i);
+        if (metaRefresh) {
+          return resolveLink(metaRefresh[1], quality, signal, providerContext, isDownload);
+        }
+        const $ = cheerio.load(text);
+        let hubcloudHref = $(".btn.btn-primary.btn-user.btn-success1.m-1").attr("href") || $(".btn.btn-primary.btn-user.btn-success1").attr("href");
+        if (!hubcloudHref) {
+          hubcloudHref = $('a[href*="hubcloud"], a[href*="/drive/"]').attr("href");
+        }
+        if (hubcloudHref) {
+          return resolveLink(hubcloudHref, quality, signal, providerContext, isDownload);
+        }
+        return [];
+      } catch (e) {
+        return [];
+      }
+    }
+    if (lowerLink.includes("r2.dev") || lowerLink.includes("hubcdn")) {
+      return [{ server: "HubCDN", link, type: "mkv", quality }];
     }
     try {
       const streams = yield hubcloudExtractor(
@@ -696,7 +659,11 @@ function resolveLink(link, quality, signal, providerContext, isDownload) {
         isDownload,
         "hdhub4u"
       );
-      return normalizeStreams(streams).map(applyQuality);
+      const normalized = normalizeStreams(streams);
+      return normalized.map((s) => __spreadProps(__spreadValues({}, s), {
+        quality: quality !== "Unknown" ? quality : s.quality || "Unknown",
+        server: s.server || "HubCloud"
+      }));
     } catch (e) {
       return [];
     }
@@ -713,165 +680,101 @@ function getStream(_0) {
   }) {
     var _a, _b, _c;
     const { axios, cheerio, commonHeaders: headers } = providerContext;
-    if (link.includes("hubcloud") || link.includes("/drive/")) {
-      const streams = yield hubcloudExtractor(
-        link,
-        signal,
-        axios,
-        cheerio,
-        headers,
-        providerContext,
-        isDownload,
-        "hdhub4u"
-      );
-      return dedupeByLink(
-        normalizeStreams(streams).map((s) => __spreadProps(__spreadValues({}, s), {
-          quality: s.quality || "Unknown",
-          server: s.server || "HubCloud"
-        }))
-      );
-    }
-    if (link.includes("hubdrive")) {
-      const streams = yield resolveLink(
-        link,
-        "Unknown",
-        signal,
-        providerContext,
-        isDownload
-      );
-      if (streams.length === 0) {
-        throwProviderError(
-          "HDHub4u",
-          "stream",
-          new Error("No streams resolved from hubdrive link")
-        );
-        return [];
-      }
-      return dedupeByLink(streams);
-    }
     let currentLink = link;
-    let text = "";
+    let pageContent = "";
     try {
       const res = yield axios.get(currentLink, { headers, signal });
-      text = res.data || "";
-      const reurlMatch = text.match(/var\s+reurl\s*=\s*["']([^"']+)["']/i);
-      if (reurlMatch == null ? void 0 : reurlMatch[1]) {
+      pageContent = res.data || "";
+      const reurlMatch = pageContent.match(/var\s+reurl\s*=\s*["']([^"']+)["']/i);
+      if (reurlMatch) {
         currentLink = reurlMatch[1];
-        const res2 = yield axios.get(currentLink, {
-          headers: __spreadProps(__spreadValues({}, headers), { Referer: link }),
-          signal
-        });
-        text = res2.data || "";
+        const res2 = yield axios.get(currentLink, { headers: __spreadProps(__spreadValues({}, headers), { Referer: link }), signal });
+        pageContent = res2.data || "";
       }
-      const encryptedString = (_c = (_b = (_a = text.split("s('o','")) == null ? void 0 : _a[1]) == null ? void 0 : _b.split("',180")) == null ? void 0 : _c[0];
+      const encryptedString = (_c = (_b = (_a = pageContent.split("s('o','")) == null ? void 0 : _a[1]) == null ? void 0 : _b.split("',180")) == null ? void 0 : _c[0];
       if (encryptedString) {
         const decoded = decodeString(encryptedString);
         if (decoded == null ? void 0 : decoded.o) {
           const nextUrl = safeAtob(decoded.o);
           if (nextUrl) {
             currentLink = nextUrl;
-            const res3 = yield axios.get(currentLink, {
-              headers: __spreadProps(__spreadValues({}, headers), { Referer: currentLink }),
-              signal
-            });
-            text = res3.data || "";
+            const res3 = yield axios.get(currentLink, { headers: __spreadProps(__spreadValues({}, headers), { Referer: currentLink }), signal });
+            pageContent = res3.data || "";
           }
         }
       }
     } catch (e) {
     }
-    const $ = cheerio.load(text);
-    const candidates = /* @__PURE__ */ new Map();
+    const $ = cheerio.load(pageContent);
+    const groups = /* @__PURE__ */ new Map();
+    const getLinkScore = /* @__PURE__ */ __name((url) => {
+      const lower = url.toLowerCase();
+      if (lower.includes("hubcloud") || lower.includes("/drive/")) return 3;
+      if (lower.includes("hubdrive")) return 2;
+      if (lower.includes("hubcdn") || lower.includes("r2.dev")) return 1;
+      return 0;
+    }, "getLinkScore");
     $("a").each((_, el) => {
       const href = $(el).attr("href");
       if (!href) return;
       const score = getLinkScore(href);
       if (score === 0) return;
-      const ownText = $(el).text().trim();
-      let quality = parseQualityFromText(ownText);
-      if (quality === "Unknown") {
-        let ctx = $(el).closest("h1, h2, h3, h4, h5, h6, p, li, tr");
-        if (!ctx.length) {
-          ctx = $(el).parent();
-          if (ctx.is("body, article, .entry-content, main, section")) {
-            ctx = $(el);
-          }
+      let container = $(el).closest("h1, h2, h3, h4, h5, h6, p, li, tr");
+      if (!container.length) {
+        container = $(el).parent();
+        if (container.is("body, article, .entry-content, main, section")) {
+          container = $(el);
         }
-        quality = parseQualityFromText(ctx.text().trim());
       }
-      const existing = candidates.get(quality);
-      if (!existing || score > existing.score) {
-        candidates.set(quality, { link: href, score });
+      const key = container.text().trim() || $(el).text().trim() || "Unknown";
+      const currentBestUrl = groups.get(key);
+      if (!currentBestUrl || score > getLinkScore(currentBestUrl)) {
+        groups.set(key, href);
       }
     });
-    if (candidates.size === 0) {
-      const directCdns = $('a[href*="r2.dev"], a[href*="hubcdn"]').toArray().map((el) => $(el).attr("href")).filter((h) => !!h);
-      if (directCdns.length) {
-        return dedupeByLink(
-          directCdns.map((cdn) => ({
-            server: "HubCDN",
-            link: cdn,
-            type: "mkv",
-            quality: "Unknown"
-          }))
-        );
-      }
-      const regexMatch = text.match(
-        /href="(https:\/\/(?:hubcloud|hubdrive)\.[^\/]+\/(?:drive|file)\/[^"]+)"/i
-      );
-      if (regexMatch == null ? void 0 : regexMatch[1]) {
-        const streams = yield resolveLink(
-          regexMatch[1],
-          "Unknown",
-          signal,
-          providerContext,
-          isDownload
-        );
-        if (streams.length) return dedupeByLink(streams);
+    if (groups.size === 0) {
+      const regexMatch = pageContent.match(/href="(https:\/\/(?:hubcloud|hubdrive)\.[^\/]+\/(?:drive|file)\/[^"]+)"/i);
+      if (regexMatch) {
+        const singleStream = yield resolveLink(regexMatch[1], "Unknown", signal, providerContext, isDownload);
+        if (singleStream.length) return deduplicateStreams(singleStream);
       }
       if (getLinkScore(currentLink) > 0) {
-        const streams = yield resolveLink(
-          currentLink,
-          "Unknown",
-          signal,
-          providerContext,
-          isDownload
-        );
-        if (streams.length) return dedupeByLink(streams);
+        const singleStream = yield resolveLink(currentLink, "Unknown", signal, providerContext, isDownload);
+        if (singleStream.length) return deduplicateStreams(singleStream);
       }
-      throwProviderError(
-        "HDHub4u",
-        "stream",
-        new Error("No stream links found on page")
-      );
+      throwProviderError("HDHub4u", "stream", new Error("No stream links found on page"));
       return [];
     }
-    const ordered = Array.from(candidates.entries()).map(([quality, c]) => __spreadValues({ quality }, c)).sort(
-      (a, b) => {
-        var _a2, _b2;
-        return ((_a2 = QUALITY_ORDER[b.quality]) != null ? _a2 : 0) - ((_b2 = QUALITY_ORDER[a.quality]) != null ? _b2 : 0);
-      }
-    );
-    const settled = yield Promise.allSettled(
-      ordered.map(
-        (c) => resolveLink(c.link, c.quality, signal, providerContext, isDownload)
-      )
-    );
+    const streamPromises = [];
+    for (const [textContext, targetLink] of groups.entries()) {
+      let baseQuality = "";
+      const lowerText = textContext.toLowerCase();
+      if (/\b(2160p|4k)\b/i.test(lowerText)) baseQuality = "4K";
+      else if (/\b1080p\b/i.test(lowerText)) baseQuality = "1080p";
+      else if (/\b720p\b/i.test(lowerText)) baseQuality = "720p";
+      else if (/\b480p\b/i.test(lowerText)) baseQuality = "480p";
+      else baseQuality = "Unknown";
+      const sizeMatch = textContext.match(/([0-9]+(?:\.[0-9]+)?\s*(?:MB|GB))/i);
+      const size = sizeMatch ? sizeMatch[1].replace(/\s/g, "").toUpperCase() : "";
+      let extra = "";
+      if (/\bweb-?dl\b/i.test(lowerText)) extra = "WEB-DL";
+      else if (/\bhdrip\b/i.test(lowerText)) extra = "HDRip";
+      else if (/\bblu-?ray\b/i.test(lowerText)) extra = "BluRay";
+      const fullQuality = [baseQuality, extra, size].filter(Boolean).join(" ");
+      streamPromises.push(resolveLink(targetLink, fullQuality, signal, providerContext, isDownload));
+    }
+    const results = yield Promise.allSettled(streamPromises);
     const allStreams = [];
-    for (const r of settled) {
-      if (r.status === "fulfilled" && Array.isArray(r.value)) {
-        allStreams.push(...r.value);
+    results.forEach((result) => {
+      if (result.status === "fulfilled" && Array.isArray(result.value)) {
+        allStreams.push(...result.value);
       }
-    }
+    });
     if (allStreams.length === 0) {
-      throwProviderError(
-        "HDHub4u",
-        "stream",
-        new Error("All quality links failed to resolve")
-      );
+      throwProviderError("HDHub4u", "stream", new Error("All quality links failed to resolve"));
       return [];
     }
-    return dedupeByLink(allStreams);
+    return deduplicateStreams(allStreams);
   });
 }
 __name(getStream, "getStream");
