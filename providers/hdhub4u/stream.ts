@@ -2,25 +2,17 @@ import { ProviderContext } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
 import { throwProviderError } from "../providerErrors";
 
-// ---------------- helpers ----------------
-
+// ---- Helper functions ----
 function rot13(str: string) {
-  return str.replace(/[a-zA-Z]/g, function (char) {
-    const charCode = char.charCodeAt(0);
-    const isUpperCase = char <= "Z";
-    const baseCharCode = isUpperCase ? 65 : 97;
-    return String.fromCharCode(
-      ((charCode - baseCharCode + 13) % 26) + baseCharCode,
-    );
+  return str.replace(/[a-zA-Z]/g, (char) => {
+    const code = char.charCodeAt(0);
+    const base = char <= "Z" ? 65 : 97;
+    return String.fromCharCode(((code - base + 13) % 26) + base);
   });
 }
 
 const safeAtob = (str: string) => {
-  try {
-    return atob(str);
-  } catch {
-    return null;
-  }
+  try { return atob(str); } catch { return null; }
 };
 
 export function decodeString(encryptedString: string) {
@@ -31,11 +23,10 @@ export function decodeString(encryptedString: string) {
     decoded = rot13(decoded);
     decoded = atob(decoded);
     return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
+// ---- Helper to normalize streams from hubcloudExtractor ----
 function normalizeStreams(result: any): any[] {
   if (!result) return [];
   if (Array.isArray(result)) return result;
@@ -43,72 +34,18 @@ function normalizeStreams(result: any): any[] {
   return [];
 }
 
-function dedupeByLink(streams: any[]): any[] {
-  const seen = new Set<string>();
-  const out: any[] = [];
-  for (const s of streams) {
-    if (!s || !s.link) continue;
-    if (seen.has(s.link)) continue;
+// ---- Helper to deduplicate stream arrays by URL ----
+function deduplicateStreams(streams: any[]) {
+  const seen = new Set();
+  return streams.filter((s) => {
+    if (!s || !s.link) return false;
+    if (seen.has(s.link)) return false;
     seen.add(s.link);
-    out.push(s);
-  }
-  return out;
+    return true;
+  });
 }
 
-const QUALITY_ORDER: Record<string, number> = {
-  "4k": 4,
-  "1080p": 3,
-  "720p": 2,
-  "480p": 1,
-  Unknown: 0,
-};
-
-function parseQualityFromText(text: string): string {
-  const t = (text || "").toLowerCase();
-  if (t.includes("2160p") || t.includes("4k")) return "4k";
-  if (t.includes("1080p")) return "1080p";
-  if (t.includes("720p")) return "720p";
-  if (t.includes("480p")) return "480p";
-  return "Unknown";
-}
-
-function getLinkScore(url: string): number {
-  const lower = url.toLowerCase();
-  if (lower.includes("hubcloud") || lower.includes("/drive/")) return 3;
-  if (lower.includes("hubdrive")) return 2;
-  if (lower.includes("hubcdn") || lower.includes("r2.dev")) return 1;
-  return 0;
-}
-
-// Resolve a hubdrive page → hubcloud link (handles meta-refresh + button)
-async function resolveHubdriveToHubcloud(
-  hubdriveUrl: string,
-  signal: AbortSignal,
-  axios: any,
-  cheerio: any,
-  headers: any,
-): Promise<string | null> {
-  try {
-    const res = await axios.get(hubdriveUrl, { headers, signal });
-    const text = res.data || "";
-
-    const meta = text.match(
-      /<META HTTP-EQUIV="refresh"\s+content="0;\s*url=([^"]+)">/i,
-    );
-    if (meta?.[1]) return meta[1];
-
-    const $ = cheerio.load(text);
-    const href =
-      $(".btn.btn-primary.btn-user.btn-success1.m-1").attr("href") ||
-      $(".btn.btn-primary.btn-user.btn-success1").attr("href") ||
-      $('a[href*="hubcloud"], a[href*="/drive/"]').attr("href");
-    return href || null;
-  } catch {
-    return null;
-  }
-}
-
-// Resolve ONE quality link into stream(s)
+// ---- Resolve a single quality link ----
 async function resolveLink(
   link: string,
   quality: string,
@@ -117,28 +54,10 @@ async function resolveLink(
   isDownload?: boolean,
 ): Promise<any[]> {
   const { axios, cheerio, commonHeaders: headers } = providerContext;
-  const lower = link.toLowerCase();
+  const lowerLink = link.toLowerCase();
 
-  // 1) Direct CDN link
-  if (lower.includes("r2.dev") || lower.includes("hubcdn")) {
-    return [{ server: "HubCDN", link, type: "mkv", quality }];
-  }
-
-  // 2) hubdrive → embedded hubcloud → extract
-  if (lower.includes("hubdrive")) {
-    const hc = await resolveHubdriveToHubcloud(
-      link,
-      signal,
-      axios,
-      cheerio,
-      headers,
-    );
-    if (hc) return resolveLink(hc, quality, signal, providerContext, isDownload);
-    return [];
-  }
-
-  // 3) hubcloud / drive → extractor (may return N streams)
-  if (lower.includes("hubcloud") || lower.includes("/drive/")) {
+  // 1) Direct hubcloud drive link
+  if (lowerLink.includes("hubcloud") || lowerLink.includes("/drive/")) {
     try {
       const streams = await hubcloudExtractor(
         link,
@@ -150,9 +69,10 @@ async function resolveLink(
         isDownload,
         "hdhub4u",
       );
-      return normalizeStreams(streams).map((s: any) => ({
+      const normalized = normalizeStreams(streams);
+      return normalized.map((s: any) => ({
         ...s,
-        quality: quality !== "Unknown" ? quality : s.quality || "Unknown",
+        quality: quality !== "Unknown" ? quality : (s.quality || "Unknown"),
         server: s.server || "HubCloud",
       }));
     } catch {
@@ -160,7 +80,41 @@ async function resolveLink(
     }
   }
 
-  // 4) Unknown → still try the extractor
+  // 2) hubdrive link → extract embedded hubcloud
+  if (lowerLink.includes("hubdrive")) {
+    try {
+      const res = await axios.get(link, { headers, signal });
+      const text = res.data;
+
+      const metaRefresh = text.match(/<META HTTP-EQUIV="refresh" content="0; url=([^"]+)">/i);
+      if (metaRefresh) {
+        return resolveLink(metaRefresh[1], quality, signal, providerContext, isDownload);
+      }
+
+      const $ = cheerio.load(text);
+      let hubcloudHref =
+        $(".btn.btn-primary.btn-user.btn-success1.m-1").attr("href") ||
+        $(".btn.btn-primary.btn-user.btn-success1").attr("href");
+
+      if (!hubcloudHref) {
+        hubcloudHref = $('a[href*="hubcloud"], a[href*="/drive/"]').attr("href");
+      }
+
+      if (hubcloudHref) {
+        return resolveLink(hubcloudHref, quality, signal, providerContext, isDownload);
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  // 3) Direct CDN (r2.dev or hubcdn)
+  if (lowerLink.includes("r2.dev") || lowerLink.includes("hubcdn")) {
+    return [{ server: "HubCDN", link, type: "mkv", quality }];
+  }
+
+  // 4) Unknown – try hubcloudExtractor anyway
   try {
     const streams = await hubcloudExtractor(
       link,
@@ -172,9 +126,10 @@ async function resolveLink(
       isDownload,
       "hdhub4u",
     );
-    return normalizeStreams(streams).map((s: any) => ({
+    const normalized = normalizeStreams(streams);
+    return normalized.map((s: any) => ({
       ...s,
-      quality: quality !== "Unknown" ? quality : s.quality || "Unknown",
+      quality: quality !== "Unknown" ? quality : (s.quality || "Unknown"),
       server: s.server || "HubCloud",
     }));
   } catch {
@@ -182,8 +137,7 @@ async function resolveLink(
   }
 }
 
-// ---------------- main ----------------
-
+// ---- Main stream extraction ----
 export async function getStream({
   link,
   type,
@@ -199,176 +153,125 @@ export async function getStream({
 }) {
   const { axios, cheerio, commonHeaders: headers } = providerContext;
 
-  // ---- Fast path 1: link already IS a hubcloud/drive ----
-  if (link.includes("hubcloud") || link.includes("/drive/")) {
-    return await hubcloudExtractor(
-      link,
-      signal,
-      axios,
-      cheerio,
-      headers,
-      providerContext,
-      isDownload,
-      "hdhub4u",
-    );
-  }
-
-  // ---- Fast path 2: link is a hubdrive redirect ----
-  if (link.includes("hubdrive")) {
-    const streams = await resolveLink(
-      link,
-      "Unknown",
-      signal,
-      providerContext,
-      isDownload,
-    );
-    if (streams.length === 0) {
-      throwProviderError(
-        "HDHub4u",
-        "stream",
-        new Error("No streams resolved from hubdrive link"),
-      );
-    }
-    return dedupeByLink(streams);
-  }
-
-  // ---- General path: follow redirects, then scrape quality anchors ----
   let currentLink = link;
-  let text = "";
+  let pageContent = "";
 
+  // 1) Fetch page content and handle intermediate redirects
   try {
     const res = await axios.get(currentLink, { headers, signal });
-    text = res.data || "";
+    pageContent = res.data || "";
 
-    // a) var reurl = "..."
-    const reurlMatch = text.match(/var\s+reurl\s*=\s*["']([^"']+)["']/i);
-    if (reurlMatch?.[1]) {
+    const reurlMatch = pageContent.match(/var\s+reurl\s*=\s*["']([^"']+)["']/i);
+    if (reurlMatch) {
       currentLink = reurlMatch[1];
-      const res2 = await axios.get(currentLink, {
-        headers: { ...headers, Referer: link },
-        signal,
-      });
-      text = res2.data || "";
+      const res2 = await axios.get(currentLink, { headers: { ...headers, Referer: link }, signal });
+      pageContent = res2.data || "";
     }
 
-    // b) obfuscated s('o', '<blob>', 180)
-    const encryptedString = text.split("s('o','")?.[1]?.split("',180")?.[0];
+    const encryptedString = pageContent.split("s('o','")?.[1]?.split("',180")?.[0];
     if (encryptedString) {
       const decoded = decodeString(encryptedString);
       if (decoded?.o) {
         const nextUrl = safeAtob(decoded.o);
         if (nextUrl) {
           currentLink = nextUrl;
-          const res3 = await axios.get(currentLink, {
-            headers: { ...headers, Referer: currentLink },
-            signal,
-          });
-          text = res3.data || "";
+          const res3 = await axios.get(currentLink, { headers: { ...headers, Referer: currentLink }, signal });
+          pageContent = res3.data || "";
         }
       }
     }
   } catch {
-    // continue with whatever text we have
+    // Continue with existing pageContent
   }
 
-  const $ = cheerio.load(text);
+  // 2) Parse quality links from the DOM
+  const $ = cheerio.load(pageContent);
+  const groups = new Map<string, string>();
 
-  // ---- Collect ALL quality candidates ----
-  // key = quality label, value = best link for that quality
-  const candidates = new Map<string, { link: string; score: number }>();
+  const getLinkScore = (url: string) => {
+    const lower = url.toLowerCase();
+    if (lower.includes("hubcloud") || lower.includes("/drive/")) return 3;
+    if (lower.includes("hubdrive")) return 2;
+    if (lower.includes("hubcdn") || lower.includes("r2.dev")) return 1;
+    return 0;
+  };
 
-  $("a").each((_, el) => {
+  $('a').each((_, el) => {
     const href = $(el).attr("href");
     if (!href) return;
     const score = getLinkScore(href);
     if (score === 0) return;
 
-    // Determine the nearest semantic container so sibling links don't
-    // inherit each other's quality text.
-    let ctx = $(el).closest("h1, h2, h3, h4, h5, h6, p, li, tr");
-    if (!ctx.length) {
-      ctx = $(el).parent();
-      if (ctx.is("body, article, .entry-content, main, section")) {
-        ctx = $(el);
+    let container = $(el).closest('h1, h2, h3, h4, h5, h6, p, li, tr');
+    if (!container.length) {
+      container = $(el).parent();
+      if (container.is('body, article, .entry-content, main, section')) {
+        container = $(el);
       }
     }
-    const contextText = `${ctx.text().trim()} ${$(el).text().trim()}`;
-    const quality = parseQualityFromText(contextText);
 
-    const existing = candidates.get(quality);
-    if (!existing || score > existing.score) {
-      candidates.set(quality, { link: href, score });
+    const key = container.text().trim() || $(el).text().trim() || "Unknown";
+
+    const currentBestUrl = groups.get(key);
+    if (!currentBestUrl || score > getLinkScore(currentBestUrl)) {
+      groups.set(key, href);
     }
   });
 
-  // ---- Fallback: no quality anchors found ----
-  if (candidates.size === 0) {
-    const directCdn = $('a[href*="r2.dev"], a[href*="hubcdn"]').attr("href");
-    if (directCdn) {
-      return [
-        { server: "HubCDN", link: directCdn, type: "mkv", quality: "Unknown" },
-      ];
+  if (groups.size === 0) {
+    const regexMatch = pageContent.match(/href="(https:\/\/(?:hubcloud|hubdrive)\.[^\/]+\/(?:drive|file)\/[^"]+)"/i);
+    if (regexMatch) {
+      const singleStream = await resolveLink(regexMatch[1], "Unknown", signal, providerContext, isDownload);
+      if (singleStream.length) return deduplicateStreams(singleStream);
     }
-
-    const regexMatch = text.match(
-      /href="(https:\/\/(?:hubcloud|hubdrive)\.[^\/]+\/(?:drive|file)\/[^"]+)"/i,
-    );
-    if (regexMatch?.[1]) {
-      const streams = await resolveLink(
-        regexMatch[1],
-        "Unknown",
-        signal,
-        providerContext,
-        isDownload,
-      );
-      if (streams.length) return dedupeByLink(streams);
-    }
-
     if (getLinkScore(currentLink) > 0) {
-      const streams = await resolveLink(
-        currentLink,
-        "Unknown",
-        signal,
-        providerContext,
-        isDownload,
-      );
-      if (streams.length) return dedupeByLink(streams);
+      const singleStream = await resolveLink(currentLink, "Unknown", signal, providerContext, isDownload);
+      if (singleStream.length) return deduplicateStreams(singleStream);
     }
-
-    throwProviderError(
-      "HDHub4u",
-      "stream",
-      new Error("No stream links found on page"),
-    );
+    throwProviderError("HDHub4u", "stream", new Error("No stream links found on page"));
+    return [];
   }
 
-  // ---- Resolve every quality concurrently, preserving label ----
-  const ordered = Array.from(candidates.entries())
-    .map(([quality, c]) => ({ quality, ...c }))
-    .sort(
-      (a, b) => (QUALITY_ORDER[b.quality] ?? 0) - (QUALITY_ORDER[a.quality] ?? 0),
-    );
+  // 3) Concurrently resolve streams with parsed quality metadata
+  const streamPromises: Promise<any[]>[] = [];
 
-  const settled = await Promise.allSettled(
-    ordered.map((c) =>
-      resolveLink(c.link, c.quality, signal, providerContext, isDownload),
-    ),
-  );
+  for (const [textContext, targetLink] of groups.entries()) {
+    let baseQuality = "";
+    const lowerText = textContext.toLowerCase();
 
+    if (/\b(2160p|4k)\b/i.test(lowerText)) baseQuality = "4K";
+    else if (/\b1080p\b/i.test(lowerText)) baseQuality = "1080p";
+    else if (/\b720p\b/i.test(lowerText)) baseQuality = "720p";
+    else if (/\b480p\b/i.test(lowerText)) baseQuality = "480p";
+    else baseQuality = "Unknown";
+
+    const sizeMatch = textContext.match(/([0-9]+(?:\.[0-9]+)?\s*(?:MB|GB))/i);
+    const size = sizeMatch ? sizeMatch[1].replace(/\s/g, '').toUpperCase() : "";
+
+    let extra = "";
+    if (/\bweb-?dl\b/i.test(lowerText)) extra = "WEB-DL";
+    else if (/\bhdrip\b/i.test(lowerText)) extra = "HDRip";
+    else if (/\bblu-?ray\b/i.test(lowerText)) extra = "BluRay";
+
+    const fullQuality = [baseQuality, extra, size].filter(Boolean).join(" ");
+
+    streamPromises.push(resolveLink(targetLink, fullQuality, signal, providerContext, isDownload));
+  }
+
+  // 4) Collect and deduplicate active stream links
+  const results = await Promise.allSettled(streamPromises);
   const allStreams: any[] = [];
-  for (const r of settled) {
-    if (r.status === "fulfilled" && Array.isArray(r.value)) {
-      allStreams.push(...r.value);
+
+  results.forEach((result) => {
+    if (result.status === "fulfilled" && Array.isArray(result.value)) {
+      allStreams.push(...result.value);
     }
-  }
+  });
 
   if (allStreams.length === 0) {
-    throwProviderError(
-      "HDHub4u",
-      "stream",
-      new Error("All quality links failed to resolve"),
-    );
+    throwProviderError("HDHub4u", "stream", new Error("All quality links failed to resolve"));
+    return [];
   }
 
-  return dedupeByLink(allStreams);
+  return deduplicateStreams(allStreams);
 }
