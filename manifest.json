@@ -235,7 +235,7 @@
   {
     "display_name": "HdHub4u",
     "value": "hdhub4u",
-    "version": "2.29",
+    "version": "2.30",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/hdhub4u.png",
     "type": "global",
     "disabled": false,
