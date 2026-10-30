@@ -128,28 +128,50 @@ export async function getStream({
     $('a[href*="hubcloud"][href*="/drive/"], a[href*="hubdrive"]').each((i, el) => {
       const href = $(el).attr("href");
       if (!href) return;
-      const t =
-        $(el).text().toLowerCase() +
-        $(el).parent().text().toLowerCase() +
-        $(el).parent().parent().text().toLowerCase();
-
+      // Stop at the nearest labelled row; wider containers include other qualities.
       let quality = "Unknown";
-      if (t.includes("2160p") || t.includes("4k")) quality = "4k";
-      else if (t.includes("1080p")) quality = "1080p";
-      else if (t.includes("720p")) quality = "720p";
-      else if (t.includes("480p")) quality = "480p";
+      let row = $(el);
+      for (let depth = 0; depth < 4 && row.length; depth++, row = row.parent()) {
+        const text = row.text();
+        const matches = [...text.matchAll(/\b(2160|1080|720|480|360)p\b|\b4k\b/gi)];
+        const values = [...new Set(matches.map(m => /4k|2160/i.test(m[0]) ? "4k" : m[1] + "p"))];
+        if (values.length === 1) { quality = values[0]; break; }
+        if (values.length > 1) break;
+      }
 
       driveLinks.push({ quality, link: href });
     });
 
-    const qualityOrder: Record<string, number> = {
-      "4k": 4,
-      "1080p": 3,
-      "720p": 2,
-      "480p": 1,
-      Unknown: 0,
-    };
-    driveLinks.sort((a, b) => qualityOrder[b.quality] - qualityOrder[a.quality]);
+    const qualityValue = (q: string) => q === "4k" ? 2160 : Number(q.replace("p", "")) || 0;
+    const saved = await providerContext.kvStore?.get<string[]>("hdhub4u_preferredQualities");
+    const preferences = (Array.isArray(saved) ? saved : ["1080"])
+      .map(q => qualityValue(String(q))).filter(q => q > 0);
+    if (!preferences.length) preferences.push(1080);
+    const known = driveLinks.filter(d => qualityValue(d.quality));
+    let selected = known.filter(d => preferences.includes(qualityValue(d.quality)));
+    if (!selected.length && known.length) {
+      const distance = (d: {quality: string}) => Math.min(...preferences.map(q => Math.abs(q - qualityValue(d.quality))));
+      known.sort((a,b) => distance(a) - distance(b) || qualityValue(b.quality) - qualityValue(a.quality));
+      selected = known.filter(d => d.quality === known[0].quality);
+    }
+    if (!selected.length && driveLinks.length) selected = [driveLinks[0]];
+    selected.sort((a,b) => qualityValue(b.quality) - qualityValue(a.quality));
+    // HubDrive and HubCloud buttons in one row are mirrors of the same file.
+    const unique = selected.filter((item, i, all) => all.findIndex(d => d.quality === item.quality) === i);
+    if (unique.length) {
+      const streams = [];
+      for (const item of unique) {
+        try {
+          const resolved = await getStream({link: item.link, type, signal, providerContext, isDownload});
+          streams.push(...resolved.map(stream => ({...stream, quality: stream.quality || String(qualityValue(item.quality)), server: item.quality + " · " + stream.server})));
+        } catch (error) {
+          if (signal?.aborted) throw error;
+          if (unique.length === 1) throw error;
+        }
+      }
+      if (streams.length) return streams;
+      throw new Error("Could not resolve the selected HDHub4u qualities. Please retry.");
+    }
 
     hubdriveLink =
       driveLinks[0]?.link ||
