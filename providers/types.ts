@@ -242,7 +242,15 @@ interface SettingsNumberField extends SettingsFieldBase {
   max?: number;
 }
 
+export interface SettingsButtonField extends SettingsFieldBase {
+  type: "button";
+  /** Optional button text; defaults to label. */
+  buttonLabel?: string;
+  defaultValue?: never;
+}
+
 export type SettingsField =
+  | SettingsButtonField
   | SettingsTextField
   | SettingsToggleField
   | SettingsSelectField
