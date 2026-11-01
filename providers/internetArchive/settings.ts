@@ -17,5 +17,17 @@ export const getSettingsSchema = async function ({
       ],
       defaultValue: "open",
     },
+    {
+      key: "sort",
+      type: "select",
+      label: "Order",
+      description: "How lists and search results are sorted",
+      options: [
+        { label: "Most popular", value: "downloads" },
+        { label: "Recently added", value: "addeddate" },
+        { label: "Highest rated", value: "avg_rating" },
+      ],
+      defaultValue: "downloads",
+    },
   ];
 };

@@ -3,6 +3,7 @@ import {
   buildSearchUrl,
   firstValue,
   getLicenseFilter,
+  getSortOrder,
   imageUrl,
   sanitizeQuery,
 } from "./api";
@@ -13,8 +14,11 @@ const searchItems = async (
   providerContext: ProviderContext,
   signal?: AbortSignal,
 ): Promise<Post[]> => {
-  const license = await getLicenseFilter(providerContext);
-  const url = buildSearchUrl(`(${query}) AND mediatype:movies AND ${license}`, page);
+  const [license, sort] = await Promise.all([
+    getLicenseFilter(providerContext),
+    getSortOrder(providerContext),
+  ]);
+  const url = buildSearchUrl(`(${query}) AND mediatype:movies AND ${license}`, page, 24, sort);
   const res = await providerContext.axios.get(url, {
     headers: providerContext.commonHeaders,
     signal,
