@@ -205,10 +205,11 @@ export const subtitleTracks = (
   video?: string,
 ): TextTracks => {
   const subtitles = files.filter(isSubtitleFile);
-  const videoBase = video ? baseName(video).toLowerCase() : "";
+  const pathStem = (name: string): string => name.replace(/\.[^/.]+$/, "").toLowerCase();
+  const videoBase = video ? pathStem(video) : "";
   // "Ep1.en.srt" belongs to "Ep1.mp4", but "Ep10.srt" does not.
   const belongsToVideo = (name: string): boolean => {
-    const base = baseName(name).toLowerCase();
+    const base = pathStem(name);
     return base === videoBase || (base.startsWith(videoBase) && /[\s._(\[-]/.test(base[videoBase.length]));
   };
   const matching = videoBase ? subtitles.filter((f) => belongsToVideo(f.name)) : subtitles;
@@ -217,7 +218,7 @@ export const subtitleTracks = (
   const byName = new Map<string, ArchiveFile>();
   for (const file of matching) {
     if (file.size !== undefined && Number(file.size) === 0) continue;
-    const key = baseName(file.name).toLowerCase();
+    const key = pathStem(file.name);
     const kept = byName.get(key);
     if (!kept || (extensionOf(file.name) === ".vtt" && extensionOf(kept.name) !== ".vtt")) {
       byName.set(key, file);

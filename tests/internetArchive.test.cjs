@@ -170,3 +170,23 @@ test("episode links from getMeta find their own subtitles, even with % and space
     assert.equal(decodeURIComponent(new URL(stream.subtitles[0].uri).pathname), `/download/show/${base}.en.srt`);
   }
 });
+
+
+test("episode subtitle matching and deduplication preserve season directories", async () => {
+  const files = [
+    { name: "Season 1/Episode 1.mp4", source: "original" },
+    { name: "Season 2/Episode 1.mp4", source: "original" },
+    { name: "Season 1/Episode 1.en.vtt", size: "100" },
+    { name: "Season 2/Episode 1.en.srt", size: "100" },
+    { name: "Season 2/Episode 1.en.vtt", size: "100" },
+  ];
+  const c = context({ "/metadata/show": { metadata: { title: "Show" }, files } });
+  const [stream] = await getStream({
+    link: "show/Season%202/Episode%201.mp4", type: "series", providerContext: c.ctx,
+  });
+  assert.deepEqual(plain(stream.subtitles.map((s) => s.uri)), [
+    "https://archive.org/download/show/Season%202/Episode%201.en.vtt",
+  ]);
+  // Without a selected episode, only twins within the same directory collapse.
+  assert.equal(api.subtitleTracks("show", files).length, 2);
+});
