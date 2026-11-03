@@ -193,17 +193,21 @@ function utf8ToBytes(str: string): Uint8Array {
 }
 
 function bytesToUtf8(bytes: Uint8Array): string {
-  if (typeof TextDecoder !== "undefined") {
-    return new TextDecoder().decode(bytes);
+  // QuickJS's TextDecoder shim concatenates one byte at a time. Avoid that
+  // quadratic path for both the encrypted HTTP body and decrypted catalog.
+  const chunks: string[] = [];
+  for (let offset = 0; offset < bytes.length; offset += 8192) {
+    chunks.push(String.fromCharCode.apply(null, Array.from(bytes.subarray(offset, offset + 8192))));
   }
-  if (typeof Buffer !== "undefined") {
-    return Buffer.from(bytes).toString("utf8");
+  return decodeURIComponent(escape(chunks.join("")));
+}
+
+function decodeResponseBody(body: any): any {
+  if (body instanceof ArrayBuffer) return bytesToUtf8(new Uint8Array(body));
+  if (ArrayBuffer.isView(body)) {
+    return bytesToUtf8(new Uint8Array(body.buffer, body.byteOffset, body.byteLength));
   }
-  let str = "";
-  for (let i = 0; i < bytes.length; i++) {
-    str += String.fromCharCode(bytes[i]);
-  }
-  return decodeURIComponent(escape(str));
+  return body;
 }
 
 /** AES-128 key = decode_b64(securityKey) + "T!BgJB", padded/truncated to 16 bytes. */
@@ -254,8 +258,9 @@ async function getSecurityKey(ctx: ProviderContext): Promise<Uint8Array> {
 
   const base = await getApiBase();
   const url = `${base}/v0.1/system/getSecurityKey/1?channel=${CHANNEL}&clientType=${CLIENT_TYPE}&lang=${LANG}`;
-  const res = await ctx.axios.get(url, { headers: { "User-Agent": UA } });
-  const data = typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+  const res = await ctx.axios.get(url, { headers: { "User-Agent": UA }, responseType: "arraybuffer" });
+  const responseBody = decodeResponseBody(res.data);
+  const data = typeof responseBody === "string" ? JSON.parse(responseBody) : responseBody;
   if (!data || data.code !== 200 || !data.data) {
     throw new Error("CastleTV: failed to fetch security key");
   }
@@ -276,6 +281,7 @@ function extractCipher(body: any): string {
 }
 
 async function unwrap(body: any, key: Uint8Array): Promise<any> {
+  body = decodeResponseBody(body);
   try {
     const j = typeof body === "string" ? JSON.parse(body) : body;
     if (j && typeof j === "object" && j.data && typeof j.data === "object") return j;
@@ -295,6 +301,7 @@ export async function fetchDecrypted(url: string, ctx: ProviderContext, signal?:
   const key = await getSecurityKey(ctx);
   const res = await ctx.axios.get(url, {
     headers: { "User-Agent": UA },
+    responseType: "arraybuffer",
     ...(signal ? { signal } : {}),
   });
   return unwrap(res.data, key);
@@ -304,6 +311,7 @@ export async function postDecrypted(url: string, body: any, ctx: ProviderContext
   const key = await getSecurityKey(ctx);
   const res = await ctx.axios.post(url, body, {
     headers: { "User-Agent": UA, "Content-Type": "application/json; charset=utf-8" },
+    responseType: "arraybuffer",
     ...(signal ? { signal } : {}),
   });
   return unwrap(res.data, key);
