@@ -7,7 +7,7 @@ let cachedServers: any[] = [
   { name: "Solara" },
   { name: "Athens" },
 ];
-let lastServerFetchTime = Date.now();
+let lastServerFetchTime = 0;
 
 function safeBtoa(str: string): string {
   if (typeof btoa !== "undefined") return btoa(str);
@@ -157,21 +157,23 @@ export async function extractCinejoyStreams({
       }
     }
 
-    // 2. Refresh available servers in background (cache for 5 minutes)
-    const now = Date.now();
-    if (now - lastServerFetchTime > 300000) {
-      axios
-        .get("https://api.wing.st/servers", { headers, timeout: 5000, signal })
-        .then((sRes: any) => {
-          if (sRes.data?.servers?.length) {
-            // Filter out Lisbon (lit.cheaptruckrepairs.cc returns 502 Bad Gateway on segments)
-            cachedServers = sRes.data.servers.filter(
-              (s: any) => s && s.name !== "Lisbon" && s.status !== "offline"
-            );
+    // Refresh before resolving, including the first request in a new sandbox.
+    // Keep the fallback list when the server directory is unavailable.
+    if (Date.now() - lastServerFetchTime > 300000) {
+      try {
+        const sRes = await axios.get("https://api.wing.st/servers", {
+          headers, timeout: 5000, signal,
+        });
+        if (Array.isArray(sRes.data?.servers) && sRes.data.servers.length) {
+          const available = sRes.data.servers.filter(
+            (s: any) => s && s.name && s.name !== "Lisbon" && s.status !== "offline"
+          );
+          if (available.length) {
+            cachedServers = available;
             lastServerFetchTime = Date.now();
           }
-        })
-        .catch(() => {});
+        }
+      } catch {}
     }
 
     // 3. Start fetching external subtitles concurrently
@@ -368,6 +370,14 @@ export async function extractCinejoyStreams({
               ) {
                 continue;
               }
+              // Some resolvers return a URL even while its upstream is down.
+              // Check the manifest before offering it to the player.
+              try {
+                const playlist = await axios.get(item.playlist, {
+                  headers: streamHeaders, timeout: 4000, signal,
+                });
+                if (typeof playlist.data !== "string" || !playlist.data.trimStart().startsWith("#EXTM3U")) continue;
+              } catch { continue; }
               streams.push({
                 server: `Cinejoy - ${serverName}${srv["4k"] ? " (4K)" : ""}`,
                 link: item.playlist,

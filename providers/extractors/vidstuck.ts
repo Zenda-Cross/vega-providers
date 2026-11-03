@@ -600,46 +600,27 @@ function md5(bytes: Uint8Array): Uint8Array {
 function decodeBase64ToUint8(str: string): Uint8Array {
   const clean = str.replace(/-/g, "+").replace(/_/g, "/");
   const pad = clean.padEnd(4 * Math.ceil(clean.length / 4), "=");
-  if (typeof Buffer !== "undefined") {
-    return new Uint8Array(Buffer.from(pad, "base64"));
-  }
   if (typeof atob !== "undefined") {
     const bin = atob(pad);
     const u8 = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
     return u8;
   }
-  return new Uint8Array(0);
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const bytes: number[] = [];
+  let value = 0, bits = 0;
+  for (const ch of pad.replace(/=+$/, "")) {
+    const digit = alphabet.indexOf(ch);
+    if (digit < 0) throw new Error("Invalid Vidstuck base64");
+    value = (value << 6) | digit;
+    bits += 6;
+    if (bits >= 8) { bits -= 8; bytes.push((value >>> bits) & 255); }
+  }
+  return new Uint8Array(bytes);
 }
 
 function opensslDecrypt(b64Ciphertext: string, passphrase: string): string {
   try {
-    // Fast-path: Use Node crypto if running in Node test harness
-    if (typeof process !== "undefined" && typeof require === "function") {
-      try {
-        const nodeCrypto = require("crypto");
-        if (nodeCrypto && typeof nodeCrypto.createDecipheriv === "function") {
-          const raw = Buffer.from(b64Ciphertext, "base64");
-          if (raw.length >= 16 && raw.subarray(0, 8).toString("latin1") === "Salted__") {
-            const salt = raw.subarray(8, 16);
-            const cipher = raw.subarray(16);
-            let keyIv = Buffer.alloc(0);
-            let d = Buffer.alloc(0);
-            while (keyIv.length < 48) {
-              d = nodeCrypto.createHash("md5").update(Buffer.concat([d, Buffer.from(passphrase, "utf8"), salt])).digest();
-              keyIv = Buffer.concat([keyIv, d]);
-            }
-            const k = keyIv.subarray(0, 32);
-            const iv = keyIv.subarray(32, 48);
-            const decipher = nodeCrypto.createDecipheriv("aes-256-cbc", k, iv);
-            const dec = Buffer.concat([decipher.update(cipher), decipher.final()]).toString("utf8");
-            if (dec.startsWith("/") || dec.startsWith("http")) return dec;
-          }
-        }
-      } catch {}
-    }
-
-    // Pure JS fallback (fully sandbox safe)
     const raw = decodeBase64ToUint8(b64Ciphertext);
     if (raw.length < 16) return "";
     const magic = String.fromCharCode.apply(null, Array.from(raw.subarray(0, 8)));
@@ -665,6 +646,7 @@ function opensslDecrypt(b64Ciphertext: string, passphrase: string): string {
       }
     }
 
+    if (!cipher.length || cipher.length % 16) return "";
     const keyBytes = new Uint8Array(derived.slice(0, 32));
     const ivBytes = new Uint8Array(derived.slice(32, 48));
 
@@ -729,17 +711,17 @@ export async function extractVidstuckStreams({
   };
 
   const API_KEYS = {
-    tmdbId: "a7f39c821d604e5b9c1e547b",
-    mediaType: "c281b306d28147a35632e816b",
-    server: "6b491e7258d392e7561a9384c",
-    season: "d8427b59c38a2f957c3613e85b",
-    episode: "91c6e4a753d1f785c92346b713d",
-    ts: "61d9a5274c8e3b29f38c291e6",
-    token: "c492f7a183d601e436c538a716d",
-    title: "5e28c9147a306d1e29f3674b392a1",
-    year: "b731e6c94f08675f8341c306e",
-    date: "e1649321a39e5814b3027",
-    imdbId: "f35a8c1943265e871c4933a725f",
+    tmdbId: "a7f39c821d604e5b91e57b",
+    mediaType: "c81306d28147a35632e816b",
+    server: "6b491e258392e7561a9384c",
+    season: "d8427b5c382f957c3613e85b",
+    episode: "91c6ea75d1f785c92346b713d",
+    ts: "61d9a5274c8e3b2f38291e6",
+    token: "c492f7a183d01e36c538a716d",
+    title: "5e28c9147a06de29f3674b392a1",
+    year: "b731e6c94f867f8341c306e",
+    date: "e16493139e5814b3027",
+    imdbId: "f35a8194265e871c4933a725f",
   };
 
   const effectiveDate = date || (year ? `${year}-01-01` : "2020-01-01");
@@ -748,7 +730,7 @@ export async function extractVidstuckStreams({
   const subPromise = (async (): Promise<TextTracks> => {
     try {
       const subTokenRes = await axios.post(
-        `${BASE_URL}/backend/vidstuck`,
+        `${BASE_URL}/backend/raider`,
         {
           [API_KEYS.tmdbId]: Number(tmdbId),
           [API_KEYS.mediaType]: mediaType,
@@ -814,7 +796,7 @@ export async function extractVidstuckStreams({
       }
 
       const tokenRes = await axios.post(
-        `${BASE_URL}/backend/vidstuck`,
+        `${BASE_URL}/backend/raider`,
         postPayload,
         { headers, timeout: 4500, signal }
       );
