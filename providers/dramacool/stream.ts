@@ -72,7 +72,7 @@ async function extractVidbasicPlayer(
     const parsedPlayer = new URL(playerUrl);
     const subParam = parsedPlayer.searchParams.get("sub");
     if (subParam) {
-      const subUrl = await decryptVidbasicAes(decodeURIComponent(subParam));
+      const subUrl = await decryptVidbasicAes(subParam);
       if (subUrl && subUrl.startsWith("http")) {
         subtitles.push({
           title: "English",
