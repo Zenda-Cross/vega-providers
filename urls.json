@@ -182,5 +182,9 @@
   "mxplayer": {
     "name": "mxplayer",
     "url": "https://www.mxplayer.in"
+  },
+  "RareAnimes": {
+    "name": "RareAnimes",
+    "url": "https://www.rareanimes.mov"
   }
 }
