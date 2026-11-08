@@ -21,12 +21,15 @@ free and legal to watch. The provider brings them into Vega.
 What it does:
 
 - **Home screen rows:** Popular Classic Films, Silent Films, Sci-Fi & Horror,
-  Classic TV, Cartoons & Animation and Short Films.
-- **Genres:** Drama, Comedy, Horror, Western, Mystery, Romance, War, Film Noir
-  and Science Fiction.
-- **Search** across the whole video collection.
-- **Details page** with title, description, poster, the year and subjects as
-  tags, and the IMDb ID when the item has one.
+  Film Noir, Classic TV, Cartoons & Animation, Short Films, Movie Trailers and
+  Prelinger Archives.
+- **Genres:** Drama, Comedy, Horror, Western, Mystery, Romance, War, Film Noir,
+  Science Fiction, Adventure, Crime, Musical and Documentary, plus the films of
+  each decade from the 1920s to the 1970s.
+- **Search** across the whole video collection by title or creator. End the
+  search with a year, such as `dracula 1931`, to narrow it to that year.
+- **Details page** with title, description, poster, the year, runtime and
+  subjects as tags, and the IMDb ID when the item has one.
 - **Playback** of the original video files (MP4 and others). An item with
   several versions of one film (different qualities) is shown as one movie
   with a choice of quality, not as a series.
@@ -34,8 +37,11 @@ What it does:
   the player, named by language; Internet Archive's own speech-recognition
   captions are labelled "Automatic captions".
 - **Settings:** in Vega's Provider Manager choose "Public domain and Creative
-  Commons" (default) or "Public domain only", and sort lists by most popular,
-  recently added or highest rated.
+  Commons" (default) or "Public domain only", sort lists by most popular,
+  recently added, highest rated, newest release, oldest release or title, and
+  pick a preferred quality so the closest resolution is listed first.
+- **Reliability:** a request that fails with a network error, a 429 or a 5xx
+  response is retried once, and duplicate search results are listed once.
 
 It uses the official Internet Archive search and metadata APIs, not page
 scraping, so it does not break when the website's layout changes.
@@ -62,7 +68,7 @@ git clone https://github.com/Tanzeel0Hussain/zenda-vega-providers.git
 cd zenda-vega-providers
 npm install
 npm run build              # compiles providers/ into dist/
-npm run test:unit          # offline tests, no network needed
+npm run test:unit          # builds, then runs the offline tests, no network needed
 npm run test:provider      # interactive: pick "internetArchive", then a function such as getPosts
 ```
 

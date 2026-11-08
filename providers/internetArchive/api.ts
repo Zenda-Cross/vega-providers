@@ -2,8 +2,6 @@ import { ProviderContext, TextTracks } from "../types";
 
 export const IA_BASE = "https://archive.org";
 
-// Only items whose uploader marked them public domain or Creative Commons.
-// creativecommons.org/publicdomain/... matches both patterns.
 const LICENSE_FILTERS: Record<string, string> = {
   publicDomain: "licenseurl:*publicdomain*",
   open: "licenseurl:(*publicdomain* OR *creativecommons*)",
@@ -26,12 +24,16 @@ export interface ArchiveItem {
   files: ArchiveFile[];
 }
 
-// Sort orders offered in the provider settings; "downloads" is the default.
 const SORT_ORDERS: Record<string, string> = {
   downloads: "downloads desc",
   addeddate: "addeddate desc",
   avg_rating: "avg_rating desc",
+  newest: "date desc",
+  oldest: "date asc",
+  title: "titleSorter asc",
 };
+
+const QUALITY_CHOICES = ["1080", "720", "480", "360"];
 
 export const getSortOrder = async (providerContext: ProviderContext): Promise<string> => {
   const choice = await providerContext.kvStore?.get<string>("sort");
@@ -43,6 +45,13 @@ export const getLicenseFilter = async (
 ): Promise<string> => {
   const choice = await providerContext.kvStore?.get<string>("licenses");
   return LICENSE_FILTERS[choice || "open"] || LICENSE_FILTERS.open;
+};
+
+export const getPreferredHeight = async (
+  providerContext: ProviderContext,
+): Promise<number> => {
+  const choice = await providerContext.kvStore?.get<string>("quality");
+  return choice && QUALITY_CHOICES.includes(choice) ? Number(choice) : 0;
 };
 
 export const buildSearchUrl = (
@@ -61,9 +70,26 @@ export const buildSearchUrl = (
   );
 };
 
-// Drops the characters that change the meaning of a Lucene query.
 export const sanitizeQuery = (text: string): string =>
   text.replace(/[\\+\-!(){}\[\]^"~*?:\/&|]/g, " ").replace(/\s+/g, " ").trim();
+
+export const parseSearch = (text: string): { words: string; year?: string } => {
+  const cleaned = sanitizeQuery(text);
+  const match = cleaned.match(/(?:^|\s)((?:18|19|20)\d{2})$/);
+  if (!match) return { words: cleaned };
+  return {
+    words: cleaned.slice(0, cleaned.length - match[0].length).trim(),
+    year: match[1],
+  };
+};
+
+export const buildSearchQuery = (text: string): string => {
+  const { words, year } = parseSearch(text);
+  const parts: string[] = [];
+  if (words) parts.push(`(title:(${words}) OR creator:(${words}))`);
+  if (year) parts.push(`year:${year}`);
+  return parts.join(" AND ");
+};
 
 export const imageUrl = (identifier: string): string =>
   `${IA_BASE}/services/img/${encodeURIComponent(identifier)}`;
@@ -74,8 +100,6 @@ export const fileUrl = (identifier: string, fileName: string): string =>
     .map(encodeURIComponent)
     .join("/")}`;
 
-// Links are "identifier" for a whole item or "identifier/fileName" for one
-// video inside an item that holds several (e.g. TV episodes).
 export const parseLink = (
   link: string,
 ): { identifier: string; fileName?: string } => {
@@ -88,14 +112,43 @@ export const parseLink = (
   };
 };
 
+const isRetryable = (error: any): boolean => {
+  if (error?.code === "ERR_CANCELED" || error?.name === "CanceledError") return false;
+  const status = error?.response?.status;
+  return !status || status === 429 || status >= 500;
+};
+
+export const getWithRetry = async (
+  url: string,
+  providerContext: ProviderContext,
+  signal?: AbortSignal,
+  attempts = 2,
+): Promise<any> => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (signal?.aborted) break;
+    try {
+      return await providerContext.axios.get(url, {
+        headers: providerContext.commonHeaders,
+        signal,
+      });
+    } catch (error) {
+      lastError = error;
+      if (!isRetryable(error)) throw error;
+    }
+  }
+  throw lastError ?? new Error("Internet Archive request was cancelled");
+};
+
 export const fetchItem = async (
   identifier: string,
   providerContext: ProviderContext,
   signal?: AbortSignal,
 ): Promise<ArchiveItem> => {
-  const res = await providerContext.axios.get(
+  const res = await getWithRetry(
     `${IA_BASE}/metadata/${encodeURIComponent(identifier)}`,
-    { headers: providerContext.commonHeaders, signal },
+    providerContext,
+    signal,
   );
   if (!res.data?.metadata) {
     throw new Error(`Internet Archive item not found: ${identifier}`);
@@ -103,10 +156,35 @@ export const fetchItem = async (
   return { metadata: res.data.metadata, files: res.data.files || [] };
 };
 
-// Metadata fields can be a string or an array of strings.
 export const firstValue = (value: unknown): string => {
   if (Array.isArray(value)) return String(value[0] ?? "");
   return value == null ? "" : String(value);
+};
+
+export const listValues = (value: unknown): string[] =>
+  ([] as unknown[])
+    .concat(value ?? [])
+    .flatMap((entry) => String(entry).split(";"))
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+export const parseDuration = (length?: string): number => {
+  if (!length) return 0;
+  if (length.includes(":")) {
+    return length
+      .split(":")
+      .reduce((total, part) => total * 60 + (Number(part) || 0), 0);
+  }
+  return Number(length) || 0;
+};
+
+export const formatRuntime = (seconds: number): string => {
+  if (!seconds || seconds < 60) return "";
+  const minutes = Math.round(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (!hours) return `${minutes}m`;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
 };
 
 export const isVideoFile = (file: ArchiveFile): boolean => {
@@ -118,8 +196,6 @@ export const isVideoFile = (file: ArchiveFile): boolean => {
 const EPISODE_NAME = /s\d{1,2}\s*e\d{1,3}|\bep(isode)?[\s._-]*\d+|\bpart[\s._-]*\d+|\bchapter[\s._-]*\d+|\b\d{1,2}x\d{2}\b/i;
 const TV_COLLECTIONS = ["classic_tv", "television"];
 
-// An item with several uploads is either a show (one upload per episode) or
-// one film uploaded in several versions (e.g. "iPod" and "PS3" encodes).
 export const isEpisodeList = (
   originals: string[],
   metadata: Record<string, any>,
@@ -133,8 +209,6 @@ export const isEpisodeList = (
   return named >= Math.ceil(originals.length / 2);
 };
 
-// Groups an item's video files by the original upload they come from, so each
-// group is one movie, episode or version with all its derived formats.
 export const groupVideos = (files: ArchiveFile[]): Map<string, ArchiveFile[]> => {
   const groups = new Map<string, ArchiveFile[]>();
   for (const file of files.filter(isVideoFile)) {
@@ -150,14 +224,11 @@ export const groupVideos = (files: ArchiveFile[]): Map<string, ArchiveFile[]> =>
   );
 };
 
-// --- subtitles ---------------------------------------------------------------
-
 const SUBTITLE_TYPES: Record<string, TextTracks[number]["type"]> = {
   ".srt": "application/x-subrip",
   ".vtt": "text/vtt",
 };
 
-// Language words and codes seen in subtitle file names -> [ISO 639-1, name].
 const LANGUAGES: Record<string, [string, string]> = {};
 for (const [code, name, ...aliases] of [
   ["en", "English", "eng", "english"],
@@ -190,15 +261,11 @@ const baseName = (name: string): string =>
 export const isSubtitleFile = (file: ArchiveFile): boolean =>
   !file.name.toLowerCase().includes(".thumbs/") && extensionOf(file.name) in SUBTITLE_TYPES;
 
-// "Film.en.srt", "Film_english.vtt", "Film (Spanish).srt" -> language. Only
-// the last word counts, so a title like "It Happened One Night" is not Italian.
 export const subtitleLanguage = (fileName: string): [string, string] | undefined => {
   const words = baseName(fileName).toLowerCase().split(/[\s._()\[\]-]+/).filter(Boolean);
   return LANGUAGES[words[words.length - 1] ?? ""];
 };
 
-// Subtitles for one video: files named after it (episodes), or every
-// subtitle in the item when there is only one film.
 export const subtitleTracks = (
   identifier: string,
   files: ArchiveFile[],
@@ -207,14 +274,11 @@ export const subtitleTracks = (
   const subtitles = files.filter(isSubtitleFile);
   const pathStem = (name: string): string => name.replace(/\.[^/.]+$/, "").toLowerCase();
   const videoBase = video ? pathStem(video) : "";
-  // "Ep1.en.srt" belongs to "Ep1.mp4", but "Ep10.srt" does not.
   const belongsToVideo = (name: string): boolean => {
     const base = pathStem(name);
     return base === videoBase || (base.startsWith(videoBase) && /[\s._(\[-]/.test(base[videoBase.length]));
   };
   const matching = videoBase ? subtitles.filter((f) => belongsToVideo(f.name)) : subtitles;
-  // Seen on archive.org: empty files, and the same captions as both .srt and
-  // .vtt. Skip the empty ones and keep one file per name, preferring WebVTT.
   const byName = new Map<string, ArchiveFile>();
   for (const file of matching) {
     if (file.size !== undefined && Number(file.size) === 0) continue;
@@ -225,7 +289,6 @@ export const subtitleTracks = (
     }
   }
   return [...byName.values()].map((file) => {
-    // Internet Archive makes "<name>.asr.srt" itself, by speech recognition.
     const automatic = /\.asr$/i.test(baseName(file.name));
     const language = subtitleLanguage(automatic ? baseName(file.name) : file.name);
     const name = language ? language[1] : baseName(file.name).replace(/_+/g, " ");

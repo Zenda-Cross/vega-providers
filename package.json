@@ -8,6 +8,7 @@
   "main": "index.js",
   "scripts": {
     "test": "node tests/test-providers.js",
+    "test:unit": "npm run build && node --test tests/internetArchive.test.cjs tests/internetArchive-links.test.cjs",
     "test:provider": "node tests/test-provider.js",
     "build": "node build-bundled.js",
     "build:dev": "cross-env SKIP_MINIFY=true node build-bundled.js",
