@@ -155,7 +155,7 @@
   {
     "display_name": "EonMovies",
     "value": "eonMovies",
-    "version": "1.16",
+    "version": "1.17",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/eonMovies.png",
     "type": "global",
     "disabled": false,
