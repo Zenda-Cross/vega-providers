@@ -534,5 +534,14 @@
     "disabled": false,
     "hasSettings": true,
     "moduleVersionHeader": true
+  },
+  {
+    "display_name": "Rareanimes",
+    "value": "rareanimes",
+    "version": "1.0",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/rareanimes.png",
+    "type": "india",
+    "disabled": false,
+    "moduleVersionHeader": true
   }
 ]
