@@ -80,11 +80,12 @@ const functionParams = {
   // Stream function
   getStream: {
     required: ["link", "type"],
-    optional: ["signal"],
+    optional: ["signal", "isDownload"],
     defaults: {
       type: "movie",
       signal: new AbortController().signal,
       providerContext,
+      isDownload: false,
     },
     prompts: {
       link: "Enter stream link/URL: ",

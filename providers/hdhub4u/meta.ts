@@ -1,3 +1,4 @@
+import { formatSeasonLinks } from "../formatSeasonLinks";
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
@@ -16,64 +17,55 @@ const hdbHeaders = {
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
 };
 
-function getEpisodeLinks($: any, seriesTitle: string): Link[] {
-  const qualityGroups: Record<string, Link["directLinks"]> = {};
+function readQuality(text: string): string {
+  const match = text.match(/\b(480|720|1080|2160)p\b|\b4k\b/i);
+  return match ? (/2160|4k/i.test(match[0]) ? "4K" : match[0].toLowerCase()) : "";
+}
 
-  $("strong").each((_, element) => {
-    const episodeTitle = $(element).text().trim();
-    if (!/^episode\s*\d+$/i.test(episodeTitle)) return;
-
-    const heading = $(element).closest("h1,h2,h3,h4,h5,h6,p,div");
-    if (!heading.length) return;
-
-    for (const sibling of heading.nextAll().toArray()) {
-      const siblingHeading = $(sibling);
-      if (/^episode\s*\d+$/i.test(siblingHeading.text().trim())) break;
-
-      const driveLinks = siblingHeading.find('a[href*="hubdrive"],a:contains("Drive")');
-
-      driveLinks.each((_, aEl) => {
-        const driveLink = $(aEl).attr("href");
-        if (driveLink) {
-          const textContext =
-            $(aEl).text().toLowerCase() + " " +
-            $(aEl).parent().text().toLowerCase() + " " +
-            $(aEl).parent().prev().text().toLowerCase();
-
-          let quality = "Unknown";
-          if (textContext.includes("2160p") || textContext.includes("4k")) quality = "4K";
-          else if (textContext.includes("1080p")) quality = "1080p";
-          else if (textContext.includes("720p")) quality = "720p";
-          else if (textContext.includes("480p")) quality = "480p";
-
-          const epTitle = episodeTitle.toUpperCase();
-
-          if (!qualityGroups[quality]) {
-            qualityGroups[quality] = [];
-          }
-
-          if (!qualityGroups[quality].some(ep => ep.link === driveLink)) {
-            qualityGroups[quality].push({ title: epTitle, link: driveLink });
-          }
-        }
-      });
+function getEpisodeLinks($: any, container: any, seriesTitle: string, pageUrl: string): Link[] {
+  const groups = new Map<string, NonNullable<Link["directLinks"]>>();
+  let episode = "";
+  let quality = "";
+  let sectionQuality = "";
+  // Follow DOM order instead of scanning every later sibling. Invalid/nested
+  // headings otherwise cause one episode to claim the rest of the season.
+  container.find("h2,h3,h4,h5,h6,p,strong,a[href]").each((_, element) => {
+    const el = $(element);
+    const own = el.clone();
+    own.find("h1,h2,h3,h4,h5,h6,p,strong").remove();
+    const text = own.text().replace(/\s+/g, " ").trim();
+    const number = text.match(/^(?:episodes?\s*[:.-]?\s*|E)(\d+)\b/i)?.[1];
+    if (!el.is("a")) {
+      if (/episode.*(?:links|index)|single episode/i.test(text) && !number) {
+        sectionQuality = readQuality(text);
+        quality = sectionQuality;
+        episode = "";
+      } else if (number) {
+        episode = "EPISODE " + Number(number);
+        quality = readQuality(text) || sectionQuality;
+      } else if (readQuality(text)) quality = readQuality(text);
+      else if (el.is("h2,h3") && /storyline|review|description/i.test(text)) episode = "";
+      return;
     }
+    if (number) { episode = "EPISODE " + Number(number); quality = sectionQuality; }
+    if (!episode) return;
+    const href = el.attr("href") || "";
+    if (!number && !/hubdrive|hubcloud/i.test(href) && !/drive/i.test(text)) return;
+    let target: string;
+    try { target = new URL(href, pageUrl).href; } catch { return; }
+    if (!/^https?:/i.test(target)) return;
+    const key = readQuality(text) || quality || "Unknown";
+    const entries = groups.get(key) || [];
+    if (!entries.some(e => e.title === episode || e.link === target)) {
+      entries.push({title: episode, link: target, type: "series"});
+    }
+    groups.set(key, entries);
   });
-
-  const links: Link[] = [];
-  for (const [quality, episodes] of Object.entries(qualityGroups)) {
-    const linkTitle = quality === "Unknown" ? seriesTitle : `${seriesTitle} - ${quality}`;
-    const linkObj: Link = {
-      title: linkTitle,
-      directLinks: episodes,
-    };
-    if (quality !== "Unknown") {
-      linkObj.quality = quality;
-    }
-    links.push(linkObj);
-  }
-
-  return links;
+  return [...groups.entries()].map(([quality, episodes]) => ({
+    title: quality === "Unknown" ? seriesTitle : seriesTitle + " - " + quality,
+    quality: quality === "Unknown" ? undefined : quality,
+    directLinks: episodes.sort((a, b) => Number(a.title.match(/\d+/)?.[0]) - Number(b.title.match(/\d+/)?.[0])),
+  }));
 }
 
 export const getMeta = async function ({
@@ -90,52 +82,28 @@ export const getMeta = async function ({
     const res = await axios.get(url, { headers: hdbHeaders });
     const data = res.data;
     const $ = cheerio.load(data);
-    const container = $(".page-body");
-    const imdbId =
-      container
-        .find('a[href*="imdb.com/title/tt"]:not([href*="imdb.com/title/tt/"])')
-        .attr("href")
-        ?.split("/")[4] || "";
-    const title = container
-      .find(
-        'h2[data-ved="2ahUKEwjL0NrBk4vnAhWlH7cAHRCeAlwQ3B0oATAfegQIFBAM"],h2[data-ved="2ahUKEwiP0pGdlermAhUFYVAKHV8tAmgQ3B0oATAZegQIDhAM"]',
-      )
-      .text();
-    const type = title.toLocaleLowerCase().includes("season")
-      ? "series"
-      : "movie";
-    const synopsis = container
-      .find('strong:contains("DESCRIPTION")')
-      .parent()
-      .text()
-      .replace("DESCRIPTION:", "");
-    const image = container.find('img[decoding="async"]').attr("src") || "";
+    $("script,style,.code-block,nav,footer").remove();
+    const container = $(".page-body").first().length ? $(".page-body").first() : $(".entry-content").first();
+    const imdbId = container.find('a[href*="imdb.com/title/"]').first().attr("href")?.match(/tt\d+/)?.[0] || "";
+    const titleHeading = container.find('h2[data-attrid="title"],h2.kno-ecr-pt').first().text().trim();
+    const fallbackTitle = $("h1.page-title .material-text, h1.entry-title, h1").first().text().replace(/[\uE000-\uF8FF]/g, "").replace(/\s+/g, " ").trim();
+    const title = titleHeading || fallbackTitle.split(/\s+(?:WEB-DL|WEBRip|BluRay|HDRip|480p|720p|1080p)\b|\s*\[/i)[0].trim();
+    let synopsis = container.find('strong').filter((_, el) => /^description\s*:/i.test($(el).text().trim())).first().parent().text().replace(/^\s*DESCRIPTION\s*:\s*:?\s*/i, "").trim();
+    {
+      const storyline = container.find("h2,h3,h4").filter((_, el) => /storyline|synopsis|plot/i.test($(el).text())).first();
+      const following = storyline.nextAll().first();
+      const description = following.find(".kno-rdesc").first();
+      const plot = (description.length ? description.text() : following.text()).replace(/\s+/g, " ").trim();
+      if (plot) synopsis = plot;
+    }
+    const poster = container.find("img").first();
+    const imageSource = poster.attr("data-src") || poster.attr("src") || $("meta[property='og:image']").attr("content") || "";
+    const image = imageSource ? new URL(imageSource, url).href : "";
+    const episodeLinks = getEpisodeLinks($, container, title, url);
+    const type = episodeLinks.length || /\bseason\b|\bS\d{1,2}\b/i.test(title + " " + fallbackTitle) ? "series" : "movie";
 
     // Links
-    const links: Link[] = [];
-    const episodeLinks = getEpisodeLinks($, title);
-
-    if (episodeLinks.length === 0) {
-      const directLink: Link["directLinks"] = [];
-      container.find('a:contains("EPiSODE")').map((i, element) => {
-        const epTitle = $(element).text();
-        const episodesLink = $(element).attr("href");
-        if (episodesLink) {
-          directLink.push({
-            title: epTitle.toLocaleUpperCase(),
-            link: episodesLink,
-          });
-        }
-      });
-      if (directLink.length > 0) {
-        links.push({
-          title: title,
-          directLinks: directLink,
-        });
-      }
-    } else {
-      links.push(...episodeLinks);
-    }
+    const links: Link[] = [...episodeLinks];
 
     if (links.length === 0) {
       container
@@ -152,7 +120,7 @@ export const getMeta = async function ({
           if (movieLinks) {
             links.push({
               directLinks: [
-                { link: movieLinks, title: "Movie", type: "movie" },
+                { link: new URL(movieLinks, url).href, title: type === "series" ? "Season Pack" : "Movie", type },
               ],
               quality: quality,
               title: title,
@@ -169,7 +137,7 @@ export const getMeta = async function ({
       imdbId: imdbId || "",
       type,
       quickDownload: quickDownload ?? true,
-      linkList: links,
+      linkList: formatSeasonLinks(links),
       webUrl: url,
     };
     if (!imdbId) return websiteInfo;

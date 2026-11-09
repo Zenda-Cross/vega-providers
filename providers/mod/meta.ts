@@ -1,3 +1,4 @@
+import { formatSeasonLinks } from "../formatSeasonLinks";
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
@@ -78,7 +79,7 @@ export const getMeta = async function ({
       }
     });
     // console.log('mod meta', links);
-    return { ...meta, linkList: links, webUrl: url };
+    return { ...meta, linkList: formatSeasonLinks(links), webUrl: url };
   } catch (err) {
     throwProviderError("MoviesMod", "metadata", err);
   }

@@ -1,3 +1,4 @@
+import { formatSeasonLinks } from "../formatSeasonLinks";
 import { getBaseUrl } from "../getBaseUrl";
 import { Info, Link, ProviderContext } from "../types";
 
@@ -84,7 +85,7 @@ export async function getMeta({
     type,
     quickDownload: quickDownload ?? true,
     tags: getTags($),
-    linkList: getDownloadLinks($, baseUrl),
+    linkList: formatSeasonLinks(getDownloadLinks($, baseUrl)),
     webUrl: url,
   };
 }

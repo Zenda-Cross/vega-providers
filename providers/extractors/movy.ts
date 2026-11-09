@@ -59,10 +59,17 @@ function decodeBase64ToUint8(str: string): Uint8Array {
     }
     return u8;
   }
-  if (typeof Buffer !== "undefined") {
-    return new Uint8Array(Buffer.from(pad, "base64"));
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const bytes: number[] = [];
+  let value = 0, bits = 0;
+  for (const ch of pad.replace(/=+$/, "")) {
+    const digit = alphabet.indexOf(ch);
+    if (digit < 0) throw new Error("Invalid Movy base64");
+    value = (value << 6) | digit;
+    bits += 6;
+    if (bits >= 8) { bits -= 8; bytes.push((value >>> bits) & 255); }
   }
-  return new Uint8Array(0);
+  return new Uint8Array(bytes);
 }
 
 function decodePayload(
@@ -241,20 +248,42 @@ export async function extractMovyStreams({
 
   const streams: Stream[] = [];
 
+  // A seed can be revoked before its advertised TTL. Refresh once for all
+  // concurrent servers, matching the player retry after an HTTP 401.
+  let refreshedSeed: Promise<string | null> | undefined;
+  const refreshSeed = (): Promise<string | null> => {
+    if (!refreshedSeed) {
+      if (cachedSeed?.mediaId === String(tmdbId)) cachedSeed = null;
+      refreshedSeed = fetchSeed(axios, headers, String(tmdbId), signal);
+    }
+    return refreshedSeed;
+  };
+
   const tasks = MOVY_SERVERS.map(async (server) => {
     try {
-      const res = await axios.get(`${MOVY_API_BASE}/${server.id}/sources`, {
+      const request = (requestSeed: string) => axios.get(`${MOVY_API_BASE}/${server.id}/sources`, {
         headers,
-        params: queryParams,
+        params: { ...queryParams, seed: requestSeed },
         timeout: 4500,
         signal,
       });
+      let responseSeed = seed;
+      let res;
+      try {
+        res = await request(responseSeed);
+      } catch (err: any) {
+        if (err.response?.status !== 401 || signal?.aborted) throw err;
+        const fresh = await refreshSeed();
+        if (!fresh) return;
+        responseSeed = fresh;
+        res = await request(responseSeed);
+      }
 
       const cipherText =
         typeof res.data === "string" ? res.data : JSON.stringify(res.data);
       if (!cipherText || cipherText.length < 10) return;
 
-      const rawJson = decodePayload(cipherText, seed, String(tmdbId));
+      const rawJson = decodePayload(cipherText, responseSeed, String(tmdbId));
       const parsed = JSON.parse(rawJson);
 
       const rawSubs = parsed.subtitles || [];

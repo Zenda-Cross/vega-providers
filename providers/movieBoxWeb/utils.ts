@@ -1,6 +1,12 @@
+import { getBaseUrl } from "../getBaseUrl";
 import { ProviderContext } from "../types";
 
 export const providerValue = "movieBoxWeb";
+export const defaultBaseUrl = "https://officialmoviebox.com";
+
+export async function getProviderBaseUrl(): Promise<string> {
+  return defaultBaseUrl;
+}
 
 export type MovieBoxSubject = {
   subjectId?: string;
@@ -49,6 +55,8 @@ export type PlaybackLink = {
   episode?: number;
   resolution?: number;
   seasons?: MovieBoxResource["seasons"];
+  fallbackSubjectId?: string;
+  fallbackDetailPath?: string;
 };
 
 export function parseNuxtDetail(
@@ -163,7 +171,21 @@ export function encodeLink(value: PlaybackLink): string {
 }
 
 export function decodeLink(value: string): PlaybackLink {
-  return JSON.parse(value) as PlaybackLink;
+  if (value && typeof value === "object") {
+    return value as PlaybackLink;
+  }
+  try {
+    return JSON.parse(value) as PlaybackLink;
+  } catch {
+    const dp = detailPath(String(value || ""));
+    return {
+      subjectId: "",
+      detailPath: dp,
+      language: "Original",
+      season: 1,
+      episode: 1,
+    };
+  }
 }
 
 export function detailPath(link: string): string {
@@ -172,4 +194,17 @@ export function detailPath(link: string): string {
 
 export function absoluteUrl(baseUrl: string, path: string): string {
   return new URL(path, `${baseUrl}/`).toString();
+}
+
+// Bound CDN artwork before download and decoding, including oversized originals.
+export function posterUrl(value: string | undefined, width = 600): string {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    if (!url.hostname.endsWith(".aoneroom.com")) return value;
+    url.searchParams.set("x-oss-process", `image/resize,w_${width},limit_1`);
+    return url.toString();
+  } catch {
+    return value;
+  }
 }

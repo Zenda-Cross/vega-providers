@@ -153,6 +153,28 @@ This generates the CommonJS outputs into the `dist/` folder, which the Vega app 
 ## 9. Advanced: Settings & Key-Value Storage
 
 ### A. Provider Settings (`settings.ts`)
+
+Settings can include an action button (requires an app version supporting `button`):
+```ts
+export const getSettingsSchema = () => [{
+  key: 'refresh', type: 'button', label: 'Refresh data',
+  description: 'Fetch fresh provider data',
+}];
+
+export const onSettingsAction = async ({key, providerContext}: {
+  key: string; providerContext: ProviderContext;
+}) => {
+  if (key === 'refresh') {
+    // Fetch or refresh provider-owned data using the existing context.
+    await providerContext.kvStore.delete('cachedData');
+  }
+};
+```
+Buttons run immediately inside the provider sandbox and have no saved value.
+Throw an Error to report failure. Unsaved form edits are not passed to the action;
+the callback reads persisted values from `providerContext.kvStore`.
+Older apps render unknown field types as text inputs, so do not rely on this
+action working there or reuse its key for an existing stored setting.
 Providers can expose user-configurable settings in the Vega App by adding `settings.ts`.
 Export `getSettingsSchema`:
 ```ts

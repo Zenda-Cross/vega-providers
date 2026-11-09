@@ -1,3 +1,4 @@
+import { formatSeasonLinks } from "../formatSeasonLinks";
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
@@ -90,6 +91,7 @@ export const getMeta = async function ({
     }
 
     const $ = cheerio.load(response.data);
+    $("script,style,.code-block,.unili-content").remove();
     const infoContainer = $(".entry-content, .post-inner").length
       ? $(".entry-content, .post-inner")
       : $("body");
@@ -103,27 +105,16 @@ export const getMeta = async function ({
       linkList: [],
     };
 
-    // --- Type determination ---
-    const infoParagraph = $("h2.movie-title").next("p").text();
-    if (
-      infoParagraph.includes("Season:") ||
-      infoParagraph.includes("Episode:") ||
-      infoParagraph.includes("SHOW Name:")
-    ) {
-      result.type = "series";
-    } else {
-      result.type = "movie";
-    }
-
-    // --- Title ---
-    const rawTitle = $("h1").text().trim() || $("h2").text().trim();
-    result.title = rawTitle.split(/\[| \d+p| x\d+/)[0].trim();
-    const showNameMatch =
-      infoParagraph.match(/SHOW Name: (.+)/) ||
-      infoParagraph.match(/Name: (.+)/);
-    if (showNameMatch && showNameMatch[1]) {
-      result.title = result.title || showNameMatch[1].trim();
-    }
+    // Preserve field boundaries instead of concatenating every <br> line.
+    const fieldContent = infoContainer.clone();
+    fieldContent.find("br").replaceWith("\n");
+    const infoParagraph = fieldContent.text();
+    const rawTitle = $("h1.entry-title, h1").first().text().trim();
+    const name = infoParagraph.match(/(?:Series|SHOW|Movie)\s*Name\s*:\s*([^\n]+)/i)?.[1]?.trim();
+    result.type = /(?:Series|SHOW)\s*Name\s*:|Season\s*:/i.test(infoParagraph) || /\bseason\s*\d+|\bweb[ -]?series\b/i.test(rawTitle) ? "series" : "movie";
+    result.title = name || rawTitle.replace(/^Download\s+/i, "").split(/\[|\b(?:480|720|1080|2160)p\b/i)[0].trim();
+    const plotHeading = infoContainer.find("h2,h3,h4").filter((_, el) => /synopsis|plot|storyline/i.test($(el).text())).first();
+    result.synopsis = plotHeading.nextAll("p").first().text().trim();
 
     // --- IMDb ID ---
     const imdbMatch =
@@ -132,10 +123,9 @@ export const getMeta = async function ({
     result.imdbId = imdbMatch ? imdbMatch[0] : "";
 
     // --- Image ---
-    let image =
-      infoContainer.find(".post-thumbnail img").attr("src") ||
-      infoContainer.find("img[src]").first().attr("src") ||
-      "";
+    let image = $("meta[property='og:image']").attr("content") ||
+      $(".post-thumbnail img").first().attr("data-src") || $(".post-thumbnail img").first().attr("src") ||
+      infoContainer.find("img").first().attr("data-src") || infoContainer.find("img[src]").first().attr("src") || "";
     if (image.startsWith("//")) image = "https:" + image;
     else if (image.startsWith("/")) image = baseUrl + image;
     if (image.includes("no-thumbnail") || image.includes("placeholder"))
@@ -145,50 +135,25 @@ export const getMeta = async function ({
     // --- LinkList extraction ---
     const links: Link[] = [];
 
-    // The site changed its layout. Links are now inside <p> tags following <h3> or <h4> tags with quality info.
-    // We can also just look for the <a> tags directly and find their preceding quality headers.
-    const hElements = infoContainer.find("h3, h4, p");
-
-    hElements.each((index, element) => {
-      const el = $(element);
-      const titleText = el.text().trim();
-      const qualityMatch = titleText.match(/\d+p\b/)?.[0];
-      const fullTitle = titleText;
-
-      // The download buttons are usually in the next <p> tag
-      const downloadButtons = el.nextAll().find("a").first();
-
-      if (downloadButtons.length && qualityMatch && titleText.length < 350) {
-        if (result.type === "series") {
-          links.push({
-            title: fullTitle,
-            quality: qualityMatch,
-            episodesLink: downloadButtons.attr("href") || "",
-            directLinks: [],
-          });
-        } else {
-          // Movie: collect all direct download buttons
-          const directLinks: Link["directLinks"] = [];
-
-          const link = downloadButtons.attr("href");
-          if (link) {
-            directLinks.push({
-              title: downloadButtons.text().trim() || "Download",
-              link,
-              type: "movie", // literal type
-            });
-          }
-
-          if (directLinks.length) {
-            links.push({
-              title: fullTitle,
-              quality: qualityMatch,
-              episodesLink: "",
-              directLinks,
-            });
-          }
-        }
-      }
+    // A heading owns only the siblings before the next heading.
+    infoContainer.find("h2,h3,h4,h5").each((_, element) => {
+      const heading = $(element);
+      const title = heading.text().replace(/\s+/g, " ").trim();
+      const quality = title.match(/\b(?:360|480|720|1080|2160)p\b/i)?.[0];
+      if (!quality || title.length > 350) return;
+      const buttons = heading.nextUntil("h2,h3,h4,h5").find("a[href]");
+      const directLinks: NonNullable<Link["directLinks"]> = [];
+      buttons.each((_, anchor) => {
+        const button = $(anchor);
+        if (/batch|zip|pack/i.test(button.text())) return;
+        const href = button.attr("href");
+        if (/\.(?:apk|zip)(?:[?#]|$)/i.test(href || "")) return;
+        if (!href || !/^https?:/i.test(new URL(href, url).href)) return;
+        const target = new URL(href, url).href;
+        if (result.type === "series") links.push({ title, quality, episodesLink: target });
+        else directLinks.push({ title: button.text().trim() || "Download", link: target, type: "movie" });
+      });
+      if (directLinks.length) links.push({ title, quality, directLinks });
     });
 
     // Deduplicate links by href
@@ -199,10 +164,10 @@ export const getMeta = async function ({
         uniqueLinks.set(href, link);
       }
     });
-    result.linkList = Array.from(uniqueLinks.values());
+    result.linkList = formatSeasonLinks(Array.from(uniqueLinks.values()));
     result.webUrl = url;
     const quickDownload = await providerContext.kvStore?.get<boolean>("movies4u_quickDownload");
-    result.quickDownload = Boolean(quickDownload);
+    result.quickDownload = quickDownload ?? true;
     const imdbId = result.imdbId;
     if (!imdbId) return result;
 

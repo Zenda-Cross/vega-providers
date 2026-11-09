@@ -156,45 +156,61 @@ export async function gdflixExtractor(
     //instant link
     try {
       const seed = $drive(".btn-danger").attr("href") || "";
-      console.log("seed", seed);
-      if (!seed.includes("?url=")) {
-        const newLinkRes = await axios.head(seed, { headers, signal });
-        console.log("newLinkRes", newLinkRes.request?.responseURL);
-        const newLink =
-          newLinkRes.request?.responseURL?.split("?url=")?.[1] || seed;
-        streamLinks.push({ server: "G-Drive", link: newLink, type: "mkv" });
-      } else {
-        const instantToken = seed.split("=")[1];
-        //   console.log('InstantToken', instantToken);
-        const InstantFromData = new FormData();
-        InstantFromData.append("keys", instantToken);
-        const videoSeedUrl = seed.split("/").slice(0, 3).join("/") + "/api";
-        //   console.log('videoSeedUrl', videoSeedUrl);
-        const instantLinkRes = await fetch(videoSeedUrl, {
-          method: "POST",
-          body: InstantFromData,
-          headers: {
-            "x-token": videoSeedUrl,
-          },
-        });
-        const instantLinkData = await instantLinkRes.json();
-        //   console.log('instantLinkData', instantLinkData);
-        if (instantLinkData.error === false) {
-          const instantLink = instantLinkData.url;
-          streamLinks.push({
-            server: "G-Drive (download only)",
-            link: instantLink,
-            type: "mkv",
-          });
-        } else {
-          console.log("Instant link not found", instantLinkData);
+      if (seed && seed.startsWith("http")) {
+        if (seed.includes("url=")) {
+          const directPart = decodeURIComponent(seed.split("url=")[1]);
+          if (directPart && directPart.startsWith("http")) {
+            streamLinks.push({ server: "Instant Download", link: directPart, type: "mkv" });
+          }
         }
+
+        try {
+          const vRes = await axios.get(seed, {
+            headers: { ...headers, Referer: link },
+            maxRedirects: 0,
+            validateStatus: (s: number) => s >= 200 && s < 400,
+            signal,
+          });
+
+          const loc = vRes.headers?.location;
+          if (loc) {
+            let directGoogleUrl: string | null = null;
+            if (loc.includes("url=")) {
+              directGoogleUrl = decodeURIComponent(loc.split("url=")[1]);
+            } else if (loc.includes("googleusercontent.com") || loc.startsWith("http")) {
+              directGoogleUrl = loc;
+            }
+            if (directGoogleUrl && directGoogleUrl.startsWith("http")) {
+              streamLinks.push({ server: "Instant Download", link: directGoogleUrl, type: "mkv" });
+            }
+          } else if (typeof vRes.data === "string") {
+            const upMatch = vRes.data.match(/window\.location\.href\s*=\s*["']([^"']+)["']/);
+            if (upMatch) {
+              const upPath = upMatch[1];
+              const vOrigin = new URL(seed).origin;
+              const upUrl = upPath.startsWith("http") ? upPath : vOrigin + upPath;
+              const upRes = await axios.get(upUrl, {
+                headers: { ...headers, Referer: seed },
+                signal,
+              });
+              const loc2 = upRes.headers?.location;
+              if (loc2 && loc2.startsWith("http")) {
+                streamLinks.push({ server: "Instant Download", link: loc2, type: "mkv" });
+              } else if (typeof upRes.data === "string") {
+                const $up = cheerio.load(upRes.data);
+                const dlBtn = $up("#downloadBtn, a.btn-danger, a.btn-success").attr("href");
+                if (dlBtn && dlBtn.startsWith("http")) {
+                  streamLinks.push({ server: "Instant Download", link: dlBtn, type: "mkv" });
+                }
+              }
+            }
+          }
+        } catch {}
       }
-    } catch (err) {
-      console.log("Instant link not found", err);
-    }
+    } catch {}
+
     return streamLinks;
   } catch (error) {
-    throwProviderError("GDFlix", `extract ${link}`, error);
+    return streamLinks;
   }
 }

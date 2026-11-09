@@ -13,9 +13,6 @@ const headers = {
   "Sec-Fetch-Dest": "document",
   "Sec-Fetch-Mode": "navigate",
   "Sec-Fetch-Site": "none",
-  "Sec-Fetch-User": "?1",
-  Cookie:
-    "xla=s4t; _ga=GA1.1.1081149560.1756378968; _ga_BLZGKYN5PF=GS2.1.s1756378968$o1$g1$t1756378984$j44$l0$h0",
   "Upgrade-Insecure-Requests": "1",
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
@@ -106,7 +103,7 @@ export const getMeta = async function ({
     // Type – check for Cinejoy episodes section
     const hasCinejoyEpisodes = $(".cinejoy-episodes-section").length > 0;
     result.type =
-      watchItem?.type === "tv" || hasCinejoyEpisodes ? "tv" : "movie";
+      watchItem?.type === "tv" || watchItem?.type === "series" || hasCinejoyEpisodes ? "series" : "movie";
 
     // IMDb ID (not exposed in this HTML)
     result.imdbId = "";
@@ -114,7 +111,7 @@ export const getMeta = async function ({
     // Build linkList
     const linkList: Link[] = [];
 
-    if (result.type === "tv" || hasCinejoyEpisodes) {
+    if (result.type === "series" || hasCinejoyEpisodes) {
       // Strip any query string and trailing slashes to get the canonical series URL
       // e.g. https://site.com/series/the-boys-1560?season=2 -> https://site.com/series/the-boys-1560
       const seriesBase = url

@@ -42,6 +42,75 @@ function getLanguageCodes(title: string): string {
   return matches.length > 0 ? [...new Set(matches)].join(", ") : "ENG";
 }
 
+const NON_UPLOADER_REGEX =
+  /^(\d+|[a-zA-Z]{1,2}|\d{3,4}p?|4k|uhd|bluray|bd|dvd|web(-?dl|-?rip)?|h\.?26[45]|x26[45]|hevc|av1|opus|flac|aac|ac3|dts|mp3|multi(-?audio|-?sub)?|dual(-?audio)?|sub(s|bed)?|dub(bed)?|audio|remux|hdr(10\+?)?|dv|dolby|hi10p?|10bit|8bit|v\d+|repack\d*|proper|raws?|es|lat|ger|ita|fra|eng?|jap?|batch|[0-9a-f]{8})$/i;
+
+const SPEC_WORDS_REGEX =
+  /\b(1080p?|720p?|480p?|360p?|2160p?|4k|bd|bluray|hevc|x26[45]|h\.?26[45]|av1|aac|ac3|dts|mp3|flac|opus|dual-audio|multi-audio|sub|dub|web(-?dl|-?rip)?|remux|10-?bit|hi10p?)\b/i;
+
+function isUploaderCandidate(val: string): boolean {
+  if (!val || val.length <= 2) return false;
+  if (NON_UPLOADER_REGEX.test(val)) return false;
+  if (SPEC_WORDS_REGEX.test(val)) return false;
+  return true;
+}
+
+function extractTorrentioUploader(title: string, name?: string): string {
+  const combined = `${name || ""}\n${title || ""}`;
+  const lines = combined
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    const allBrackets = [...line.matchAll(/\[([a-zA-Z0-9_.\s@-]+)\]/g)].map((m) =>
+      m[1].replace(/^@/, "").trim(),
+    );
+    for (const b of allBrackets) {
+      if (isUploaderCandidate(b)) return b;
+    }
+  }
+
+  for (const line of lines) {
+    const cleanTrailing = line
+      .replace(/(\s*\[[^\]]*\]|\s*\([^)]*\))+$/g, "")
+      .replace(/\.(mkv|mp4|avi|webm|ts)$/i, "")
+      .trim();
+    const hyphenMatch = cleanTrailing.match(/[-_–]\s*@?([a-zA-Z0-9_]+(?:-[a-zA-Z0-9_]+)?)$/);
+    if (hyphenMatch && isUploaderCandidate(hyphenMatch[1].trim())) {
+      return hyphenMatch[1].trim();
+    }
+  }
+
+  for (const line of lines) {
+    const gearMatch = line.match(/⚙️\s*([^\n\r]+)/);
+    if (gearMatch) {
+      const val = gearMatch[1].replace(/^@/, "").trim();
+      if (isUploaderCandidate(val)) return val;
+    }
+  }
+
+  return "Torrentio";
+}
+
+function extractFormatTags(text: string): string[] {
+  const tags: string[] = [];
+  if (/AV1/i.test(text)) tags.push("AV1");
+  else if (/x265|HEVC/i.test(text)) tags.push("HEVC");
+  else if (/x264|AVC/i.test(text)) tags.push("AVC");
+
+  if (/10-?bit|hi10p?/i.test(text)) tags.push("10-bit");
+  if (/[\b\s.]DV[\b\s.]|Dolby\s*Vision/i.test(text)) tags.push("DV");
+  if (/[\b\s.]HDR(?:10(?:\+)?)?[\b\s.]/i.test(text)) tags.push("HDR");
+  if (/REMUX/i.test(text)) tags.push("Remux");
+  if (/BluRay|BD\b|BDRip/i.test(text)) tags.push("BluRay");
+  else if (/WEB-?DL|WEBRip/i.test(text)) tags.push("WEB-DL");
+  if (/Dual[\s-]Audio/i.test(text)) tags.push("Dual-Audio");
+  else if (/Multi[\s-]Audio/i.test(text)) tags.push("Multi-Audio");
+
+  return tags;
+}
+
 export const getStream = async ({
   link: id,
   type,
@@ -179,9 +248,10 @@ export const getStream = async ({
         }
 
         const title = s.title || "";
+        const combinedText = `${s.name || ""} ${title}`;
         const language = getLanguageCodes(title);
         const size = title.match(/💾\s*([\d.]+\s*(?:KB|MB|GB|TB))/i)?.[1] || "";
-        const uploader = title.match(/⚙️\s*([^\n]+)/)?.[1]?.trim() || "";
+        const uploader = extractTorrentioUploader(title, s.name);
 
         let seeders = "";
         const seedersMatch = title.match(/👤\s*(\d+)/);
@@ -194,37 +264,47 @@ export const getStream = async ({
           }
         }
 
-        // Extract format tags (DV, HDR, Remux)
-        const formatTags: string[] = [];
-        const fullTitle = `${s.name || ""} ${title}`;
-        if (/[\b\s.]DV[\b\s.]|Dolby\s*Vision/i.test(fullTitle)) formatTags.push("DV");
-        if (/[\b\s.]HDR(?:10(?:\+)?)?[\b\s.]/i.test(fullTitle)) formatTags.push("HDR");
-        if (/REMUX/i.test(fullTitle)) formatTags.push("Remux");
+        const formatTags = extractFormatTags(combinedText);
 
-        const tagStr = formatTags.join("/");
-
-        // Extract Debrid badge from s.name (e.g., [RD+], [AD+], [PM+], [TB+], [DL+], [RD download])
-        const debridBadge = (s.name || "").match(/\[(RD\+?|AD\+?|PM\+?|TB\+?|DL\+?|OC\+?|RD download|AD download)\]/i)?.[0];
+        const debridBadge = (s.name || "").match(
+          /\[(RD\+?|AD\+?|PM\+?|TB\+?|DL\+?|OC\+?|RD download|AD download)\]/i,
+        )?.[0];
         const isCachedDebrid =
           Boolean(debridBadge && !debridBadge.toLowerCase().includes("download")) ||
           Boolean(link && !link.startsWith("magnet:"));
 
-        const serverParts: string[] = [];
-        if (debridBadge) serverParts.push(debridBadge);
-        if (tagStr) serverParts.push(tagStr);
-        if (language && language !== "ENG") serverParts.push(language);
-        if (seeders && !isCachedDebrid) serverParts.push(seeders);
-        if (size) serverParts.push(size);
-        serverParts.push(uploader || "Torrentio");
+        const server = debridBadge ? `${debridBadge} ${uploader}` : uploader;
 
-        const serverName = serverParts.join(" •");
+        const tags: string[] = [];
+        if (quality) {
+          tags.push(`${quality}p`);
+        }
+        if (seeders && !isCachedDebrid) {
+          tags.push(seeders);
+        }
+        if (debridBadge) {
+          tags.push(debridBadge.replace(/[\[\]]/g, ""));
+        }
+        for (const tag of formatTags) {
+          tags.push(tag);
+        }
+        if (language && language !== "ENG") {
+          tags.push(language);
+        }
+        if (size) {
+          tags.push(size);
+        }
+
+        const tag = tags.join(" • ") || undefined;
 
         if (link) {
           streams.push({
-            server: serverName,
-            link: link,
+            server,
+            link,
             type: link.startsWith("magnet:") ? "torrent" : "mp4",
-            quality: quality,
+            quality,
+            tags: tags.length > 0 ? tags : undefined,
+            tag,
             skip: streamSkip,
           });
         }

@@ -195,8 +195,7 @@ export async function getSearchPosts({
 }): Promise<Post[]> {
   const { axios, cheerio } = providerContext;
 
-  // ✅ Same import pattern as Vega
-  const baseUrl = (await getBaseUrl("multimovies")).replace(/\/+$/, "");
+  const baseUrl = (await getBaseUrl("multi")).replace(/\/+$/, "");
 
   // ✅ Correct search endpoint
   const url = `${baseUrl}/search?q=${encodeURIComponent(searchQuery)}`;

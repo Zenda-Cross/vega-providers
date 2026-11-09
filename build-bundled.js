@@ -2,6 +2,7 @@ const esbuild = require("esbuild");
 const fs = require("fs");
 const path = require("path");
 const { minify } = require("terser");
+const {createProviderHeader} = require("./provider-build-metadata");
 
 const SKIP_MINIFY = process.env.SKIP_MINIFY === "true";
 
@@ -16,6 +17,12 @@ const providerDirs = fs
       dirent.name !== "extractors",
   )
   .map((dirent) => dirent.name);
+
+// Validate all stamps before clearing dist; never publish files with guessed versions.
+const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "manifest.json"), "utf8"));
+const providerHeaders = new Map(providerDirs.map(name => [
+  name, createProviderHeader(manifest.find(entry => entry.value === name)),
+]));
 
 console.log(`Found ${providerDirs.length} providers to build`);
 
@@ -132,6 +139,9 @@ async function buildProvider(providerName) {
         }
       }
 
+      // Stamp after minification so the compatibility comment is always retained.
+      code = providerHeaders.get(providerName) + code;
+
       // Write the output
       const outputPath = path.join(distPath, `${moduleName}.js`);
       fs.writeFileSync(outputPath, code);
@@ -149,6 +159,7 @@ async function buildProvider(providerName) {
         `✗ Error building ${providerName}/${moduleName}:`,
         error.message,
       );
+      throw error;
     }
   }
 

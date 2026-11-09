@@ -24,6 +24,7 @@ async function getVisitorData(axios: any, kvStore: any): Promise<string> {
   try {
     const cached = await kvStore?.get("youtube_visitor_data");
     if (cached) return cached;
+
     const res = await axios.get("https://www.youtube.com", {
       headers: {
         "User-Agent":
@@ -40,9 +41,31 @@ async function getVisitorData(axios: any, kvStore: any): Promise<string> {
       return match[1];
     }
   } catch {
-    // Fall back to default
+    // Return fallback on network error
   }
   return fallback;
+}
+
+function extractCaptions(data: any): TextTracks {
+  const subtitles: TextTracks = [];
+  const captionTracks =
+    data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+  if (Array.isArray(captionTracks)) {
+    for (const c of captionTracks) {
+      if (c.baseUrl) {
+        const name =
+          c.name?.runs?.[0]?.text || c.name?.simpleText || c.languageCode;
+        subtitles.push({
+          title: name,
+          language: c.languageCode || name,
+          type: "text/vtt",
+          uri: c.baseUrl.includes("fmt=") ? c.baseUrl : `${c.baseUrl}&fmt=vtt`,
+        });
+      }
+    }
+  }
+  return subtitles;
 }
 
 async function fetchFromInnerTube(
@@ -50,14 +73,13 @@ async function fetchFromInnerTube(
   kvStore: any,
   videoId: string,
   signal?: AbortSignal
-): Promise<Stream[]> {
+): Promise<{ streams: Stream[]; subtitles: TextTracks }> {
   const streams: Stream[] = [];
-  const subtitles: TextTracks = [];
+  let subtitles: TextTracks = [];
 
   const visitorData = await getVisitorData(axios, kvStore);
 
   try {
-    // Query VISIONOS (for Master HLS) and ANDROID_VR (for progressive MP4 with audio) in parallel
     const [visionRes, vrRes] = await Promise.allSettled([
       axios.post(
         "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json",
@@ -150,7 +172,7 @@ async function fetchFromInnerTube(
       });
     }
 
-    // 2. Progressive MP4 (Audio + Video muxed, ideal for offline download)
+    // 2. Progressive MP4 (Audio + Video muxed)
     const formats = vrData?.streamingData?.formats || [];
     for (const f of formats) {
       if (f.url) {
@@ -165,36 +187,51 @@ async function fetchFromInnerTube(
       }
     }
 
-    // Extract subtitles from captions
-    const captionTracks =
-      vData?.captions?.playerCaptionsTracklistRenderer?.captionTracks ||
-      vrData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-    if (Array.isArray(captionTracks)) {
-      for (const c of captionTracks) {
-        if (c.baseUrl) {
-          const name =
-            c.name?.runs?.[0]?.text || c.name?.simpleText || c.languageCode;
-          subtitles.push({
-            title: name,
-            language: c.languageCode || name,
-            type: "text/vtt",
-            uri: c.baseUrl.includes("fmt=") ? c.baseUrl : `${c.baseUrl}&fmt=vtt`,
-          });
-        }
-      }
-    }
+    // 3. Subtitles
+    subtitles = extractCaptions(vData) || extractCaptions(vrData) || [];
   } catch {
     // Return empty on failure
   }
 
-  // Attach subtitles to streams
-  if (subtitles.length > 0) {
-    for (const s of streams) {
-      if (!s.subtitles) s.subtitles = subtitles;
-    }
-  }
+  return { streams, subtitles };
+}
 
-  return streams;
+function sortStreams(
+  streams: Stream[],
+  preferredQuality?: string,
+  isDownload?: boolean
+) {
+  streams.sort((a, b) => {
+    // 1. If downloading, prefer standalone MP4 if available
+    if (isDownload) {
+      const aIsMp4 = a.type === "mp4";
+      const bIsMp4 = b.type === "mp4";
+      if (aIsMp4 && !bIsMp4) return -1;
+      if (!aIsMp4 && bIsMp4) return 1;
+    }
+
+    // 2. If streaming, prioritize adaptive HLS
+    if (!isDownload) {
+      const aIsHls = a.server.includes("Multi-Quality") || a.type === "m3u8";
+      const bIsHls = b.server.includes("Multi-Quality") || b.type === "m3u8";
+      if (aIsHls && !bIsHls) return -1;
+      if (!aIsHls && bIsHls) return 1;
+    }
+
+    // 3. Match preferred quality
+    if (preferredQuality && preferredQuality !== "auto") {
+      const cleanPref = preferredQuality.replace("p", "");
+      const aMatches = a.quality === cleanPref;
+      const bMatches = b.quality === cleanPref;
+      if (aMatches && !bMatches) return -1;
+      if (!aMatches && bMatches) return 1;
+    }
+
+    // 4. Default quality order
+    const orderA = QUALITY_ORDER[a.quality || ""] || 99;
+    const orderB = QUALITY_ORDER[b.quality || ""] || 99;
+    return orderA - orderB;
+  });
 }
 
 export const getStream = async function ({
@@ -215,58 +252,36 @@ export const getStream = async function ({
   if (!videoId) return [];
 
   const preferredQuality = await kvStore?.get<string>("preferredQuality");
+  const { streams, subtitles } = await fetchFromInnerTube(
+    axios,
+    kvStore,
+    videoId,
+    signal
+  );
 
-  try {
-    const directStreams = await fetchFromInnerTube(
-      axios,
-      kvStore,
-      videoId,
-      signal
-    );
-    if (directStreams && directStreams.length > 0) {
-      sortStreams(directStreams, preferredQuality, isDownload);
-      return directStreams;
-    }
-  } catch {
-    // Return empty if extraction fails
+  if (streams.length === 0) {
+    return [];
   }
 
-  return [];
+  // Deduplicate streams
+  const seenUrls = new Set<string>();
+  const uniqueStreams: Stream[] = [];
+  for (const s of streams) {
+    if (!seenUrls.has(s.link)) {
+      seenUrls.add(s.link);
+      uniqueStreams.push(s);
+    }
+  }
+
+  // Attach subtitles
+  if (subtitles.length > 0) {
+    for (const s of uniqueStreams) {
+      if (!s.subtitles) {
+        s.subtitles = subtitles;
+      }
+    }
+  }
+
+  sortStreams(uniqueStreams, preferredQuality, isDownload);
+  return uniqueStreams;
 };
-
-function sortStreams(
-  streams: Stream[],
-  preferredQuality?: string,
-  isDownload?: boolean
-) {
-  streams.sort((a, b) => {
-    // If downloading, sort progressive MP4 ahead of HLS for reliable download
-    if (isDownload) {
-      const aIsMp4 = a.type === "mp4";
-      const bIsMp4 = b.type === "mp4";
-      if (aIsMp4 && !bIsMp4) return -1;
-      if (!aIsMp4 && bIsMp4) return 1;
-    }
-
-    // Quality preference matching
-    if (preferredQuality && preferredQuality !== "auto") {
-      const cleanPref = preferredQuality.replace("p", "");
-      const aMatches = a.quality === cleanPref;
-      const bMatches = b.quality === cleanPref;
-      if (aMatches && !bMatches) return -1;
-      if (!aMatches && bMatches) return 1;
-    }
-
-    // For streaming (default), prioritize Multi-Quality HLS
-    if (!isDownload) {
-      const aIsHls = a.server.includes("Multi-Quality");
-      const bIsHls = b.server.includes("Multi-Quality");
-      if (aIsHls && !bIsHls) return -1;
-      if (!aIsHls && bIsHls) return 1;
-    }
-
-    const orderA = QUALITY_ORDER[a.quality || ""] || 99;
-    const orderB = QUALITY_ORDER[b.quality || ""] || 99;
-    return orderA - orderB;
-  });
-}

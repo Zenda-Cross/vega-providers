@@ -7,6 +7,14 @@ export const getSettingsSchema = async function ({
 }): Promise<SettingsField[]> {
   return [
     {
+      key: "hdhub4u_preferredQualities",
+      type: "multiselect",
+      label: "Preferred qualities",
+      description: "For episode pages offering multiple resolutions. Selected qualities appear highest first; if none are available, uses the nearest quality. Direct file links keep their original resolution.",
+      options: [2160, 1080, 720, 480, 360].map(q => ({label: q === 2160 ? "4K (2160p)" : q + "p", value: String(q)})),
+      defaultValue: ["1080"],
+    },
+    {
       key: "hdhub4u_quickDownload",
       type: "toggle",
       label: "Quick Download",
