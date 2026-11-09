@@ -1,4 +1,4 @@
-import { ProviderContext } from "../types";
+import { EpisodeLink, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
 import {
@@ -7,11 +7,6 @@ import {
   enrichCinemetaEpisodes,
   readCinemetaContext,
 } from "../getCinemetaMeta";
-
-export interface EpisodeLink {
-  title: string;
-  link: string;
-}
 
 export const getEpisodes = async function ({
   url,

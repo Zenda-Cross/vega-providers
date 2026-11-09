@@ -116,8 +116,11 @@ async function fetchPosts({
           ? `${baseUrl}/page/${page}/?s=${search}`
           : `${baseUrl}/?s=${search}`;
     } else if (filter) {
-      const cleanFilter = filter.replace(/^\/+|\/+$/g, "");
-      url = `${baseUrl}/${cleanFilter}${page > 1 ? `/page/${page}` : ""}/`;
+      const target = new URL(filter, `${baseUrl.replace(/\/+$/, "")}/`);
+      if (page > 1) {
+        target.pathname = `${target.pathname.replace(/\/+$/, "")}/page/${page}/`;
+      }
+      url = target.href;
     } else {
       url = page > 1 ? `${baseUrl}/page/${page}/` : `${baseUrl}/`;
     }

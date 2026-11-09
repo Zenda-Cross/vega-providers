@@ -114,11 +114,13 @@ export async function getStream({
   type,
   signal,
   providerContext,
+  isDownload,
 }: {
   link: string;
   type: string;
-  signal: AbortSignal;
+  signal?: AbortSignal;
   providerContext: ProviderContext;
+  isDownload?: boolean;
 }): Promise<Stream[]> {
   const { axios, cheerio, commonHeaders } = providerContext;
 
@@ -137,7 +139,7 @@ export async function getStream({
     let hubcloudUrl: string | null = null;
 
     for (let hop = 1; hop <= MAX_HOPS; hop++) {
-      if (signal.aborted) {
+      if (signal?.aborted) {
         console.log("[RareAnimes] Aborted during hop", hop);
         return [];
       }
@@ -215,7 +217,10 @@ export async function getStream({
       signal,
       axios,
       cheerio,
-      mergedHeaders
+      mergedHeaders,
+      providerContext,
+      isDownload,
+      "rareanimes",
     );
 
     if (hubcloudStreams?.length) {
