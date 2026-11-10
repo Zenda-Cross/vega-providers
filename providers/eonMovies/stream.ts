@@ -12,14 +12,9 @@ let cachedProxyAction = "40be6d9fdcc81dd69cf943cccce3e8fcf190219950";
 let cachedDriveAction = "40e5348909ff78510ee46337a237c1352fcc630ad2";
 
 function getStreamQuality(label: string): StreamQuality | undefined {
-  const resolution = Number(label.match(/\b(\d{3,4})p\b/i)?.[1]);
-  if (!resolution) return undefined;
-  if (resolution >= 2160) return "2160";
-  if (resolution >= 1080) return "1080";
-  if (resolution >= 720) return "720";
-  if (resolution >= 480) return "480";
-  if (resolution >= 360) return "360";
-  return undefined;
+  const resolution = label.match(/(?:^|[^0-9])(\d{3,4})p(?=$|[^a-z0-9])/i)?.[1];
+  if (resolution) return String(Number(resolution));
+  return /\b4k\b/i.test(label) ? "2160" : undefined;
 }
 
 function addQuality(streams: Stream[], quality?: StreamQuality): Stream[] {
@@ -318,6 +313,38 @@ async function followDownloadLink(
   throw new Error("EonMovies download redirect chain exceeded the limit");
 }
 
+async function resolveDotflixShareUrl(
+  link: string,
+  signal: AbortSignal | undefined,
+  headers: Record<string, string>,
+  providerContext: ProviderContext,
+): Promise<string> {
+  const sharingCode = getDotflixSharingCode(link);
+  const visited = new Set<string>();
+  let currentUrl = link;
+  for (let hop = 0; hop < 5; hop++) {
+    if (visited.has(currentUrl)) throw new Error("Dotflix share redirect loop");
+    visited.add(currentUrl);
+    const response = await providerContext.axios.get(currentUrl, {
+      signal,
+      headers: { ...headers, Referer: currentUrl },
+      timeout: 15000,
+      maxRedirects: 0,
+      validateStatus: (status: number) => status >= 200 && status < 400,
+    });
+    const location = response.headers?.location || response.headers?.Location;
+    // Some app transports follow redirects internally despite maxRedirects.
+    const finalUrl = response.request?.responseURL || response.request?.res?.responseUrl;
+    const target = location ? new URL(location, currentUrl).href : finalUrl || currentUrl;
+    if (getDotflixSharingCode(target) !== sharingCode) {
+      throw new Error("Dotflix redirected away from the requested share");
+    }
+    if (!location) return target;
+    currentUrl = target;
+  }
+  throw new Error("Dotflix share redirect chain exceeded the limit");
+}
+
 async function extractDotflixStream(
   link: string,
   signal: AbortSignal | undefined,
@@ -328,6 +355,9 @@ async function extractDotflixStream(
   const sharingCode = getDotflixSharingCode(link);
   if (!sharingCode) return [];
 
+  // A 301/302 on an API POST can change its method to GET. Resolve the
+  // share's canonical host first, then send POSTs directly to that host.
+  link = await resolveDotflixShareUrl(link, signal, headers, providerContext);
   const origin = new URL(link).origin;
   const requestHeaders = { ...headers, Origin: origin, Referer: link };
 
