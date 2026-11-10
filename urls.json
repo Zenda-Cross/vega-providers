@@ -21,7 +21,7 @@
   },
   "drive": {
     "name": "moviesDrive",
-    "url": "https://new1.moviesdrive.cyou/"
+    "url": "https://new2.moviesdrive.cyou/"
   },
   "multi": {
     "name": "multimovies",
@@ -57,7 +57,7 @@
   },
   "gokuHD": {
     "name": "GokuHD",
-    "url": "https://gokuhd.cc"
+    "url": "https://gokuhd.nl"
   },
   "mkvDrama": {
     "name": "MKVDrama",
@@ -193,6 +193,6 @@
   },
   "RareAnimes": {
     "name": "RareAnimes",
-    "url": "https://www.rareanimes.mov"
+    "url": "https://www.rareanimes.fans"
   }
 }
