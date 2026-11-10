@@ -14,6 +14,7 @@ function load(part) {
 const context = axios => ({axios, cheerio, commonHeaders: {'User-Agent': 'Test UA'}});
 const modern = {
   get: async url => {
+    if (url.includes('/share/')) return {data: '', headers: {}};
     if (url.includes('/api/share-status/')) return {data: {success: true, data: {filename: 'Movie.1080p.mp4', fileType: 'mp4'}}};
     throw Error('Unexpected GET ' + url);
   },
@@ -80,4 +81,50 @@ test('EonMovies recognizes seasons even when the site labels them Movie', async 
   const meta = await getMeta({link: '/show', providerContext: context(axios)});
   assert.equal(meta.type, 'series');
   assert.equal(meta.linkList[0].directLinks[0].link, 'https://eon.example/dl/720');
+});
+
+test('Dotflix alias redirects are resolved before download API POSTs', async () => {
+  const {getStream} = load('stream');
+  const posts = [];
+  const axios = {
+    get: async (url, config) => {
+      assert.equal(config.maxRedirects, url.includes('/share/') ? 0 : undefined);
+      if (url === 'https://dtflix.site/share/ABC123') return {status: 301, headers: {location: 'https://dotflix.fit/share/ABC123'}};
+      if (url === 'https://dotflix.fit/share/ABC123') return {data: '', headers: {}};
+      return modern.get(url);
+    },
+    post: async (url, body, config) => {
+      posts.push(url);
+      assert.equal(new URL(url).origin, 'https://dotflix.fit');
+      assert.equal(config.headers.Origin, 'https://dotflix.fit');
+      assert.equal(config.headers.Referer, 'https://dotflix.fit/share/ABC123');
+      assert.equal(body.sharingCode, 'ABC123');
+      return modern.post(url);
+    },
+  };
+  const streams = await getStream({link: 'https://dtflix.site/share/ABC123', type: 'movie', providerContext: context(axios)});
+  assert.equal(streams.length, 2);
+  assert.equal(posts.length, 2);
+});
+
+test('Dotflix uses the final share URL when the app transport follows redirects itself', async () => {
+  const {getStream} = load('stream');
+  const axios = {...modern,
+    get: async url => url.includes('/share/') ? {data: '', request: {responseURL: 'https://dotflix.fit/share/ABC123'}} : modern.get(url),
+    post: async (url, body, config) => {
+      assert.equal(new URL(url).origin, 'https://dotflix.fit');
+      return modern.post(url, body, config);
+    },
+  };
+  assert.equal((await getStream({link: 'https://dtflix.site/share/ABC123', type: 'movie', providerContext: context(axios)})).length, 2);
+});
+
+test('EonMovies preserves nonstandard 612p resolutions from the release filename', async () => {
+  const {getStream} = load('stream');
+  const axios = {...modern, get: async url => {
+    if (url.includes('/share/')) return {data: ''};
+    return {data: {success: true, data: {filename: 'Movie.612p.HEVC.mkv', fileType: 'mkv'}}};
+  }};
+  const streams = await getStream({link: 'https://dotflix.fit/share/ABC123', type: 'movie', providerContext: context(axios)});
+  assert.ok(streams.every(s => s.quality === '612' && s.server.endsWith('612p')));
 });
