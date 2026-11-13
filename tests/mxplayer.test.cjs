@@ -36,7 +36,7 @@ test('dynamic seasons omit directLinks so the app invokes getEpisodes', async ()
 });
 test('blocked pages and failed requests throw instead of returning empty metadata', async () => {
   await assert.rejects(load('meta').getMeta({link,providerContext:context('<h1>Oops!!!</h1>We are currently not available in your region.')}),/region/);
-  await assert.rejects(load('meta').getMeta({link,providerContext:{axios:{get:async()=>{throw Error('HTTP 403');}}}}),/HTTP 403/);
+  await assert.rejects(load('meta').getMeta({link,providerContext:{cheerio,axios:{get:async()=>{throw Error('HTTP 403');}}}}),/HTTP 403/);
 });
 test('missing page state falls back to selected movie detail API', async () => {
   const meta=await load('meta').getMeta({link,providerContext:context('<html></html>',{id,title:'API film',type:'movie'})});
@@ -52,4 +52,17 @@ test('posts normalize absolute share URLs and absolute images once', async () =>
   const posts=await load('posts').getPosts({providerContext:ctx});
   assert.equal(posts[0].link,link);
   assert.equal(posts[0].image,'https://example.com/image.jpg');
+});
+test('season URL resolves via SEO to real metadata and a dynamic season link', async () => {
+  const ctx={cheerio, commonHeaders:{}, axios:{get:async url=>({data:url.includes('seo.mxplayer.in')?{successful:true,data:{id,type:'season',title:'SEO page title',source:{title:'Season 2',thumbnail_url:'pic/season.jpg',genres:[{name:'Drama'}]}}}:'<html></html>'})}};
+  const meta=await load('meta').getMeta({link:`https://www.mxplayer.in/show/watch-show/seasons/season-2-${id}`,providerContext:ctx});
+  assert.equal(meta.title,'Season 2');
+  assert.equal(meta.linkList[0].episodesLink,id);
+  assert.equal(meta.linkList[0].directLinks,undefined);
+  assert.equal(meta.type,'series');
+});
+test('empty title page falls back to authoritative SEO metadata', async () => {
+  const ctx={cheerio,commonHeaders:{},axios:{get:async url=>({data:url.includes('seo.mxplayer.in')?{data:{id,type:'movie',source:{title:'Real title'}}}:'<html></html>'})}};
+  const meta=await load('meta').getMeta({link,providerContext:ctx});
+  assert.equal(meta.title,'Real title');
 });

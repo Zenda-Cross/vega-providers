@@ -45,16 +45,40 @@ export function entitiesOf(state: any): any[] {
 }
 export async function loadPage(link: string, context: ProviderContext, signal?: AbortSignal) {
   const url = pageUrl(link);
-  const response = await context.axios.get(url, {headers: headers(context), signal, timeout: 20000});
-  const html = String(response.data);
-  if (/not available in your (?:region|country)|access denied|request could not be satisfied/i.test(html)) throw new Error('MXPlayer: access blocked or unavailable in your region');
+  let html = '', pageError: any;
+  try {
+    const response = await context.axios.get(url, {headers: headers(context), signal, timeout: 20000});
+    html = String(response.data);
+    if (/not available in your (?:region|country)|access denied|request could not be satisfied/i.test(html)) {
+      pageError = new Error('MXPlayer: access blocked or unavailable in your region');
+      html = '';
+    }
+  } catch (error) { pageError = error; }
+  if (signal?.aborted) throw pageError || new Error('MXPlayer: request cancelled');
   const $ = context.cheerio.load(html);
   const entities: any[] = [];
   $('script').each((_, element) => entities.push(...entitiesOf(parseState($(element).html() || ''))));
   const id = contentId(url);
-  const entity = entities.find(item => String(item.id).toLowerCase() === id.toLowerCase()) || (entities.length === 1 ? entities[0] : undefined);
+  let entity = entities.find(item => String(item.id).toLowerCase() === id.toLowerCase()) || (entities.length === 1 ? entities[0] : undefined);
+  if (!entity?.title) {
+    try {
+      const response = await context.axios.get('https://seo.mxplayer.in/v1/api/seo/get-url-details?url=' + encodeURIComponent(new URL(url).pathname) + '&platform=com.mxplay.desktop&content-languages=hi,en&kids-mode-enabled=false', {headers: headers(context), signal, timeout: 20000});
+      const data = response.data?.data;
+      if (data && !data.deleted && (data.source?.title || data.display_title || data.title)) {
+        entity = {...data, ...data.source, id: data.id, type: data.type, dependencies: data.dependencies,
+          title: data.source?.title || data.display_title || data.title,
+          imageInfo: data.source?.thumbnail_url ? [{type: 'landscape', url: data.source.thumbnail_url}] : []};
+        entities.push(entity);
+      }
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      if (pageError) throw pageError;
+    }
+  }
+  if (pageError && !entity?.title) throw pageError;
   return {$, entity, entities, url};
 }
+
 export async function videoDetail(link: string, context: ProviderContext, signal?: AbortSignal): Promise<any> {
   const id = contentId(link);
   if (!id) throw new Error('MXPlayer: could not identify this title');

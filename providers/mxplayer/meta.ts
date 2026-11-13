@@ -4,7 +4,7 @@ const names = (values: any): string[] => (Array.isArray(values) ? values : []).m
 export const getMeta = async ({link, providerContext, signal}: {link: string; providerContext: ProviderContext; signal?: AbortSignal}): Promise<Info> => {
   try {
     const {$, entity, entities, url} = await loadPage(link, providerContext, signal);
-    const isSeries = ['tvshow', 'show'].includes(entity?.type) || /\/(?:tvshow|show)\//.test(url);
+    const isSeries = ['tvshow', 'show', 'season'].includes(entity?.type) || /\/(?:tvshow|show)\//.test(url);
     let item = entity;
     if (!item?.title && !isSeries) item = await videoDetail(url, providerContext, signal);
     const title = item?.title || $('meta[property="og:title"]').attr('content') || $('h1').first().text().trim();
@@ -22,8 +22,14 @@ export const getMeta = async ({link, providerContext, signal}: {link: string; pr
       linkList.push({title: title || `Season ${linkList.length + 1}`, episodesLink: id});
     };
     if (isSeries) {
+      if (item?.type === 'season' && item.id) addSeason(String(item.id), item.title);
+      const dependency = item?.dependencies?.season;
+      if (dependency?.id) addSeason(String(dependency.id), dependency.name || 'Season 1');
       $('div.hs__items-container > div[data-id]').each((_, el) => addSeason($(el).attr('data-id') || '', $(el).text().trim()));
       // Some pages keep seasons solely in their normalized state.
+      for (const tab of item?.tabs || []) for (const season of tab.containers || []) {
+        if (season.type === 'season' && season.id) addSeason(String(season.id), season.title || `Season ${season.sequence || linkList.length + 1}`);
+      }
       if (!linkList.length) for (const season of entities.filter(value => value.type === 'season')) addSeason(String(season.id), season.title || season.name);
       if (!linkList.length) throw new Error('no seasons available for this show');
     } else linkList.push({title: 'Movie', directLinks: [{title: 'Full Movie', link: url, type: 'movie'}]});
