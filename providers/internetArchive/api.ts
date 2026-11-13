@@ -88,7 +88,12 @@ export const buildSearchQuery = (text: string): string => {
   const parts: string[] = [];
   if (words) parts.push(`(title:(${words}) OR creator:(${words}))`);
   if (year) parts.push(`year:${year}`);
-  return parts.join(" AND ");
+  const narrowed = parts.join(" AND ");
+  if (!year) return narrowed;
+  // A trailing number may belong to a title (1984, Class of 1984).
+  // Keep the year shortcut while also matching the complete title.
+  const fullTitle = sanitizeQuery(text);
+  return `(${narrowed} OR title:(${fullTitle}))`;
 };
 
 export const imageUrl = (identifier: string): string =>

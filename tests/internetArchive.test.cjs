@@ -198,8 +198,8 @@ test("search splits a trailing year from the title words", () => {
   assert.deepEqual(plain(api.parseSearch("Dracula 1931")), { words: "Dracula", year: "1931" });
   assert.deepEqual(plain(api.parseSearch("1931")), { words: "", year: "1931" });
   assert.deepEqual(plain(api.parseSearch("Plan 9 from outer space")), { words: "Plan 9 from outer space" });
-  assert.equal(api.buildSearchQuery("Dracula 1931"), "(title:(Dracula) OR creator:(Dracula)) AND year:1931");
-  assert.equal(api.buildSearchQuery("1931"), "year:1931");
+  assert.equal(api.buildSearchQuery("Dracula 1931"), "((title:(Dracula) OR creator:(Dracula)) AND year:1931 OR title:(Dracula 1931))");
+  assert.equal(api.buildSearchQuery("1931"), "(year:1931 OR title:(1931))");
   assert.equal(api.buildSearchQuery("hitchcock"), "(title:(hitchcock) OR creator:(hitchcock))");
   assert.equal(api.buildSearchQuery("+-()"), "");
 });
@@ -345,4 +345,9 @@ test("catalog rows and genres are well formed", () => {
   );
   assert.equal(new Set(plain(catalog).map((e) => e.title)).size, catalog.length);
   assert.equal(new Set(plain(genres).map((e) => e.title)).size, genres.length);
+});
+
+ test("numeric titles remain searchable alongside the year shortcut", () => {
+  assert.equal(api.buildSearchQuery("1984"), "(year:1984 OR title:(1984))");
+  assert.equal(api.buildSearchQuery("Class of 1984"), "((title:(Class of) OR creator:(Class of)) AND year:1984 OR title:(Class of 1984))");
 });
