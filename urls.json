@@ -198,5 +198,9 @@
   "durbinLive": {
     "name": "DurbinLive",
     "url": "https://durbinlive.live"
+  },
+  "liveTgTv": {
+    "name": "LiveTG TV",
+    "url": "https://livetgtv.lovable.app"
   }
 }

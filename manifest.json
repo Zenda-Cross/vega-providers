@@ -552,5 +552,14 @@
     "type": "global",
     "disabled": false,
     "moduleVersionHeader": true
+  },
+  {
+    "display_name": "LiveTG TV",
+    "value": "liveTgTv",
+    "version": "1.0",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/liveTgTv.png",
+    "type": "global",
+    "disabled": false,
+    "moduleVersionHeader": true
   }
 ]
