@@ -194,5 +194,9 @@
   "RareAnimes": {
     "name": "RareAnimes",
     "url": "https://www.rareanimes.fans"
+  },
+  "liveTgTv": {
+    "name": "LiveTG TV",
+    "url": "https://livetgtv.lovable.app"
   }
 }
