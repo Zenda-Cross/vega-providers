@@ -1,7 +1,14 @@
 import { ProviderContext, Stream } from "../types";
-import { ArchiveFile, fetchItem, fileUrl, groupVideos, parseLink, subtitleTracks } from "./api";
+import {
+  ArchiveFile,
+  fetchItem,
+  fileUrl,
+  getPreferredHeight,
+  groupVideos,
+  parseLink,
+  subtitleTracks,
+} from "./api";
 
-// Players handle these best; the rest are listed after them.
 const FORMAT_RANK = [".mp4", ".m4v", ".webm", ".mkv", ".ogv", ".mov", ".avi", ".mpeg", ".mpg"];
 
 const extensionOf = (name: string): string => {
@@ -15,7 +22,6 @@ const formatSize = (bytes?: string): string => {
   return n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(2)} GB` : `${Math.round(n / 1024 ** 2)} MB`;
 };
 
-// Names a version by its upload, e.g. "NightOfTheLivingDead iPod.mp4" -> "NightOfTheLivingDead iPod".
 const versionName = (original: string): string =>
   original.replace(/^.*\//, "").replace(/\.[^.]+$/, "").replace(/_+/g, " ").trim();
 
@@ -58,11 +64,12 @@ export const getStream = async function ({
   isDownload?: boolean;
 }): Promise<Stream[]> {
   const { identifier, fileName } = parseLink(link);
-  const { files } = await fetchItem(identifier, providerContext, signal);
+  const [{ files }, preferred] = await Promise.all([
+    fetchItem(identifier, providerContext, signal),
+    getPreferredHeight(providerContext),
+  ]);
   const groups = groupVideos(files);
 
-  // An episode link plays its own upload; a movie offers every version of the
-  // film the item holds.
   const versions = fileName
     ? [[fileName, groups.get(fileName) || []] as const]
     : [...groups.entries()];
@@ -82,14 +89,16 @@ export const getStream = async function ({
     const i = FORMAT_RANK.indexOf(extensionOf(f.name));
     return i === -1 ? FORMAT_RANK.length : i;
   };
-  // Streaming prefers widely supported formats; downloads prefer the
-  // largest (usually original, best quality) file.
+  const distance = (f: ArchiveFile) => {
+    if (!preferred) return 0;
+    const height = Number(f.height) || 0;
+    return height ? Math.abs(height - preferred) : Number.MAX_SAFE_INTEGER;
+  };
   const sorted = [...videos].sort((a, b) =>
     isDownload
       ? Number(b.size || 0) - Number(a.size || 0)
-      : rank(a) - rank(b) || Number(b.height || 0) - Number(a.height || 0),
+      : distance(a) - distance(b) || rank(a) - rank(b) || Number(b.height || 0) - Number(a.height || 0),
   );
-  // An episode gets the subtitles named after it; a film gets all of them.
   const subtitles = subtitleTracks(identifier, files, fileName);
   return sorted.map((file) => toStream(identifier, file, subtitles, versionOf.get(file)));
 };

@@ -1,5 +1,3 @@
-// Offline tests for the Internet Archive provider: axios is replaced by a
-// fake, so they need no network. Run with `npm run test:unit`.
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const vm = require("node:vm");
@@ -13,8 +11,6 @@ function load(entry) {
   return module.exports;
 }
 
-// Values made inside the vm have their own Array prototype; copy them out
-// before deepEqual compares prototypes.
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
 const api = load("providers/internetArchive/api.ts");
@@ -90,7 +86,6 @@ test("no subtitles means no subtitles field", async () => {
 });
 
 test("speech-recognition captions get a readable title", async () => {
-  // Seen on archive.org: items get "<name>.asr.srt" made by Internet Archive.
   const item = {
     metadata: { title: "About Bananas" },
     files: [{ name: "AboutBan1935.mp4" }, { name: "AboutBan1935.asr.srt" }, { name: "AboutBan1935.en.asr.srt" }],
@@ -104,7 +99,6 @@ test("speech-recognition captions get a readable title", async () => {
 });
 
 test("empty subtitle files are skipped and srt/vtt twins shown once", async () => {
-  // Both seen on archive.org (AboutBan1935, Doctorin1946).
   const item = {
     metadata: { title: "Doctor in Industry" },
     files: [
@@ -122,7 +116,6 @@ test("empty subtitle files are skipped and srt/vtt twins shown once", async () =
 test("subtitle language comes from the last word only", () => {
   assert.deepEqual(plain(api.subtitleLanguage("Film (Urdu).srt")), ["ur", "Urdu"]);
   assert.deepEqual(plain(api.subtitleLanguage("film.eng.srt")), ["en", "English"]);
-  // "It" is Italian's code, but here it is part of the title.
   assert.equal(api.subtitleLanguage("It Happened One Night.srt"), undefined);
 });
 
@@ -132,6 +125,9 @@ test("the sort setting changes the search order", async () => {
     [undefined, "downloads desc"],
     ["addeddate", "addeddate desc"],
     ["avg_rating", "avg_rating desc"],
+    ["newest", "date desc"],
+    ["oldest", "date asc"],
+    ["title", "titleSorter asc"],
     ["bogus", "downloads desc"],
   ]) {
     const c = context({ "advancedsearch.php": search }, { sort: choice });
@@ -144,13 +140,21 @@ test("the sort setting changes the search order", async () => {
 test("settings offer the order choice", async () => {
   const schema = await getSettingsSchema({ providerContext: {} });
   const sort = schema.find((f) => f.key === "sort");
-  assert.deepEqual(plain(sort.options.map((o) => o.value)), ["downloads", "addeddate", "avg_rating"]);
+  assert.deepEqual(plain(sort.options.map((o) => o.value)), [
+    "downloads",
+    "addeddate",
+    "avg_rating",
+    "newest",
+    "oldest",
+    "title",
+  ]);
   assert.equal(sort.defaultValue, "downloads");
+  const quality = schema.find((f) => f.key === "quality");
+  assert.deepEqual(plain(quality.options.map((o) => o.value)), ["auto", "1080", "720", "480", "360"]);
+  assert.equal(quality.defaultValue, "auto");
 });
 
 test("episode links from getMeta find their own subtitles, even with % and spaces", async () => {
-  // getMeta URL-encodes episode links; getStream must decode them once and
-  // still match the subtitles named after the episode.
   for (const name of ["folder/Episode 1 100% complete.mp4", "Episode 1 literal%20 #?.mp4"]) {
     const base = name.replace(/\.mp4$/, "");
     const show = {
@@ -187,6 +191,163 @@ test("episode subtitle matching and deduplication preserve season directories", 
   assert.deepEqual(plain(stream.subtitles.map((s) => s.uri)), [
     "https://archive.org/download/show/Season%202/Episode%201.en.vtt",
   ]);
-  // Without a selected episode, only twins within the same directory collapse.
   assert.equal(api.subtitleTracks("show", files).length, 2);
+});
+
+test("search splits a trailing year from the title words", () => {
+  assert.deepEqual(plain(api.parseSearch("Dracula 1931")), { words: "Dracula", year: "1931" });
+  assert.deepEqual(plain(api.parseSearch("1931")), { words: "", year: "1931" });
+  assert.deepEqual(plain(api.parseSearch("Plan 9 from outer space")), { words: "Plan 9 from outer space" });
+  assert.equal(api.buildSearchQuery("Dracula 1931"), "((title:(Dracula) OR creator:(Dracula)) AND year:1931 OR title:(Dracula 1931))");
+  assert.equal(api.buildSearchQuery("1931"), "(year:1931 OR title:(1931))");
+  assert.equal(api.buildSearchQuery("hitchcock"), "(title:(hitchcock) OR creator:(hitchcock))");
+  assert.equal(api.buildSearchQuery("+-()"), "");
+});
+
+test("search results match titles and creators and ignore empty queries", async () => {
+  const search = { response: { docs: [{ identifier: "a", title: "A" }] } };
+  const c = context({ "advancedsearch.php": search });
+  const { getSearchPosts } = load("providers/internetArchive/posts.ts");
+  const posts = await getSearchPosts({ searchQuery: "hitchcock 1935", page: 2, providerContext: c.ctx });
+  assert.equal(posts.length, 1);
+  const query = decodeURIComponent(new URL(c.calls[0]).searchParams.get("q"));
+  assert.ok(query.includes("(title:(hitchcock) OR creator:(hitchcock)) AND year:1935"), query);
+  assert.ok(query.includes("mediatype:movies"), query);
+  assert.ok(c.calls[0].includes("page=2"), c.calls[0]);
+  const none = await getSearchPosts({ searchQuery: "  ", page: 1, providerContext: c.ctx });
+  assert.deepEqual(plain(none), []);
+  assert.equal(c.calls.length, 1);
+});
+
+test("duplicate search results are listed once", async () => {
+  const search = {
+    response: { docs: [{ identifier: "a", title: "A" }, { identifier: "a", title: "A" }, { identifier: "b" }] },
+  };
+  const c = context({ "advancedsearch.php": search });
+  const posts = await getPosts({ filter: "collection:feature_films", page: 1, providerContext: c.ctx });
+  assert.deepEqual(plain(posts.map((p) => [p.link, p.title])), [["a", "A"], ["b", "b"]]);
+});
+
+test("a failed request is retried once and then reported", async () => {
+  let attempts = 0;
+  const ctx = {
+    commonHeaders: {},
+    axios: {
+      get: async () => {
+        attempts += 1;
+        if (attempts === 1) throw Object.assign(new Error("busy"), { response: { status: 503 } });
+        return { data: { metadata: { title: "T" }, files: [{ name: "t.mp4" }] } };
+      },
+    },
+  };
+  const streams = await getStream({ link: "t", type: "movie", providerContext: ctx });
+  assert.equal(attempts, 2);
+  assert.equal(streams.length, 1);
+
+  let missing = 0;
+  const notFound = {
+    commonHeaders: {},
+    axios: {
+      get: async () => {
+        missing += 1;
+        throw Object.assign(new Error("gone"), { response: { status: 404 } });
+      },
+    },
+  };
+  await assert.rejects(getStream({ link: "t", type: "movie", providerContext: notFound }), /gone/);
+  assert.equal(missing, 1);
+
+  let failures = 0;
+  const down = {
+    commonHeaders: {},
+    axios: {
+      get: async () => {
+        failures += 1;
+        throw new Error("offline");
+      },
+    },
+  };
+  await assert.rejects(getStream({ link: "t", type: "movie", providerContext: down }), /offline/);
+  assert.equal(failures, 2);
+});
+
+test("the quality setting puts the closest resolution first", async () => {
+  const item = {
+    metadata: { title: "Film" },
+    files: [
+      { name: "film.mp4", source: "original", height: "1080", format: "h.264" },
+      { name: "film.512kb.mp4", source: "derivative", original: "film.mp4", height: "360", format: "512Kb MPEG4" },
+      { name: "film.ogv", source: "derivative", original: "film.mp4", height: "480", format: "Ogg Video" },
+    ],
+  };
+  const heights = async (settings) => {
+    const c = context({ "/metadata/film": item }, settings);
+    const streams = await getStream({ link: "film", type: "movie", providerContext: c.ctx });
+    return plain(streams.map((s) => s.quality));
+  };
+  assert.deepEqual(await heights({}), ["1080", "360", "480"]);
+  assert.deepEqual(await heights({ quality: "auto" }), ["1080", "360", "480"]);
+  assert.deepEqual(await heights({ quality: "480" }), ["480", "360", "1080"]);
+  assert.deepEqual(await heights({ quality: "360" }), ["360", "480", "1080"]);
+  assert.deepEqual(await heights({ quality: "1080" }), ["1080", "480", "360"]);
+});
+
+test("downloads still list the largest file first whatever the quality setting", async () => {
+  const item = {
+    metadata: { title: "Film" },
+    files: [
+      { name: "film.mp4", source: "original", height: "1080", size: "900" },
+      { name: "film.512kb.mp4", source: "derivative", original: "film.mp4", height: "360", size: "100" },
+    ],
+  };
+  const c = context({ "/metadata/film": item }, { quality: "360" });
+  const streams = await getStream({ link: "film", type: "movie", isDownload: true, providerContext: c.ctx });
+  assert.deepEqual(plain(streams.map((s) => s.quality)), ["1080", "360"]);
+});
+
+test("durations and runtimes are formatted for the details page", () => {
+  assert.equal(api.parseDuration("5779.17"), 5779.17);
+  assert.equal(api.parseDuration("1:36:19"), 5779);
+  assert.equal(api.parseDuration("12:30"), 750);
+  assert.equal(api.parseDuration(undefined), 0);
+  assert.equal(api.formatRuntime(5779), "1h 36m");
+  assert.equal(api.formatRuntime(7200), "2h");
+  assert.equal(api.formatRuntime(1500), "25m");
+  assert.equal(api.formatRuntime(30), "");
+});
+
+test("the details page lists the year, runtime and subjects as tags", async () => {
+  const item = {
+    metadata: { title: "Film", year: "1935", subject: "Horror; Classic", description: "A<br>B" },
+    files: [
+      { name: "film.mp4", source: "original", length: "5779.17" },
+      { name: "film.ogv", source: "derivative", original: "film.mp4", length: "5779.20" },
+    ],
+  };
+  const cheerio = require("cheerio");
+  const c = context({ "/metadata/film": item });
+  const meta = await getMeta({ link: "film", providerContext: { ...c.ctx, cheerio } });
+  assert.deepEqual(plain(meta.tags), ["1935", "1h 36m", "Horror", "Classic"]);
+  assert.equal(meta.type, "movie");
+  assert.equal(meta.synopsis, "A\nB");
+});
+
+test("catalog rows and genres are well formed", () => {
+  const { catalog, genres } = load("providers/internetArchive/catalog.ts");
+  for (const entry of [...catalog, ...genres]) {
+    assert.ok(entry.title && entry.filter, JSON.stringify(entry));
+  }
+  const titles = [...catalog, ...genres].map((e) => e.title);
+  assert.ok(titles.includes("1950s Films"));
+  assert.equal(
+    plain(genres).find((g) => g.title === "1950s Films").filter,
+    "collection:feature_films AND year:[1950 TO 1959]",
+  );
+  assert.equal(new Set(plain(catalog).map((e) => e.title)).size, catalog.length);
+  assert.equal(new Set(plain(genres).map((e) => e.title)).size, genres.length);
+});
+
+ test("numeric titles remain searchable alongside the year shortcut", () => {
+  assert.equal(api.buildSearchQuery("1984"), "(year:1984 OR title:(1984))");
+  assert.equal(api.buildSearchQuery("Class of 1984"), "((title:(Class of) OR creator:(Class of)) AND year:1984 OR title:(Class of 1984))");
 });
