@@ -547,7 +547,7 @@
   {
     "display_name": "DurbinLive",
     "value": "durbinLive",
-    "version": "1.0",
+    "version": "1.1",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/durbinLive.jpg",
     "type": "global",
     "disabled": false,

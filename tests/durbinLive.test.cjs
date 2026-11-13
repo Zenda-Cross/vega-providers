@@ -65,17 +65,65 @@ test('DurbinLive follows player iframes and keeps all accessible HLS sources', a
   assert.equal(streams[0].headers.Origin, 'https://player.example');
   assert.equal(streams[1].link, 'https://cdn.example/second.m3u8');
 });
-test('DurbinLive explains unsupported DRM instead of returning its encrypted DASH URL', async () => {
+test('DurbinLive rejects invalid DRM instead of returning a bare encrypted DASH URL', async () => {
   const {getStream} = load('stream');
   const key = 'PublicWrapper';
   const plain = 'const mpdUrl="https://cdn.example/encrypted.mpd";const config={drm:{clearKeys:{key:"value"}}};';
   const encrypted = Buffer.from(Array.from(plain, (c,i)=>c.charCodeAt(0)^key.charCodeAt(i%key.length))).toString('base64');
   const c = ctx(async () => ({data: `<script>const decryptionKey="${key}";let encrypted="${encrypted}";</script>`}));
-  await assert.rejects(getStream({link: 'https://player.example/channel', providerContext: c}), /requires DRM playback/);
+  await assert.rejects(getStream({link: 'https://player.example/channel', providerContext: c}), /supported DRM configuration/);
 });
 test('DurbinLive bounds recursive iframes and reports inaccessible players', async () => {
   const {getStream} = load('stream');let calls = 0;
   const c = ctx(async () => {calls++;return {data: '<iframe src="https://player.example/loop"></iframe>'};});
   await assert.rejects(getStream({link:'https://player.example/loop',providerContext:c}), /No accessible live stream/);
   assert.equal(calls, 1);
+});
+
+test('DurbinLive refreshes encoded ClearKey configuration for every playback', async () => {
+  const {getStream} = load('stream');
+  const kid = '00112233445566778899aabbccddeeff';
+  const keys = ['ffeeddccbbaa99887766554433221100', '11223344556677889900aabbccddeeff'];
+  let calls = 0;
+  const c = ctx(async () => {
+    const key = keys[calls++];
+    const plain = `const mpdUrl='https://cdn.example/live.mpd';const kid='${kid}';const key='${key}';const cfg={drm:{clearKeys:{[kid]:key}}};`;
+    const wrapperKey = 'PublicWrapper';
+    const encrypted = Buffer.from(Array.from(plain, (ch,i)=>ch.charCodeAt(0)^wrapperKey.charCodeAt(i%wrapperKey.length))).toString('base64');
+    return {data: `<script>const decryptionKey='${wrapperKey}';let encrypted='${encrypted}';</script>`};
+  });
+  for (const expected of keys) {
+    const streams = await getStream({link:'https://player.example/channel',providerContext:c});
+    assert.equal(streams.length, 1);
+    assert.equal(streams[0].type, 'mpd');
+    assert.equal(streams[0].drm.type, 'clearkey');
+    assert.equal(streams[0].drm.clearKeys[kid], expected);
+    assert.equal(streams[0].drm.licenseServer, undefined);
+    assert.equal(streams[0].headers.Origin, 'https://player.example');
+    assert.deepEqual(JSON.parse(JSON.stringify(streams[0].drm)), {type:'clearkey',clearKeys:{[kid]:expected}});
+  }
+  assert.equal(calls, 2);
+});
+
+test('DurbinLive handles multiple inline keys and omits DRM streams from downloads', async () => {
+  const {getStream} = load('stream');
+  const kid = '00112233445566778899aabbccddeeff';
+  const second = '11223344556677889900aabbccddeeff';
+  const c = ctx(async () => ({data: `<script>const source='https://cdn.example/live.mpd';const cfg={drm:{clearKeys:{'${kid}':'${second}','${second}':'${kid}'}}};</script>`}));
+  const streams = await getStream({link:'https://player.example/channel',providerContext:c});
+  assert.equal(Object.keys(streams[0].drm.clearKeys).length, 2);
+  assert.equal((await getStream({link:'https://player.example/channel',isDownload:true,providerContext:c})).length, 0);
+});
+
+test('DurbinLive keeps clear HLS mirrors available when downloading a mixed channel', async () => {
+  const {getStream} = load('stream');
+  const c = ctx(async url => {
+    if (url.endsWith('/watch')) return {data:'<iframe src="/protected"></iframe><iframe src="/clear"></iframe>'};
+    if (url.endsWith('/protected')) return {data:'<script>const url="https://cdn.example/encrypted.mpd";const cfg={drm:{clearKeys:{"00112233445566778899aabbccddeeff":"ffeeddccbbaa99887766554433221100"}}};</script>'};
+    return {data:'<source src="https://cdn.example/clear.m3u8">'};
+  });
+  const streams = await getStream({link:'https://player.example/watch',isDownload:true,providerContext:c});
+  assert.equal(streams.length, 1);
+  assert.equal(streams[0].link, 'https://cdn.example/clear.m3u8');
+  assert.equal(streams[0].drm, undefined);
 });
