@@ -195,6 +195,10 @@
     "name": "RareAnimes",
     "url": "https://www.rareanimes.fans"
   },
+  "durbinLive": {
+    "name": "DurbinLive",
+    "url": "https://durbinlive.live"
+  },
   "liveTgTv": {
     "name": "LiveTG TV",
     "url": "https://livetgtv.lovable.app"
