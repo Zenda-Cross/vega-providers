@@ -543,5 +543,14 @@
     "type": "india",
     "disabled": false,
     "moduleVersionHeader": true
+  },
+  {
+    "display_name": "DurbinLive",
+    "value": "durbinLive",
+    "version": "1.1",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/durbinLive.jpg",
+    "type": "global",
+    "disabled": false,
+    "moduleVersionHeader": true
   }
 ]
