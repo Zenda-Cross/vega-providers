@@ -547,7 +547,7 @@
   {
     "display_name": "DurbinLive",
     "value": "durbinLive",
-    "version": "1.1",
+    "version": "1.2",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/durbinLive.jpg",
     "type": "global",
     "disabled": false,
@@ -556,8 +556,8 @@
   {
     "display_name": "LiveTG TV",
     "value": "liveTgTv",
-    "version": "1.1",
-    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/liveTgTv.png",
+    "version": "1.2",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/liveTgTv.jpg",
     "type": "global",
     "disabled": false,
     "moduleVersionHeader": true
