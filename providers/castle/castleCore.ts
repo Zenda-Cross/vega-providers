@@ -89,59 +89,61 @@ function aesMul(a: number, b: number): number {
   return p;
 }
 
-function aesInvMixColumns(s: Uint8Array): void {
-  for (let c = 0; c < 4; c++) {
-    const i = c * 4;
-    const a = s[i], b = s[i + 1], d = s[i + 2], e = s[i + 3];
-    s[i] = aesMul(0x0e, a) ^ aesMul(0x0b, b) ^ aesMul(0x0d, d) ^ aesMul(0x09, e);
-    s[i + 1] = aesMul(0x09, a) ^ aesMul(0x0e, b) ^ aesMul(0x0b, d) ^ aesMul(0x0d, e);
-    s[i + 2] = aesMul(0x0d, a) ^ aesMul(0x09, b) ^ aesMul(0x0e, d) ^ aesMul(0x0b, e);
-    s[i + 3] = aesMul(0x0b, a) ^ aesMul(0x0d, b) ^ aesMul(0x09, d) ^ aesMul(0x0e, e);
-  }
+// Cache finite-field products once instead of recomputing them for every
+// byte of the large catalog response (especially costly in QuickJS).
+const AES_MUL9 = Uint8Array.from({ length: 256 }, (_, n) => aesMul(0x09, n));
+const AES_MUL11 = Uint8Array.from({ length: 256 }, (_, n) => aesMul(0x0b, n));
+const AES_MUL13 = Uint8Array.from({ length: 256 }, (_, n) => aesMul(0x0d, n));
+const AES_MUL14 = Uint8Array.from({ length: 256 }, (_, n) => aesMul(0x0e, n));
+
+function inverseMixWord(word: number): number {
+  const a = word >>> 24, b = (word >>> 16) & 255;
+  const c = (word >>> 8) & 255, d = word & 255;
+  return ((AES_MUL14[a] ^ AES_MUL11[b] ^ AES_MUL13[c] ^ AES_MUL9[d]) << 24)
+    | ((AES_MUL9[a] ^ AES_MUL14[b] ^ AES_MUL11[c] ^ AES_MUL13[d]) << 16)
+    | ((AES_MUL13[a] ^ AES_MUL9[b] ^ AES_MUL14[c] ^ AES_MUL11[d]) << 8)
+    | (AES_MUL11[a] ^ AES_MUL13[b] ^ AES_MUL9[c] ^ AES_MUL14[d]);
+}
+
+const AES_T0 = new Int32Array(256);
+const AES_T1 = new Int32Array(256);
+const AES_T2 = new Int32Array(256);
+const AES_T3 = new Int32Array(256);
+for (let i = 0; i < 256; i++) {
+  const b = AES_INV_SBOX[i];
+  const word = (AES_MUL14[b] << 24) | (AES_MUL9[b] << 16) | (AES_MUL13[b] << 8) | AES_MUL11[b];
+  AES_T0[i] = word;
+  AES_T1[i] = (word >>> 8) | (word << 24);
+  AES_T2[i] = (word >>> 16) | (word << 16);
+  AES_T3[i] = (word >>> 24) | (word << 8);
 }
 
 function aesDecryptBlock128(block: Uint8Array, w: Uint32Array): Uint8Array {
-  const state = new Uint8Array(block);
-  const Nr = 10;
+  let t0 = ((block[0] << 24) | (block[1] << 16) | (block[2] << 8) | block[3]) ^ w[40];
+  let t1 = ((block[4] << 24) | (block[5] << 16) | (block[6] << 8) | block[7]) ^ w[41];
+  let t2 = ((block[8] << 24) | (block[9] << 16) | (block[10] << 8) | block[11]) ^ w[42];
+  let t3 = ((block[12] << 24) | (block[13] << 16) | (block[14] << 8) | block[15]) ^ w[43];
+  for (let r = 9; r > 0; r--) {
+    const a = AES_T0[t0 >>> 24] ^ AES_T1[(t3 >>> 16) & 255] ^ AES_T2[(t2 >>> 8) & 255] ^ AES_T3[t1 & 255] ^ w[r * 4];
+    const b = AES_T0[t1 >>> 24] ^ AES_T1[(t0 >>> 16) & 255] ^ AES_T2[(t3 >>> 8) & 255] ^ AES_T3[t2 & 255] ^ w[r * 4 + 1];
+    const c = AES_T0[t2 >>> 24] ^ AES_T1[(t1 >>> 16) & 255] ^ AES_T2[(t0 >>> 8) & 255] ^ AES_T3[t3 & 255] ^ w[r * 4 + 2];
+    const d = AES_T0[t3 >>> 24] ^ AES_T1[(t2 >>> 16) & 255] ^ AES_T2[(t1 >>> 8) & 255] ^ AES_T3[t0 & 255] ^ w[r * 4 + 3];
+    t0 = a; t1 = b; t2 = c; t3 = d;
+  }
+  const words = [t0, t1, t2, t3];
+  const out = new Uint8Array(16);
   for (let c = 0; c < 4; c++) {
-    const rk = w[Nr * 4 + c];
-    state[c * 4] ^= (rk >>> 24) & 0xff;
-    state[c * 4 + 1] ^= (rk >>> 16) & 0xff;
-    state[c * 4 + 2] ^= (rk >>> 8) & 0xff;
-    state[c * 4 + 3] ^= rk & 0xff;
+    out[c * 4] = AES_INV_SBOX[words[c] >>> 24] ^ (w[c] >>> 24);
+    out[c * 4 + 1] = AES_INV_SBOX[(words[(c + 3) % 4] >>> 16) & 255] ^ (w[c] >>> 16);
+    out[c * 4 + 2] = AES_INV_SBOX[(words[(c + 2) % 4] >>> 8) & 255] ^ (w[c] >>> 8);
+    out[c * 4 + 3] = AES_INV_SBOX[words[(c + 1) % 4] & 255] ^ w[c];
   }
-  for (let round = Nr - 1; round >= 1; round--) {
-    const t1 = state[13]; state[13] = state[9]; state[9] = state[5]; state[5] = state[1]; state[1] = t1;
-    const t2 = state[2]; state[2] = state[10]; state[10] = t2;
-    const t6 = state[6]; state[6] = state[14]; state[14] = t6;
-    const t3 = state[3]; state[3] = state[7]; state[7] = state[11]; state[11] = state[15]; state[15] = t3;
-    for (let i = 0; i < 16; i++) state[i] = AES_INV_SBOX[state[i]];
-    for (let c = 0; c < 4; c++) {
-      const rk = w[round * 4 + c];
-      state[c * 4] ^= (rk >>> 24) & 0xff;
-      state[c * 4 + 1] ^= (rk >>> 16) & 0xff;
-      state[c * 4 + 2] ^= (rk >>> 8) & 0xff;
-      state[c * 4 + 3] ^= rk & 0xff;
-    }
-    aesInvMixColumns(state);
-  }
-  const t1 = state[13]; state[13] = state[9]; state[9] = state[5]; state[5] = state[1]; state[1] = t1;
-  const t2 = state[2]; state[2] = state[10]; state[10] = t2;
-  const t6 = state[6]; state[6] = state[14]; state[14] = t6;
-  const t3 = state[3]; state[3] = state[7]; state[7] = state[11]; state[11] = state[15]; state[15] = t3;
-  for (let i = 0; i < 16; i++) state[i] = AES_INV_SBOX[state[i]];
-  for (let c = 0; c < 4; c++) {
-    const rk = w[c];
-    state[c * 4] ^= (rk >>> 24) & 0xff;
-    state[c * 4 + 1] ^= (rk >>> 16) & 0xff;
-    state[c * 4 + 2] ^= (rk >>> 8) & 0xff;
-    state[c * 4 + 3] ^= rk & 0xff;
-  }
-  return state;
+  return out;
 }
 
 function aes128CbcDecrypt(cipherBytes: Uint8Array, keyBytes: Uint8Array, ivBytes: Uint8Array): Uint8Array {
   const w = aes128KeyExpansion(keyBytes);
+  for (let i = 4; i < 40; i++) w[i] = inverseMixWord(w[i]);
   const out = new Uint8Array(cipherBytes.length);
   let prev = ivBytes;
   for (let offset = 0; offset < cipherBytes.length; offset += 16) {
@@ -160,13 +162,17 @@ function aes128CbcDecrypt(cipherBytes: Uint8Array, keyBytes: Uint8Array, ivBytes
 }
 
 function base64ToBytes(b64: string): Uint8Array {
-  if (typeof Buffer !== "undefined") {
-    return new Uint8Array(Buffer.from(b64, "base64"));
+  const clean = b64.replace(/\s/g, "").replace(/=+$/, "");
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  if (clean.length % 4 === 1 || /[^A-Za-z0-9+/]/.test(clean)) {
+    throw new Error("CastleTV: invalid base64 response");
   }
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) {
-    bytes[i] = bin.charCodeAt(i);
+  const bytes = new Uint8Array(Math.floor(clean.length * 6 / 8));
+  let value = 0, bits = 0, offset = 0;
+  for (let i = 0; i < clean.length; i++) {
+    value = (value << 6) | alphabet.indexOf(clean[i]);
+    bits += 6;
+    if (bits >= 8) { bits -= 8; bytes[offset++] = (value >>> bits) & 255; }
   }
   return bytes;
 }
@@ -187,17 +193,21 @@ function utf8ToBytes(str: string): Uint8Array {
 }
 
 function bytesToUtf8(bytes: Uint8Array): string {
-  if (typeof TextDecoder !== "undefined") {
-    return new TextDecoder().decode(bytes);
+  // QuickJS's TextDecoder shim concatenates one byte at a time. Avoid that
+  // quadratic path for both the encrypted HTTP body and decrypted catalog.
+  const chunks: string[] = [];
+  for (let offset = 0; offset < bytes.length; offset += 8192) {
+    chunks.push(String.fromCharCode.apply(null, Array.from(bytes.subarray(offset, offset + 8192))));
   }
-  if (typeof Buffer !== "undefined") {
-    return Buffer.from(bytes).toString("utf8");
+  return decodeURIComponent(escape(chunks.join("")));
+}
+
+function decodeResponseBody(body: any): any {
+  if (body instanceof ArrayBuffer) return bytesToUtf8(new Uint8Array(body));
+  if (ArrayBuffer.isView(body)) {
+    return bytesToUtf8(new Uint8Array(body.buffer, body.byteOffset, body.byteLength));
   }
-  let str = "";
-  for (let i = 0; i < bytes.length; i++) {
-    str += String.fromCharCode(bytes[i]);
-  }
-  return decodeURIComponent(escape(str));
+  return body;
 }
 
 /** AES-128 key = decode_b64(securityKey) + "T!BgJB", padded/truncated to 16 bytes. */
@@ -248,8 +258,9 @@ async function getSecurityKey(ctx: ProviderContext): Promise<Uint8Array> {
 
   const base = await getApiBase();
   const url = `${base}/v0.1/system/getSecurityKey/1?channel=${CHANNEL}&clientType=${CLIENT_TYPE}&lang=${LANG}`;
-  const res = await ctx.axios.get(url, { headers: { "User-Agent": UA } });
-  const data = typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+  const res = await ctx.axios.get(url, { headers: { "User-Agent": UA }, responseType: "arraybuffer" });
+  const responseBody = decodeResponseBody(res.data);
+  const data = typeof responseBody === "string" ? JSON.parse(responseBody) : responseBody;
   if (!data || data.code !== 200 || !data.data) {
     throw new Error("CastleTV: failed to fetch security key");
   }
@@ -270,6 +281,7 @@ function extractCipher(body: any): string {
 }
 
 async function unwrap(body: any, key: Uint8Array): Promise<any> {
+  body = decodeResponseBody(body);
   try {
     const j = typeof body === "string" ? JSON.parse(body) : body;
     if (j && typeof j === "object" && j.data && typeof j.data === "object") return j;
@@ -289,6 +301,7 @@ export async function fetchDecrypted(url: string, ctx: ProviderContext, signal?:
   const key = await getSecurityKey(ctx);
   const res = await ctx.axios.get(url, {
     headers: { "User-Agent": UA },
+    responseType: "arraybuffer",
     ...(signal ? { signal } : {}),
   });
   return unwrap(res.data, key);
@@ -298,6 +311,7 @@ export async function postDecrypted(url: string, body: any, ctx: ProviderContext
   const key = await getSecurityKey(ctx);
   const res = await ctx.axios.post(url, body, {
     headers: { "User-Agent": UA, "Content-Type": "application/json; charset=utf-8" },
+    responseType: "arraybuffer",
     ...(signal ? { signal } : {}),
   });
   return unwrap(res.data, key);

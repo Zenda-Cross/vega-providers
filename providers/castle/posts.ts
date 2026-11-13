@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { throwProviderError } from "../providerErrors";
 import { apiHome, apiSearch, pickRows, mediaLink, SERIES_TYPES } from "./castleCore";
 
 const SKIP_HOME_ROWS = new Set(["Hot Erotic Series", "Bollywood Star"]);
@@ -77,8 +78,7 @@ export async function getPosts({
     // Anything else → keyword search
     return await getSearchPosts({ searchQuery: filter, page, signal, providerContext });
   } catch (err) {
-    console.error("CastleTV getPosts error:", err);
-    return [];
+    throwProviderError("CastleTV", "getPosts", err);
   }
 }
 
@@ -109,7 +109,6 @@ export async function getSearchPosts({
     }
     return out;
   } catch (err) {
-    console.error("CastleTV search error:", err);
-    return [];
+    throwProviderError("CastleTV", "getSearchPosts", err);
   }
 }

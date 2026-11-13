@@ -13,15 +13,15 @@
   },
   "Vega": {
     "name": "vegamovies",
-    "url": "https://new1.vegamovies.lease"
+    "url": "https://vegamovies.lease"
   },
   "lux": {
     "name": "luxmovies",
-    "url": "https://rogmovies.im"
+    "url": "https://rogmovies.autos"
   },
   "drive": {
     "name": "moviesDrive",
-    "url": "https://new1.moviesdrive.cyou/"
+    "url": "https://new3.moviesdrive.cyou/"
   },
   "multi": {
     "name": "multimovies",
@@ -29,7 +29,7 @@
   },
   "w4u": {
     "name": "world4ufree",
-    "url": "https://world4ufree.gay"
+    "url": "https://world4ufree.vu"
   },
   "extra": {
     "name": "extraMovies",
@@ -37,7 +37,7 @@
   },
   "hdhub": {
     "name": "hdhub4u",
-    "url": "https://new10.hdhub4u.cl"
+    "url": "https://new13.hdhub4u.cl"
   },
   "kat": {
     "name": "katmovieshd",
@@ -57,7 +57,7 @@
   },
   "gokuHD": {
     "name": "GokuHD",
-    "url": "https://gokuhd.cc"
+    "url": "https://gokuhd.nl"
   },
   "mkvDrama": {
     "name": "MKVDrama",
@@ -109,7 +109,7 @@
   },
   "moviezwap": {
     "name": "moviezwap",
-    "url": "https://www.moviezwap.chat/"
+    "url": "https://www.moviezwap.moe/"
   },
   "9xflix": {
     "name": "9xflix",
@@ -117,15 +117,15 @@
   },
   "cinevood": {
     "name": "Cinevood",
-    "url": "https://kmmovies.autos"
+    "url": "https://kmmovies.beer"
   },
   "kmmovies": {
     "name": "kmmovies",
-    "url": "https://kmmovies.autos"
+    "url": "https://kmmovies.beer"
   },
   "zeefliz": {
     "name": "zeefliz",
-    "url": "https://zeefliz.beauty"
+    "url": "https://zeefliz1.xyz"
   },
   "katmoviefix": {
     "name": "katmoviefix",
@@ -190,5 +190,17 @@
   "asianc": {
     "name": "AsianC",
     "url": "https://asianc.id"
+  },
+  "RareAnimes": {
+    "name": "RareAnimes",
+    "url": "https://www.rareanimes.fans"
+  },
+  "durbinLive": {
+    "name": "DurbinLive",
+    "url": "https://durbinlive.live"
+  },
+  "liveTgTv": {
+    "name": "LiveTG TV",
+    "url": "https://livetgtv.lovable.app"
   }
 }
