@@ -80,3 +80,65 @@ test('protected-only channels have no download servers', async () => {
   const link = api.channelLink(api.parsePlaylist(text)[0].channel.id);
   assert.equal((await load('stream').getStream({link, providerContext: ctx, isDownload: true})).length, 0);
 });
+test('public JSON API loads channels, normalizes relative logos, and resolves ClearKey streams even when playlist.m3u returns 502', async () => {
+  const store = new Map();
+  const ctx = {
+    commonHeaders: {},
+    kvStore: {get: async k => store.get(k), set: async (k, v) => store.set(k, v)},
+    axios: {
+      get: async (url, config) => {
+        assert.equal(config.responseType, 'arraybuffer');
+        if (url.includes('/api/public/playlist.m3u')) {
+          const err = new Error('Request failed with status code 502');
+          err.response = {status: 502, data: Buffer.from('#EXTM3U\n')};
+          throw err;
+        }
+        if (url.includes('/api/public/channels/')) {
+          const channelId = decodeURIComponent(url.split('/api/public/channels/')[1].split('?')[0]);
+          if (channelId === 'bad-drm') {
+            return {data: Buffer.from(JSON.stringify({id: 'bad-drm', name: 'Bad DRM', category: 'Sports', sources: ['https://example.com/bad.mpd'], drm: {type: 'clearkey', keyId: 'bad', key: 'bad'}}))};
+          }
+          if (channelId === 'missing') {
+            const err = new Error('Not found');
+            err.response = {status: 404};
+            throw err;
+          }
+          return {data: Buffer.from(JSON.stringify({
+            id: '143',
+            name: 'CNBC TV18 Prime',
+            category: 'English',
+            logo: '/api/public/ls-image/143',
+            sources: ['https://example.com/live.mpd|referer=https%3A%2F%2Fexample.com%2F', 'https://example.com/live.m3u8'],
+            drm: {type: 'clearkey', keyId: kid, key},
+          }))};
+        }
+        return {data: Buffer.from(JSON.stringify({
+          count: 2,
+          channels: [
+            {id: '143', name: 'CNBC TV18 Prime', category: 'English', logo: '/api/public/ls-image/143'},
+            {id: '143', name: 'CNBC TV18 Prime', category: 'Business', logo: ''},
+            {id: '502', name: 'Good News Today', category: 'News', logo: 'https://example.com/gnt.png'},
+          ],
+        }))};
+      },
+    },
+  };
+  const posts = load('posts');
+  const list = await posts.getPosts({providerContext: ctx});
+  assert.equal(list.length, 2);
+  assert.ok(list[0].image.includes(encodeURIComponent('https://livetgtv.lovable.app/api/public/ls-image/143')));
+  const catalogs = await load('catalog').catalog({providerContext: ctx});
+  assert.equal(catalogs.length, 4);
+  const meta = await load('meta').getMeta({link: list[0].link, providerContext: ctx});
+  assert.deepEqual(JSON.parse(JSON.stringify(meta.tags)), ['Live TV', 'English', 'Business']);
+  const streams = await load('stream').getStream({link: list[0].link, providerContext: ctx});
+  assert.equal(streams.length, 2);
+  assert.equal(streams[0].type, 'm3u8');
+  const dash = streams.find(s => s.type === 'mpd');
+  assert.equal(dash.link, 'https://example.com/live.mpd');
+  assert.equal(dash.headers.Referer, 'https://example.com/');
+  assert.deepEqual(JSON.parse(JSON.stringify(dash.drm)), {type: 'clearkey', clearKeys: {[kid]: key}});
+  assert.equal((await load('stream').getStream({link: list[0].link, providerContext: ctx, isDownload: true})).length, 0);
+  await assert.rejects(load('stream').getStream({link: 'livetgtv://channel/bad-drm%3Abad', providerContext: ctx}), /supported DRM/);
+  await assert.rejects(load('stream').getStream({link: 'livetgtv://channel/missing%3Amissing', providerContext: ctx}), /no longer available/);
+});

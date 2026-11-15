@@ -1,8 +1,8 @@
 import { Stream, ProviderContext } from '../types';
-import { channelId, loadSources, sourceDrm } from './playlist';
+import { channelId, loadChannelSources, sourceDrm } from './playlist';
 export const getStream = async ({link, providerContext, signal, isDownload}: {link: string; providerContext: ProviderContext; signal?: AbortSignal; isDownload?: boolean}): Promise<Stream[]> => {
   const id = channelId(link);
-  const sources = (await loadSources(providerContext, signal)).filter(item => item.channel.id === id);
+  const sources = await loadChannelSources(id, providerContext, signal);
   if (!sources.length) throw new Error('LiveTG TV: channel is no longer available');
   const streams: Stream[] = [], seen = new Set<string>();
   let invalid = false;
