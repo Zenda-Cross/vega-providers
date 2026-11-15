@@ -142,3 +142,14 @@ test('public JSON API loads channels, normalizes relative logos, and resolves Cl
   await assert.rejects(load('stream').getStream({link: 'livetgtv://channel/bad-drm%3Abad', providerContext: ctx}), /supported DRM/);
   await assert.rejects(load('stream').getStream({link: 'livetgtv://channel/missing%3Amissing', providerContext: ctx}), /no longer available/);
 });
+test('Jio signed query tokens are forwarded as media cookies for DASH segments', () => {
+  const api = load('playlist');
+  const detail = {name: 'Sony Ten 1 HD', sources: ['https://jiotvmblive.cdn.jio.com/channel/index.mpd?__hdnea__=st%3D1~exp%3D2~hmac%3Dtest'], headers: {Cookie: 'other=value'}};
+  const source = api.parseChannelDetail('162:sony ten 1 hd', detail)[0];
+  assert.equal(source.headers.Cookie, 'other=value; __hdnea__=st=1~exp=2~hmac=test');
+  detail.headers.Cookie = '__hdnea__=explicit';
+  assert.equal(api.parseChannelDetail('162:sony ten 1 hd', detail)[0].headers.Cookie, '__hdnea__=explicit');
+  detail.sources = ['https://example.com/index.mpd?__hdnea__=unrelated'];
+  detail.headers.Cookie = 'other=value';
+  assert.equal(api.parseChannelDetail('162:sony ten 1 hd', detail)[0].headers.Cookie, 'other=value');
+});

@@ -49,6 +49,18 @@ function buildSourceUrl(rawUrl: string, headers: Record<string, string>): string
   const pipe = rawUrl.indexOf('|');
   const url = pipe < 0 ? rawUrl : rawUrl.slice(0, pipe);
   if (pipe >= 0) new URLSearchParams(rawUrl.slice(pipe + 1)).forEach((value, key) => header(headers, key, value));
+  // Signed manifest query parameters are not inherited by relative DASH segments.
+  // Jio accepts the same media token as a cookie, which the player forwards
+  // to manifest and segment requests without rewriting the MPD.
+  const signed = url.match(/^https?:\/\/([^/?#]+)[^?#]*\?([^#]*)/i);
+  if (signed && /(?:^|\.)cdn\.jio\.com$/i.test(signed[1])) {
+    const token = new URLSearchParams(signed[2]).get('__hdnea__');
+    if (token) {
+      const cookieName = Object.keys(headers).find(key => key.toLowerCase() === 'cookie');
+      const cookies = cookieName ? headers[cookieName] : '';
+      if (!/(?:^|;\s*)__hdnea__=/.test(cookies)) header(headers, 'Cookie', (cookies ? cookies + '; ' : '') + '__hdnea__=' + token);
+    }
+  }
   return url;
 }
 function applyDrmProperties(drm: unknown, properties: Record<string, string>) {
