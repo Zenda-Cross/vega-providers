@@ -570,5 +570,14 @@
     "type": "anime",
     "disabled": false,
     "moduleVersionHeader": true
+  },
+  {
+    "display_name": "ExtraFlix",
+    "value": "extraflix",
+    "version": "1.0",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/extraflix.png",
+    "type": "global",
+    "disabled": false,
+    "moduleVersionHeader": true
   }
 ]
