@@ -57,22 +57,30 @@ function cleanTitle(value: string): string {
 }
 
 function parseQualityLabel(text: string): Omit<QualityRow, "link"> | null {
-  const resolution = text.match(/\b(2160p|1080p|720p|480p)\b/i);
+  const resolution = text.match(/\b(2160p|1440p|1080p|720p|480p|360p)\b/i);
   if (!resolution) return null;
 
-  const sizeMatch = text.match(/\[([^\]]*(?:GB|MB|TB)[^\]]*)\]/i);
-  const looksLikeRow = Boolean(sizeMatch) || /[-–]\s*$/.test(text);
+  const sizeMatch = text.match(/(\d+(?:\.\d+)?)\s*(GB|MB|TB)\b/i);
+  const trailingDash = /[-–]\s*$/.test(text);
+  const wordCount = normalizeText(text).split(" ").filter(Boolean).length;
+  const looksLikeRow = Boolean(sizeMatch) || trailingDash || wordCount <= 8;
   if (!looksLikeRow) return null;
 
   const label = normalizeText(
-    text.replace(/\[[^\]]*\]/g, " ").replace(/[-–]\s*$/g, ""),
+    text
+      .replace(/\[[^\]]*\]/g, " ")
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/\b\d+(?:\.\d+)?\s*(GB|MB|TB)\b/gi, " ")
+      .replace(/[-–|]\s*$/g, ""),
   );
   if (!label) return null;
 
   return {
     label,
     quality: resolution[1].toLowerCase(),
-    size: sizeMatch ? normalizeText(sizeMatch[1]) : undefined,
+    size: sizeMatch
+      ? normalizeText(`${sizeMatch[1]} ${sizeMatch[2].toUpperCase()}`)
+      : undefined,
   };
 }
 
@@ -99,7 +107,10 @@ function parseMediaRows($: any): MediaRow[] {
       const anchor = row.find("a[href]").first();
 
       if (anchor.length) {
-        if (pending && push(anchor.attr("href"), pending)) pending = null;
+        if (pending) {
+          push(anchor.attr("href"), pending);
+          pending = null;
+        }
         return;
       }
 
@@ -171,10 +182,6 @@ export const getMeta = async function ({
     );
     const title = cleanTitle(rawTitle) || infoHeading || rawTitle;
 
-    const isSeries =
-      /\bseason\b/i.test(rawTitle) || /\bseries\b/i.test(rawTitle);
-    const type: "movie" | "series" = isSeries ? "series" : "movie";
-
     const description =
       normalizeText($('meta[name="description"]').attr("content")) ||
       normalizeText($('meta[property="og:description"]').attr("content"));
@@ -214,10 +221,16 @@ export const getMeta = async function ({
     const mediaRows = parseMediaRows($);
     const episodeRows = mediaRows.filter((row) => row.kind === "episode");
     const qualityRows = mediaRows.filter((row) => row.kind === "quality");
+    const isSeries =
+      /\bseason\b/i.test(rawTitle) ||
+      /\bseries\b/i.test(rawTitle) ||
+      episodeRows.length > 0;
+    const type: "movie" | "series" = isSeries ? "series" : "movie";
     const linkList: Link[] = [];
 
     if (episodeRows.length) {
-      const season = rawTitle.match(/\bSeason\s+(\d+)/i);
+      const season =
+        rawTitle.match(/\bSeason\s+(\d+)/i) || rawTitle.match(/\bS(\d{1,2})\b/i);
       linkList.push({
         title: season ? `Season ${Number(season[1])}` : "Episodes",
         directLinks: episodeRows.map((row) => ({

@@ -634,3 +634,191 @@ test("getStream reports when no playable links are found", async () => {
     /ExtraFlix stream failed: no playable streams found/,
   );
 });
+
+test("getStream does not follow other-show archive links found inside quality rows", async () => {
+  const requested = [];
+  const extractorCalls = [];
+  const { getStream } = loadModule("stream", {
+    hubcloudExtractor: async (url) => {
+      extractorCalls.push(url);
+      return [
+        {
+          server: "CF Storage",
+          link: "https://a.r2.cloudflarestorage.com/abc.mkv",
+          type: "mkv",
+        },
+      ];
+    },
+  });
+
+  const providerContext = createContext((url) => {
+    requested.push(url);
+    if (url.includes("/archives/8283")) {
+      return {
+        data: `
+          <html><body><div class="entry-content">
+            <p>480p [266 MB]</p>
+            <p><a class="fasc-button" href="https://links.linkshub.fun/view/kapilS05E01">Download Link</a></p>
+            <p>720p [684 MB]</p>
+            <p><a class="fasc-button" href="https://ep1.linkshub.fun/archives/9999">Previous post: MobLand S02E02</a></p>
+          </div></body></html>`,
+      };
+    }
+    if (url.includes("/view/kapilS05E01")) {
+      return {
+        data: `<html><body><a href="https://hubdrive.blog/file/123">HubDrive</a></body></html>`,
+      };
+    }
+    if (url.includes("/hubdrive.blog/file/123")) {
+      return {
+        data: `<html><body><a href="https://hubcloud.mov/drive/abc">HubCloud</a></body></html>`,
+      };
+    }
+    return { data: "<html></html>" };
+  });
+
+  const streams = await getStream({
+    link: "https://ep1.linkshub.fun/archives/8283",
+    providerContext,
+  });
+
+  assert.deepEqual(extractorCalls, ["https://hubcloud.mov/drive/abc"]);
+  assert.ok(requested.includes("https://ep1.linkshub.fun/archives/8283"));
+  assert.ok(requested.includes("https://links.linkshub.fun/view/kapilS05E01"));
+  assert.ok(!requested.some((url) => url.includes("archives/9999")));
+  assert.equal(streams.length, 1);
+  assert.equal(streams[0].server, "CF Storage");
+  assert.equal(streams[0].quality, "480");
+});
+
+test("getStream applies the quality of 1440p archive rows to resolved streams", async () => {
+  const { getStream } = loadModule("stream", {
+    hubcloudExtractor: async (url) => [
+      {
+        server: "CF Storage",
+        link: `https://a.r2.cloudflarestorage.com/${url.split("/").pop()}.mkv`,
+        type: "mkv",
+      },
+    ],
+  });
+
+  const providerContext = createContext((url) => {
+    if (url.includes("/archives/8283")) {
+      return {
+        data: `
+          <html><body><div class="entry-content">
+            <p>1440p x265 – [2.1 GB]</p>
+            <p><a class="fasc-button" href="https://hubcloud.mov/drive/qhd">Download Link</a></p>
+          </div></body></html>`,
+      };
+    }
+    return { data: "" };
+  });
+
+  const streams = await getStream({
+    link: "https://ep1.linkshub.fun/archives/8283",
+    providerContext,
+  });
+
+  assert.equal(streams.length, 1);
+  assert.equal(streams[0].quality, "1440");
+});
+
+test("getMeta parses quality rows with parenthesized or unbracketed sizes and bare labels", async () => {
+  const { getMeta } = loadModule("meta");
+  const html = `
+    <html><body>
+      <h1>Test Film (2024) 1080p WEB-DL</h1>
+      <div class="entry-content">
+        <p>480p x264 (374 MB)</p>
+        <p><a class="fasc-button" href="https://links.linkshub.fun/view/480">Download Link</a></p>
+        <p>360p x265 250 MB</p>
+        <p><a class="fasc-button" href="https://links.linkshub.fun/view/360">Download Link</a></p>
+        <p>720p</p>
+        <p><a class="fasc-button" href="https://links.linkshub.fun/view/720">Download Link</a></p>
+      </div>
+    </body></html>`;
+  const providerContext = createContext(() => ({ data: html }));
+
+  const info = await getMeta({ link: "/test-film/", providerContext });
+
+  assert.equal(info.linkList.length, 3);
+  assert.equal(info.linkList[0].quality, "480p");
+  assert.equal(info.linkList[0].title, "480p x264 - 374 MB");
+  assert.equal(
+    info.linkList[0].directLinks[0].link,
+    "https://links.linkshub.fun/view/480",
+  );
+  assert.equal(info.linkList[1].quality, "360p");
+  assert.equal(info.linkList[1].title, "360p x265 - 250 MB");
+  assert.equal(info.linkList[2].quality, "720p");
+  assert.equal(info.linkList[2].title, "720p");
+});
+
+test("getMeta does not pair a stale quality label with an unlabelled link", async () => {
+  const { getMeta } = loadModule("meta");
+  const html = `
+    <html><body>
+      <h1>Test Stale Pending (2024) 1080p WEB-DL</h1>
+      <div class="entry-content">
+        <p>1080p HEVC x265 - 1 GB</p>
+        <p><a class="fasc-button" href="https://links.linkshub.fun/view/first">Download Link</a></p>
+        <p>720p x265 - 900 MB</p>
+        <p><a class="fasc-button" href="https://links.linkshub.fun/view/first">Duplicate Download</a></p>
+        <p><a class="fasc-button" href="https://links.linkshub.fun/view/fresh">Unlabelled Download</a></p>
+      </div>
+    </body></html>`;
+  const providerContext = createContext(() => ({ data: html }));
+
+  const info = await getMeta({ link: "/test-stale/", providerContext });
+
+  assert.equal(info.linkList.length, 1);
+  assert.equal(info.linkList[0].quality, "1080p");
+  assert.equal(
+    info.linkList[0].directLinks[0].link,
+    "https://links.linkshub.fun/view/first",
+  );
+  assert.ok(
+    !info.linkList.some((entry) =>
+      entry.directLinks.some((link) => link.link.endsWith("fresh")),
+    ),
+  );
+});
+
+test("getMeta detects series from episode rows even without season or series in the title", async () => {
+  const { getMeta } = loadModule("meta");
+  const html = `
+    <html><body>
+      <h1>The Great Indian Kapil Show (2026) [Hindi] 1080p 720p 480p Netflix WEB-DL</h1>
+      <div class="entry-content">
+        <p><span>Episode 1</span></p>
+        <p><a class="fasc-button" href="https://ep1.linkshub.fun/archives/8283">Download Link</a></p>
+      </div>
+    </body></html>`;
+  const providerContext = createContext(() => ({ data: html }));
+
+  const info = await getMeta({ link: "/some-show/", providerContext });
+
+  assert.equal(info.type, "series");
+  assert.equal(info.linkList.length, 1);
+  assert.equal(info.linkList[0].title, "Episodes");
+  assert.equal(info.linkList[0].directLinks[0].type, "series");
+});
+
+test("getMeta supports S05-style season titles", async () => {
+  const { getMeta } = loadModule("meta");
+  const html = `
+    <html><body>
+      <h1>The Great Indian Kapil Show S05 (2026) [Hindi] 1080p 720p Netflix WEB-DL</h1>
+      <div class="entry-content">
+        <p><span>Episode 1</span></p>
+        <p><a class="fasc-button" href="https://ep1.linkshub.fun/archives/8283">Download Link</a></p>
+      </div>
+    </body></html>`;
+  const providerContext = createContext(() => ({ data: html }));
+
+  const info = await getMeta({ link: "/some-show-s05/", providerContext });
+
+  assert.equal(info.type, "series");
+  assert.equal(info.linkList[0].title, "Season 5");
+});

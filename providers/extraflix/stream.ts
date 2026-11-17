@@ -58,7 +58,7 @@ function pathOf(url: string): string {
 }
 
 function qualityFromText(value: string | undefined | null): string | undefined {
-  const match = normalizeText(value).match(/\b(2160|1080|720|480|360)p\b/i);
+  const match = normalizeText(value).match(/\b(2160|1440|1080|720|480|360)p\b/i);
   return match ? match[1] : undefined;
 }
 
@@ -173,8 +173,10 @@ function collectPageLinks(
     const href = absoluteUrl(rawHref, pageUrl);
     if (!href || !isHttpUrl(href) || seen.has(href)) return;
 
+    // Never follow archive or prev/next page navigation inside quality rows;
+    // archive pages may still surface the per-episode view links their files use.
     const allowed = allowPageLinks
-      ? isArchivePage(href) || isLinkshubView(href) || isDownloadTarget(href)
+      ? isLinkshubView(href) || isDownloadTarget(href)
       : isDownloadTarget(href);
     if (!allowed) return;
 
