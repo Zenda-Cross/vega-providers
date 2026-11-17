@@ -4,7 +4,8 @@ import {
   buildAnimeUrl,
   callServerFn,
   cleanSynopsis,
-  extractMediaImage,
+  extractMediaBackdrop,
+  extractMediaPoster,
   extractMediaTitle,
   mapEpisodesToLinks,
   parseAnimeId,
@@ -25,7 +26,7 @@ export const getMeta = async function ({
     const animeId = parseAnimeId(link);
     const referer = buildAnimeUrl(baseUrl, animeId);
 
-    const [info, episodes] = await Promise.all([
+    const [info, episodes, logoRes] = await Promise.all([
       callServerFn<any>(
         SERVER_FNS.INFO,
         { id: animeId, type: "ANIME", watchOrder: true },
@@ -36,6 +37,11 @@ export const getMeta = async function ({
         { id: animeId },
         { providerContext, baseUrl, referer },
       ).catch(() => []),
+      callServerFn<{ logo?: string | null } | null>(
+        SERVER_FNS.LOGO,
+        { id: animeId, type: "ANIME", lang: "en" },
+        { providerContext, baseUrl, referer },
+      ).catch(() => null),
     ]);
 
     if (!info || !info.id) {
@@ -44,7 +50,13 @@ export const getMeta = async function ({
 
     const title = extractMediaTitle(info.title) || `Anime ${animeId}`;
     const isMovie = info.format === "MOVIE";
-    const image = extractMediaImage(info);
+    const poster = extractMediaPoster(info) || undefined;
+    const image = extractMediaBackdrop(info) || poster || "";
+    const rawLogo =
+      (typeof info.logo_image === "string" && info.logo_image.trim()) ||
+      (typeof logoRes?.logo === "string" && logoRes.logo.trim()) ||
+      "";
+    const logo = rawLogo || undefined;
     const synopsis = cleanSynopsis(info.description);
     const rating =
       typeof info.average_score === "number" && info.average_score > 0
@@ -111,7 +123,8 @@ export const getMeta = async function ({
     return {
       title,
       image,
-      poster: info.cover_image?.large || info.cover_image?.medium || undefined,
+      poster,
+      logo,
       synopsis,
       imdbId: "",
       tmdbId: info.tmdb_id ? String(info.tmdb_id) : undefined,

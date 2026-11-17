@@ -16,6 +16,7 @@ export const SERVER_FNS = {
   FACETS: "7dd851f9f94b2ba5d7b440193467da2d51e23e56e6b8cd5aceca6b64b1c0f780",
   INFO: "505b30ac55cdb92c6321f682548d2934b45f693f37b62f9b91007a836ebda9f9",
   EPISODES: "33c4f1e3d3bb451ddccfbb87aeb0d7e52f86a1c8954c61f38d31ea4527593190",
+  LOGO: "93a33c99c618cb82056a1920881e278e55fd392abd5d120d5a5fd0920c021cac",
   PLAYBACK: "5ebed94ee2be52c6280fe2b832298a7f8a78c1dc67d7f28b42231743b2ebde1a",
 } as const;
 
@@ -85,15 +86,25 @@ export function extractMediaTitle(title: any): string {
   return (title.english || title.romaji || title.native || "").trim();
 }
 
-export function extractMediaImage(media: any): string {
+export function extractMediaPoster(media: any): string {
   const cover = media?.cover_image;
+  return cover?.large || cover?.medium || cover?.small || "";
+}
+
+export function extractMediaImage(media: any): string {
   return (
-    cover?.large ||
-    cover?.medium ||
-    cover?.small ||
+    extractMediaPoster(media) ||
     media?.banner_image ||
     media?.backdrop_image ||
     ""
+  );
+}
+
+export function extractMediaBackdrop(media: any): string {
+  return (
+    media?.backdrop_image ||
+    media?.banner_image ||
+    extractMediaImage(media)
   );
 }
 

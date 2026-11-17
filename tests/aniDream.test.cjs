@@ -193,7 +193,9 @@ test("catalog, posts deduplication, and search pass AniDream serverFn headers", 
   }
 });
 
-test("meta and episodes resolve synopsis, rating, watch_order, and episode links", async () => {
+test("meta and episodes resolve synopsis, rating, backdrop, poster, logo, watch_order, and episode links", async () => {
+  const { decodeSeroval } = createSerovalHelper();
+  let seenLogoPayload = null;
   const ctx = createBaseContext(async (_method, url) => {
     if (url.includes("505b30ac")) {
       return {
@@ -206,7 +208,9 @@ test("meta and episodes resolve synopsis, rating, watch_order, and episode links
           genres: ["Action", "Drama"],
           title: { english: "Attack on Titan", romaji: "Shingeki no Kyojin" },
           description: "Titans!<br><br>Walls &amp; humanity.",
-          cover_image: { large: "https://example.com/aot.jpg" },
+          cover_image: { large: "https://example.com/aot-cover.jpg" },
+          banner_image: "https://example.com/aot-banner.jpg",
+          backdrop_image: "https://image.tmdb.org/t/p/original/aot-bg.jpg",
           watch_order: [
             { id: 16498, type: "ANIME", label: "Season 1", episodes_aired: 25 },
             { id: 20958, type: "ANIME", label: "Season 2", episodes_aired: 12 },
@@ -226,6 +230,15 @@ test("meta and episodes resolve synopsis, rating, watch_order, and episode links
         ]),
       };
     }
+    if (url.includes("93a33c99")) {
+      const payload = decodeSeroval(JSON.parse(new URL(url).searchParams.get("payload")));
+      seenLogoPayload = payload.data;
+      return {
+        data: createServerFnBody({
+          logo: "https://image.tmdb.org/t/p/original/aot-logo.png",
+        }),
+      };
+    }
     throw new Error(`Unexpected URL: ${url}`);
   });
 
@@ -238,6 +251,14 @@ test("meta and episodes resolve synopsis, rating, watch_order, and episode links
 
   assert.equal(info.title, "Attack on Titan");
   assert.equal(info.type, "series");
+  assert.equal(info.image, "https://image.tmdb.org/t/p/original/aot-bg.jpg");
+  assert.equal(info.poster, "https://example.com/aot-cover.jpg");
+  assert.equal(info.logo, "https://image.tmdb.org/t/p/original/aot-logo.png");
+  assert.deepEqual(JSON.parse(JSON.stringify(seenLogoPayload)), {
+    id: 16498,
+    type: "ANIME",
+    lang: "en",
+  });
   assert.equal(info.rating, "8.5");
   assert.equal(info.tmdbId, "1429");
   assert.equal(info.synopsis, "Titans!\n\nWalls & humanity.");
@@ -252,6 +273,41 @@ test("meta and episodes resolve synopsis, rating, watch_order, and episode links
   });
   assert.equal(eps.length, 1);
   assert.equal(eps[0].link, "https://anidream.to/watch?id=20958&n=1&dub=1");
+});
+
+test("meta falls back gracefully to banner_image/cover_image and omits failed/null logo", async () => {
+  const ctx = createBaseContext(async (_method, url) => {
+    if (url.includes("505b30ac")) {
+      return {
+        data: createServerFnBody({
+          id: 999,
+          format: "MOVIE",
+          title: { romaji: "Banner Only Movie" },
+          cover_image: { medium: "https://example.com/cover-med.jpg" },
+          banner_image: "https://example.com/banner.jpg",
+          backdrop_image: null,
+        }),
+      };
+    }
+    if (url.includes("33c4f1e3")) {
+      return { data: createServerFnBody([]) };
+    }
+    if (url.includes("93a33c99")) {
+      throw new Error("Logo endpoint failed");
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  });
+
+  const metaMod = loadBrowserModule("meta");
+  const info = await metaMod.getMeta({
+    link: "https://anidream.to/anime/999",
+    provider: "aniDream",
+    providerContext: ctx,
+  });
+
+  assert.equal(info.image, "https://example.com/banner.jpg");
+  assert.equal(info.poster, "https://example.com/cover-med.jpg");
+  assert.equal(info.logo, undefined);
 });
 
 test("getStream returns m3u8 + sorted subtitles + skip intervals when streaming", async () => {
