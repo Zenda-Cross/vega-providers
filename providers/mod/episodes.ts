@@ -1,3 +1,4 @@
+import { getPage } from "./request";
 import { EpisodeLink, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
 
@@ -13,14 +14,14 @@ export const getEpisodes = async function ({
     if (url.includes("url=")) {
       url = atob(url.split("url=")[1]);
     }
-    const res = await axios.get(url);
+    const res = await getPage(url, providerContext);
     const html = res.data;
     let $ = cheerio.load(html);
     if (url.includes("url=")) {
       const newUrl = $("meta[http-equiv='refresh']")
         .attr("content")
         ?.split("url=")[1];
-      const res2 = await axios.get(newUrl || url);
+      const res2 = await getPage(newUrl || url, providerContext);
       const html2 = res2.data;
       $ = cheerio.load(html2);
     }

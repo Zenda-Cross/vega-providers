@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getPage } from "./request";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
 
@@ -24,6 +25,7 @@ export const getPosts = async function ({
     axios,
     cheerio,
     operation: "posts",
+    providerContext,
   });
 };
 
@@ -49,6 +51,7 @@ export const getSearchPosts = async function ({
     axios,
     cheerio,
     operation: "search posts",
+    providerContext,
   });
 };
 
@@ -59,6 +62,7 @@ async function posts({
   axios,
   cheerio,
   operation,
+  providerContext,
 }: {
   baseUrl: string;
   url: string;
@@ -66,9 +70,10 @@ async function posts({
   axios: ProviderContext["axios"];
   cheerio: ProviderContext["cheerio"];
   operation: string;
+  providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const res = await axios.get(url, { signal });
+    const res = await getPage(url, providerContext, signal);
     const data = res.data;
     const $ = cheerio.load(data);
     const catalog: Post[] = [];
