@@ -15,14 +15,22 @@ export async function getPage(url: string, context: ProviderContext, signal?: Ab
     if (!challenged(response)) return response;
     original = new Error('Moviesmod: Cloudflare verification required');
   } catch (error: any) {
-    if (!challenged(error?.response)) throw error;
+    const forbiddenSession = error?.response?.status === 403 && (
+      /(?:^|;\s*)cf_clearance=/.test(session?.cookies || '') ||
+      /(?:^|\.)moviesmod\.[a-z.]+$/i.test(new URL(url).hostname)
+    );
+    if (!challenged(error?.response) && !forbiddenSession) throw error;
     original = error;
   }
   if (signal?.aborted) throw original;
   if (typeof context.openWebView !== 'function') throw new Error('Moviesmod: Cloudflare verification requires an app with WebView support');
+  // The request has already rejected the saved clearance. Do not let the
+  // WebView resolver's cookie shortcut reuse it, including after an IP change.
+  await context.kvStore?.delete(cacheKey);
+  const verificationHeaders = Object.fromEntries(Object.entries(headers).filter(([name]) => name.toLowerCase() !== 'cookie'));
   const result = await context.openWebView(url, {
     title: 'Verify access to Moviesmod', description: 'Complete the website verification to continue.',
-    headers, waitForCookie: 'cf_clearance', force: false, timeoutMs: 120000,
+    headers: verificationHeaders, waitForCookie: 'cf_clearance', force: true, timeoutMs: 120000,
   });
   if (signal?.aborted) throw new Error('Moviesmod: request cancelled');
   if (new URL(result.url || url).origin !== origin) throw new Error('Moviesmod: verification returned a different website');
