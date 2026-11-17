@@ -202,5 +202,9 @@
   "liveTgTv": {
     "name": "LiveTG TV",
     "url": "https://livetgtv.lovable.app"
+  },
+  "aniDream": {
+    "name": "AniDream",
+    "url": "https://anidream.to"
   }
 }
