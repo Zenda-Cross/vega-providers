@@ -25,3 +25,17 @@ test('verification may reuse a solved session and return the requested HTML dire
  assert.equal(options.force,false);return {url,cookies:'cf_clearance=test',userAgent:'Verified Browser',data:'<title>Movie information</title>'};}};
  const result=await load()('https://example.com/movie',ctx);assert.equal(calls,1);assert.equal(result.data,'<title>Movie information</title>');
 });
+test('verified rendered redirect is consumed without requesting the challenged wrapper again',async()=>{
+ let calls=0;const ctx={axios:{get:async()=>{calls++;return {data:'<title>Just a moment...</title>'};}},openWebView:async()=>({url:'https://example.com/episodes/',cookies:'',userAgent:'Browser',data:'<h3>Episode 1</h3>'})};
+ const response=await load()('https://example.com/wrapper',ctx);assert.equal(calls,1);assert.equal(response.url,'https://example.com/episodes/');
+});
+test('episode wrapper decoding and relative refresh preserve navigation and final episode URLs',async()=>{
+ const code=buildSync({entryPoints:['providers/mod/episodes.ts'],bundle:true,format:'cjs',write:false}).outputFiles[0].text;
+ const m={exports:{}};vm.runInNewContext(code,{module:m,exports:m.exports,URL,atob,console});
+ const calls=[];const ctx={cheerio:require('cheerio'),commonHeaders:{},axios:{get:async(url,config)=>{
+ calls.push(url);if(calls.length===1)return {data:'<meta http-equiv="refresh" content="0;url=/season/episodes">'};
+ assert.equal(config.headers.Referer,'https://example.com/season');return {data:'<h3><a href="episode-1">Episode 1</a></h3>'};
+ }}};
+ const url='https://example.com/wrapper?url='+encodeURIComponent(btoa('https://example.com/season'))+'&extra=1';
+ const result=await m.exports.getEpisodes({url,providerContext:ctx});assert.equal(calls[0],'https://example.com/season');assert.equal(result[0].link,'https://example.com/season/episode-1');
+});

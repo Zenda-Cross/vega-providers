@@ -72,9 +72,7 @@ export const getMeta = async function ({
         links.push({
           title: seriesTitle.replace("Download ", "").trim() || "Download",
           episodesLink: episodesLink || "",
-          directLinks: movieLink
-            ? [{ link: movieLink, title: "Movie", type: "movie" }]
-            : [],
+          ...(movieLink ? {directLinks: [{link: movieLink, title: "Movie", type: "movie" as const}]} : {}),
           quality: seriesTitle?.match(/\d+p\b/)?.[0] || "",
         });
       }

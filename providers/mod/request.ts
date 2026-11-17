@@ -26,12 +26,13 @@ export async function getPage(url: string, context: ProviderContext, signal?: Ab
   });
   if (signal?.aborted) throw new Error('Moviesmod: request cancelled');
   if (new URL(result.url || url).origin !== origin) throw new Error('Moviesmod: verification returned a different website');
-  if (!result.cookies) throw new Error('Moviesmod: verification did not return cookies');
+  const rendered = !!result.data && !challenged({data: result.data});
+  if (!result.cookies && !rendered) throw new Error('Moviesmod: verification did not return cookies or a usable page');
   const verified = {cookies: result.cookies, userAgent: result.userAgent || headers['User-Agent'] || ''};
   await context.kvStore?.set(cacheKey, verified);
   // A completed dialog can already contain the requested page.
-  if (result.data && !challenged({data: result.data}) && new URL(result.url || url).pathname === new URL(url).pathname) {
-    return {data: result.data, status: 200};
+  if (rendered) {
+    return {data: result.data, status: 200, url: result.url || url};
   }
   const response = await context.axios.get(url, {signal, headers: {...headers, Cookie: verified.cookies, ...(verified.userAgent ? {'User-Agent': verified.userAgent} : {})}});
   if (challenged(response)) throw new Error('Moviesmod: verification was not accepted; please retry');

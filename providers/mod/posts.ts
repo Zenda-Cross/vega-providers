@@ -82,13 +82,15 @@ async function posts({
       .map((i, element) => {
         const title = $(element).find("a").attr("title");
         const link = $(element).find("a").attr("href");
-        const image = $(element).find("img").attr("src");
+        const img = $(element).find("img").first();
+        const image = img.attr("data-lazy-src") || img.attr("data-src") ||
+          (img.attr("data-srcset") || img.attr("srcset") || "").split(",")[0].trim().split(/\s+/)[0] || img.attr("src");
         if (title && link && image) {
           const postUrl = new URL(link, `${baseUrl}/`);
           catalog.push({
             title: title,
             link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
-            image: image,
+            image: new URL(image, `${baseUrl}/`).href,
           });
         }
       });

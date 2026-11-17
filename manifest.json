@@ -72,7 +72,7 @@
   {
     "display_name": "MoviesMod",
     "value": "mod",
-    "version": "2.12",
+    "version": "2.13",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/mod.png",
     "type": "global",
     "disabled": false
