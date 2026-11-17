@@ -79,7 +79,7 @@ export async function zcloudExtractor(
           delete cleanHeaders["sec-ch-ua-platform"];
           delete cleanHeaders["Cookie"];
 
-          const wafResult = await openWebView(baseUrl, {
+          const wafResult = await openWebView(link, {
             title: "Solve the captcha below and click done",
             description: "Required to bypass anti-bot protection.",
             headers: cleanHeaders,
@@ -136,7 +136,7 @@ export async function zcloudExtractor(
         delete cleanHeaders2["sec-ch-ua-platform"];
         delete cleanHeaders2["Cookie"];
 
-        const wafResult = await openWebView(vcloudBaseUrl, {
+        const wafResult = await openWebView(vcloudLink, {
           title: "Solve the captcha below and click done",
           description: "Required to bypass anti-bot protection.",
           headers: cleanHeaders2,
@@ -174,7 +174,7 @@ export async function zcloudExtractor(
           delete cleanHeaders3["sec-ch-ua-platform"];
           delete cleanHeaders3["Cookie"];
 
-          const wafResult = await openWebView(vcloudBaseUrl, {
+          const wafResult = await openWebView(vcloudLink, {
             title: "Solve the captcha below and click done",
             description: "Required to bypass anti-bot protection.",
             headers: cleanHeaders3,
