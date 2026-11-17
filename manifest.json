@@ -58,7 +58,7 @@
     "version": "1.8",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/world4u.png",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "KatMoviesHd",
@@ -176,7 +176,7 @@
     "version": "2.35",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/kmMovies.png",
     "type": "global",
-    "disabled": false,
+    "disabled": true,
     "hasSettings": true
   },
   {
@@ -489,7 +489,7 @@
     "version": "1.01",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/movielinkdb.png",
     "type": "india",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "MX Player",
