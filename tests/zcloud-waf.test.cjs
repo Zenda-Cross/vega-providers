@@ -10,7 +10,8 @@ for (const [stage, browserPage] of ['initial', 'decoded', 'fetch fallback'].flat
     const encode = value => Buffer.from(value).toString('base64');
     const firstHtml = `atob(atob('${encode(encode(decoded))}'))`;
     const calls = [], verified = [];
-    const downloadHtml = '<a class="server" href="https://cdn.example/video.mkv">Download</a>';
+    let popupHeaders;
+    const downloadHtml = '<html><title>Download file</title><a href="https://cdn.example/video.mkv">Download</a><script src="/cdn-cgi/challenge-platform/normal.js"></script></html>';
     const blocked = () => Object.assign(new Error('Forbidden'), {response: {status: 403}});
     const axios = async (url, config) => {
       calls.push(url);
@@ -18,7 +19,8 @@ for (const [stage, browserPage] of ['initial', 'decoded', 'fetch fallback'].flat
       if (stage === 'initial' && verified.length) {
         assert.equal(browserPage, false, 'Do not refetch a captured file page');
         assert.equal(config.headers['User-Agent'], 'Verified browser');
-        assert.ok(config.headers.Cookie.includes('cf_clearance=fresh'));
+        assert.equal(config.headers.Cookie, 'cf_clearance=fresh');
+        assert.deepEqual({...config.headers}, {...popupHeaders, 'User-Agent': 'Verified browser', Cookie: 'cf_clearance=fresh'});
       }
       return {data: firstHtml};
     };
@@ -40,10 +42,13 @@ for (const [stage, browserPage] of ['initial', 'decoded', 'fetch fallback'].flat
         return ++fetches === 1 ? {status: 403} : {ok: true, text: async () => ''};
       }});
     const result = await module.exports.zcloudExtractor(original, new AbortController().signal,
-      axios, {load: html => { if (browserPage && stage !== 'initial') assert.equal(html, downloadHtml); return () => []; }}, {}, {openWebView: async (url, options) => {
+      axios, {load: html => { if (browserPage && stage !== 'initial') assert.equal(html, downloadHtml); return () => []; }}, {Referer: 'https://zeefliz1.xyz', 'User-Agent': 'Old agent', Cookie: 'cf_clearance=old', 'sec-ch-ua': 'Old browser'}, {openWebView: async (url, options) => {
         verified.push(url);
         assert.equal(url, stage === 'initial' ? original : decoded);
         assert.equal(options.force, true);
+        assert.equal(options.waitForCookie, undefined);
+        popupHeaders = {...options.headers};
+        assert.equal(options.headers.Referer, 'https://zcloud.lat');
         return {userAgent: 'Verified browser', cookies: 'cf_clearance=fresh', data: browserPage ? (stage === 'initial' ? firstHtml : downloadHtml) : ''};
       }});
     assert.equal(result.length, 0);

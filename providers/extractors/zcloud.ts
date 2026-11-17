@@ -62,13 +62,14 @@ export async function zcloudExtractor(
     // successfully loaded file page instead of immediately requesting it again.
     const pageFromWebView = (result: any): string => {
       const html = typeof result.data === "string" ? result.data : "";
-      if (/cf-chl-|challenge-platform|<title[^>]*>\s*(?:Just a moment|Attention Required)/i.test(html)) return "";
-      return /class=["'][^"']*\bserver\b|atob\(atob\(/i.test(html) ? html : "";
+      if (/<title[^>]*>\s*(?:Just a moment|Attention Required)|Sorry, you have been blocked/i.test(html)) return "";
+      return html.trim() ? html : "";
     };
-    const useWebViewSession = (result: any) => {
-      for (const key of Object.keys(headers)) {
-        if (/^(cookie|user-agent|sec-ch-ua(?:-.*)?)$/i.test(key)) delete headers[key];
-      }
+    const useWebViewSession = (result: any, requestHeaders: Record<string, string>) => {
+      // Retry the same explicit headers used to load the WebView, including
+      // Referer. Cookies and User-Agent come from that completed browser session.
+      for (const key of Object.keys(headers)) delete headers[key];
+      Object.assign(headers, requestHeaders);
       if (result.userAgent) headers["User-Agent"] = result.userAgent;
       if (result.cookies) headers["Cookie"] = result.cookies;
     };
@@ -83,20 +84,17 @@ export async function zcloudExtractor(
             `zcloudExtractor: WAF detected (403) for ${link}, using solver...`,
           );
           const cleanHeaders = { ...headers, Referer: baseUrl };
-          delete cleanHeaders["User-Agent"];
-          delete cleanHeaders["sec-ch-ua"];
-          delete cleanHeaders["sec-ch-ua-mobile"];
-          delete cleanHeaders["sec-ch-ua-platform"];
-          delete cleanHeaders["Cookie"];
+          for (const key of Object.keys(cleanHeaders)) {
+            if (/^(cookie|user-agent|sec-ch-ua(?:-.*)?)$/i.test(key)) delete cleanHeaders[key];
+          }
 
           const wafResult = await openWebView(link, {
             title: "Open download page",
             description: "If the download page is visible, tap Done. Complete verification only if requested.",
             headers: cleanHeaders,
-            waitForCookie: "cf_clearance",
             force: true,
           });
-          useWebViewSession(wafResult);
+          useWebViewSession(wafResult, cleanHeaders);
           vLinkRes = pageFromWebView(wafResult)
             ? {data: pageFromWebView(wafResult)}
             : await axios(`${link}`, { headers, signal });
@@ -141,20 +139,17 @@ export async function zcloudExtractor(
         );
         const vcloudBaseUrl = vcloudLink.split("/").slice(0, 3).join("/");
         const cleanHeaders2 = { ...headers, Referer: vcloudBaseUrl };
-        delete cleanHeaders2["User-Agent"];
-        delete cleanHeaders2["sec-ch-ua"];
-        delete cleanHeaders2["sec-ch-ua-mobile"];
-        delete cleanHeaders2["sec-ch-ua-platform"];
-        delete cleanHeaders2["Cookie"];
+        for (const key of Object.keys(cleanHeaders2)) {
+          if (/^(cookie|user-agent|sec-ch-ua(?:-.*)?)$/i.test(key)) delete cleanHeaders2[key];
+        }
 
         const wafResult = await openWebView(vcloudLink, {
           title: "Open download page",
           description: "If the download page is visible, tap Done. Complete verification only if requested.",
           headers: cleanHeaders2,
-          waitForCookie: "cf_clearance",
           force: true,
         });
-        useWebViewSession(wafResult);
+        useWebViewSession(wafResult, cleanHeaders2);
         const retryRes = pageFromWebView(wafResult)
           ? {data: pageFromWebView(wafResult)}
           : await axios.get(vcloudLink, { headers, signal });
@@ -178,20 +173,17 @@ export async function zcloudExtractor(
           );
           const vcloudBaseUrl = vcloudLink.split("/").slice(0, 3).join("/");
           const cleanHeaders3 = { ...headers, Referer: vcloudBaseUrl };
-          delete cleanHeaders3["User-Agent"];
-          delete cleanHeaders3["sec-ch-ua"];
-          delete cleanHeaders3["sec-ch-ua-mobile"];
-          delete cleanHeaders3["sec-ch-ua-platform"];
-          delete cleanHeaders3["Cookie"];
+          for (const key of Object.keys(cleanHeaders3)) {
+            if (/^(cookie|user-agent|sec-ch-ua(?:-.*)?)$/i.test(key)) delete cleanHeaders3[key];
+          }
 
           const wafResult = await openWebView(vcloudLink, {
             title: "Open download page",
             description: "If the download page is visible, tap Done. Complete verification only if requested.",
             headers: cleanHeaders3,
-            waitForCookie: "cf_clearance",
             force: true,
           });
-          useWebViewSession(wafResult);
+          useWebViewSession(wafResult, cleanHeaders3);
           fetchRes = pageFromWebView(wafResult)
             ? {ok: true, text: async () => pageFromWebView(wafResult)}
             : await fetch(vcloudLink, {
