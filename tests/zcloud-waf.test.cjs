@@ -3,18 +3,20 @@ const {test} = require('node:test');
 const vm = require('node:vm');
 const {buildSync} = require('esbuild');
 
-for (const stage of ['initial', 'decoded', 'fetch fallback']) {
-  test(`ZCloud verification opens the exact challenged URL: ${stage}`, async () => {
+for (const [stage, browserPage] of ['initial', 'decoded', 'fetch fallback'].flatMap(stage => [[stage, false], [stage, true]])) {
+  test(`ZCloud verification opens the exact challenged URL: ${stage}, captured page=${browserPage}`, async () => {
     const original = 'https://zcloud.lat/a20obxvsnn2ox7-?source=zeefliz';
     const decoded = 'https://zcloud.lat/file/example?token=123';
     const encode = value => Buffer.from(value).toString('base64');
     const firstHtml = `atob(atob('${encode(encode(decoded))}'))`;
     const calls = [], verified = [];
+    const downloadHtml = '<a class="server" href="https://cdn.example/video.mkv">Download</a>';
     const blocked = () => Object.assign(new Error('Forbidden'), {response: {status: 403}});
     const axios = async (url, config) => {
       calls.push(url);
       if (stage === 'initial' && !verified.length) throw blocked();
       if (stage === 'initial' && verified.length) {
+        assert.equal(browserPage, false, 'Do not refetch a captured file page');
         assert.equal(config.headers['User-Agent'], 'Verified browser');
         assert.ok(config.headers.Cookie.includes('cf_clearance=fresh'));
       }
@@ -24,6 +26,7 @@ for (const stage of ['initial', 'decoded', 'fetch fallback']) {
       calls.push(url);
       assert.equal(url, decoded);
       if (!verified.length && stage === 'decoded') throw blocked();
+      if (stage === 'decoded' && verified.length) assert.equal(browserPage, false, 'Do not refetch a captured file page');
       if (stage === 'fetch fallback') throw new Error('Axios failed');
       return {data: ''};
     };
@@ -37,15 +40,15 @@ for (const stage of ['initial', 'decoded', 'fetch fallback']) {
         return ++fetches === 1 ? {status: 403} : {ok: true, text: async () => ''};
       }});
     const result = await module.exports.zcloudExtractor(original, new AbortController().signal,
-      axios, {load: () => () => []}, {}, {openWebView: async (url, options) => {
+      axios, {load: html => { if (browserPage && stage !== 'initial') assert.equal(html, downloadHtml); return () => []; }}, {}, {openWebView: async (url, options) => {
         verified.push(url);
         assert.equal(url, stage === 'initial' ? original : decoded);
         assert.equal(options.force, true);
-        return {userAgent: 'Verified browser', cookies: 'cf_clearance=fresh'};
+        return {userAgent: 'Verified browser', cookies: 'cf_clearance=fresh', data: browserPage ? (stage === 'initial' ? firstHtml : downloadHtml) : ''};
       }});
     assert.equal(result.length, 0);
     assert.equal(verified.length, 1);
     assert.ok(calls.includes(original));
-    if (stage === 'fetch fallback') assert.equal(fetches, 2);
+    if (stage === 'fetch fallback') assert.equal(fetches, browserPage ? 1 : 2);
   });
 }

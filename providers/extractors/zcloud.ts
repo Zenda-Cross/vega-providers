@@ -53,15 +53,25 @@ export async function zcloudExtractor(
   providerContext?: any,
 ) {
   try {
-    if (!headers["Cookie"]) {
-      headers["Cookie"] =
-        "ext_name=ojplmecpdpgccookcobabopnaifgidhf; xla=s4t; cf_clearance=woQrFGXtLfmEMBEiGUsVHrUBMT8s3cmguIzmMjmvpkg-1770053679-1.2.1.1-xBrQdciOJsweUF6F2T_OtH6jmyanN_TduQ0yslc_XqjU6RcHSxI7.YOKv6ry7oYo64868HYoULnVyww536H2eVI3R2e4wKzsky6abjPdfQPxqpUaXjxfJ02o6jl3_Vkwr4uiaU7Wy596Vdst3y78HXvVmKdIohhtPvp.vZ9_L7wvWdce0GRixjh_6JiqWmWMws46hwEt3hboaS1e1e4EoWCvj5b0M_jVwvSxBOAW5emFzvT3QrnRh4nyYmKDERnY";
-    }
     console.log("zcloudExtractor", link);
     // console.log("headers", headers);
     const baseUrl = link.split("/").slice(0, 3).join("/");
     const streamLinks: any[] = [];
     const openWebView = providerContext?.openWebView;
+    // WebView and native HTTP can receive different WAF responses. Reuse a
+    // successfully loaded file page instead of immediately requesting it again.
+    const pageFromWebView = (result: any): string => {
+      const html = typeof result.data === "string" ? result.data : "";
+      if (/cf-chl-|challenge-platform|<title[^>]*>\s*(?:Just a moment|Attention Required)/i.test(html)) return "";
+      return /class=["'][^"']*\bserver\b|atob\(atob\(/i.test(html) ? html : "";
+    };
+    const useWebViewSession = (result: any) => {
+      for (const key of Object.keys(headers)) {
+        if (/^(cookie|user-agent|sec-ch-ua(?:-.*)?)$/i.test(key)) delete headers[key];
+      }
+      if (result.userAgent) headers["User-Agent"] = result.userAgent;
+      if (result.cookies) headers["Cookie"] = result.cookies;
+    };
 
     let vLinkRes: any;
     try {
@@ -80,17 +90,16 @@ export async function zcloudExtractor(
           delete cleanHeaders["Cookie"];
 
           const wafResult = await openWebView(link, {
-            title: "Solve the captcha below and click done",
-            description: "Required to bypass anti-bot protection.",
+            title: "Open download page",
+            description: "If the download page is visible, tap Done. Complete verification only if requested.",
             headers: cleanHeaders,
             waitForCookie: "cf_clearance",
             force: true,
           });
-          if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
-          headers["Cookie"] =
-            (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
-            wafResult.cookies;
-          vLinkRes = await axios(`${link}`, { headers, signal });
+          useWebViewSession(wafResult);
+          vLinkRes = pageFromWebView(wafResult)
+            ? {data: pageFromWebView(wafResult)}
+            : await axios(`${link}`, { headers, signal });
         } else {
           console.log(
             `zcloudExtractor: 403 Forbidden for ${link}, but openWebView solver is not available!`,
@@ -121,7 +130,9 @@ export async function zcloudExtractor(
 
     let vcloudText = "";
     try {
-      const vcloudRes = await axios.get(vcloudLink, { headers, signal });
+      const vcloudRes = vcloudLink === link
+        ? vLinkRes
+        : await axios.get(vcloudLink, { headers, signal });
       vcloudText = vcloudRes.data;
     } catch (error: any) {
       if (error.response?.status === 403 && openWebView) {
@@ -137,17 +148,16 @@ export async function zcloudExtractor(
         delete cleanHeaders2["Cookie"];
 
         const wafResult = await openWebView(vcloudLink, {
-          title: "Solve the captcha below and click done",
-          description: "Required to bypass anti-bot protection.",
+          title: "Open download page",
+          description: "If the download page is visible, tap Done. Complete verification only if requested.",
           headers: cleanHeaders2,
           waitForCookie: "cf_clearance",
           force: true,
         });
-        if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
-        headers["Cookie"] =
-          (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
-          wafResult.cookies;
-        const retryRes = await axios.get(vcloudLink, { headers, signal });
+        useWebViewSession(wafResult);
+        const retryRes = pageFromWebView(wafResult)
+          ? {data: pageFromWebView(wafResult)}
+          : await axios.get(vcloudLink, { headers, signal });
         vcloudText = retryRes.data;
       } else {
         if (error.response?.status === 403 && !openWebView) {
@@ -175,17 +185,16 @@ export async function zcloudExtractor(
           delete cleanHeaders3["Cookie"];
 
           const wafResult = await openWebView(vcloudLink, {
-            title: "Solve the captcha below and click done",
-            description: "Required to bypass anti-bot protection.",
+            title: "Open download page",
+            description: "If the download page is visible, tap Done. Complete verification only if requested.",
             headers: cleanHeaders3,
             waitForCookie: "cf_clearance",
             force: true,
           });
-          if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
-          headers["Cookie"] =
-            (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
-            wafResult.cookies;
-          fetchRes = await fetch(vcloudLink, {
+          useWebViewSession(wafResult);
+          fetchRes = pageFromWebView(wafResult)
+            ? {ok: true, text: async () => pageFromWebView(wafResult)}
+            : await fetch(vcloudLink, {
             headers,
             signal,
             redirect: "follow",
