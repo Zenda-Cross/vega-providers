@@ -1,3 +1,4 @@
+import { getPage } from "./request";
 import { Post, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
@@ -83,7 +84,7 @@ async function fetchPosts({
     }
 
     const { axios, cheerio } = providerContext;
-    const res = await axios.get(url, { headers: defaultHeaders, signal });
+    const res = await getPage(url, providerContext, signal);
     const $ = cheerio.load(res.data || "");
 
     const resolveUrl = (href: string) =>

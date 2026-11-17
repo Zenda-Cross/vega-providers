@@ -1,3 +1,4 @@
+import { getPage } from "./request";
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import {
@@ -40,9 +41,7 @@ export const getMeta = async function ({
   const url = new URL(link, `${baseUrl}/`).href;
 
   try {
-    const response = await axios.get(url, {
-      headers: { ...headers, Referer: baseUrl },
-    });
+    const response = await getPage(url, providerContext);
     const $ = cheerio.load(response.data);
     const content = $(".entry-content, .post-inner").length
       ? $(".entry-content, .post-inner")
