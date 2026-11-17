@@ -3,6 +3,7 @@ import { ProviderContext, SkipInterval, Stream, TextTracks } from "../types";
 import {
   buildWatchUrl,
   callServerFn,
+  DEFAULT_USER_AGENT,
   parseWatchUrl,
   resolveBaseUrl,
   SERVER_FNS,
@@ -274,6 +275,15 @@ export const getStream = async function ({
     const streams: Stream[] = [];
     const seenUrls = new Set<string>();
 
+    const streamHeaders = {
+      Referer: `${baseUrl}/`,
+      Origin: baseUrl,
+      "User-Agent":
+        providerContext.commonHeaders?.["User-Agent"] ||
+        providerContext.commonHeaders?.["user-agent"] ||
+        DEFAULT_USER_AGENT,
+    };
+
     for (const entry of allResults) {
       const data = entry.pb.data;
       const streamUrl = typeof data?.streamUrl === "string" ? data.streamUrl.trim() : "";
@@ -288,6 +298,7 @@ export const getStream = async function ({
         server: `Server ${entry.server}${audioLabel}`,
         link: streamUrl,
         type: "m3u8",
+        headers: streamHeaders,
         ...(subtitles ? { subtitles } : {}),
         ...(skip ? { skip } : {}),
       });

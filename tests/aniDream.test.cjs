@@ -352,6 +352,9 @@ test("getStream returns m3u8 + sorted subtitles + skip intervals when streaming"
   assert.equal(streams.length, 2);
   assert.equal(streams[0].type, "m3u8");
   assert.equal(streams[0].server, "Server 1 (Dual Audio)");
+  assert.equal(streams[0].headers?.Referer, "https://anidream.to/");
+  assert.equal(streams[0].headers?.Origin, "https://anidream.to");
+  assert.ok(streams[0].headers?.["User-Agent"]);
   assert.equal(streams[0].subtitles[0].type, "application/x-subrip");
   assert.equal(streams[0].subtitles[1].type, "text/x-ssa");
   assert.deepEqual(JSON.parse(JSON.stringify(streams[0].skip)), [
