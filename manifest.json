@@ -182,7 +182,7 @@
   {
     "display_name": "Zeefliz",
     "value": "zeefliz",
-    "version": "1.39",
+    "version": "1.40",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/zeefliz.jpg",
     "type": "global",
     "disabled": false,

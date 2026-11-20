@@ -58,6 +58,14 @@ export async function zcloudExtractor(
     const baseUrl = link.split("/").slice(0, 3).join("/");
     const streamLinks: any[] = [];
     const openWebView = providerContext?.openWebView;
+    const store = providerContext?.kvStore;
+    const cacheKey = "zcloud-session:" + new URL(link).origin;
+    const saved = await store?.get(cacheKey);
+    headers = { ...headers };
+    if (saved?.clearance && saved?.userAgent) {
+      headers.Cookie = saved.clearance;
+      headers["User-Agent"] = saved.userAgent;
+    }
     // WebView and native HTTP can receive different WAF responses. Reuse a
     // successfully loaded file page instead of immediately requesting it again.
     const pageFromWebView = (result: any): string => {
@@ -65,13 +73,21 @@ export async function zcloudExtractor(
       if (/<title[^>]*>\s*(?:Just a moment|Attention Required)|Sorry, you have been blocked/i.test(html)) return "";
       return html.trim() ? html : "";
     };
-    const useWebViewSession = (result: any, requestHeaders: Record<string, string>) => {
+    const useWebViewSession = async (result: any, requestHeaders: Record<string, string>) => {
       // Retry the same explicit headers used to load the WebView, including
       // Referer. Cookies and User-Agent come from that completed browser session.
       for (const key of Object.keys(headers)) delete headers[key];
       Object.assign(headers, requestHeaders);
       if (result.userAgent) headers["User-Agent"] = result.userAgent;
-      if (result.cookies) headers["Cookie"] = result.cookies;
+      if (!result.url || new URL(result.url).origin === new URL(link).origin) {
+        if (result.cookies) headers.Cookie = result.cookies;
+        const clearance = result.cookies?.match(/(?:^|;\s*)(cf_clearance=[^;]+)/)?.[1];
+        if (clearance && result.userAgent) {
+          await store?.set(cacheKey, { clearance, userAgent: result.userAgent });
+        } else {
+          await store?.delete(cacheKey);
+        }
+      }
     };
 
     let vLinkRes: any;
@@ -90,11 +106,11 @@ export async function zcloudExtractor(
 
           const wafResult = await openWebView(link, {
             title: "Open download page",
-            description: "If the download page is visible, tap Done. Complete verification only if requested.",
+            description: "Complete any verification, then select Generate Download Link if shown. Tap Done when the download servers appear.",
             headers: cleanHeaders,
             force: true,
           });
-          useWebViewSession(wafResult, cleanHeaders);
+          await useWebViewSession(wafResult, cleanHeaders);
           vLinkRes = pageFromWebView(wafResult)
             ? {data: pageFromWebView(wafResult)}
             : await axios(`${link}`, { headers, signal });
@@ -112,17 +128,16 @@ export async function zcloudExtractor(
     const vLinkText = vLinkRes.data;
     const doubleAtobMatch = vLinkText.match(/atob\(atob\(['"]([^'"]+)['"]\)\)/);
     let vcloudLink = link;
-    if (doubleAtobMatch?.[1]) {
+    // Use the server links if the WebView already reached the generated page.
+    const hasServerLinks = /<a\b[^>]*\bclass=["'][^"']*(?:\bserver\b|\bbtn-success\b[^"']*\bbtn-lg\b[^"']*\bh6\b)/i.test(vLinkText);
+    if (doubleAtobMatch?.[1] && !hasServerLinks) {
       const decoded = atob(atob(doubleAtobMatch[1]));
-      try {
-        const linkUrl = new URL(link);
-        const decodedUrl = new URL(decoded);
-        decodedUrl.protocol = linkUrl.protocol;
-        decodedUrl.host = linkUrl.host;
-        vcloudLink = decodedUrl.toString();
-      } catch (e) {
-        vcloudLink = decoded.replace(/https?:\/\/(?:www\.)?vcloud\.fit/gi, baseUrl);
-      }
+      const linkUrl = new URL(link);
+      const decodedUrl = new URL(decoded, linkUrl);
+      linkUrl.pathname = decodedUrl.pathname;
+      linkUrl.search = decodedUrl.search;
+      linkUrl.hash = "";
+      vcloudLink = linkUrl.href;
     }
     console.log("vcloudLink", vcloudLink);
 
@@ -145,11 +160,11 @@ export async function zcloudExtractor(
 
         const wafResult = await openWebView(vcloudLink, {
           title: "Open download page",
-          description: "If the download page is visible, tap Done. Complete verification only if requested.",
+          description: "Complete any verification, then select Generate Download Link if shown. Tap Done when the download servers appear.",
           headers: cleanHeaders2,
           force: true,
         });
-        useWebViewSession(wafResult, cleanHeaders2);
+        await useWebViewSession(wafResult, cleanHeaders2);
         const retryRes = pageFromWebView(wafResult)
           ? {data: pageFromWebView(wafResult)}
           : await axios.get(vcloudLink, { headers, signal });
@@ -179,11 +194,11 @@ export async function zcloudExtractor(
 
           const wafResult = await openWebView(vcloudLink, {
             title: "Open download page",
-            description: "If the download page is visible, tap Done. Complete verification only if requested.",
+            description: "Complete any verification, then select Generate Download Link if shown. Tap Done when the download servers appear.",
             headers: cleanHeaders3,
             force: true,
           });
-          useWebViewSession(wafResult, cleanHeaders3);
+          await useWebViewSession(wafResult, cleanHeaders3);
           fetchRes = pageFromWebView(wafResult)
             ? {ok: true, text: async () => pageFromWebView(wafResult)}
             : await fetch(vcloudLink, {
@@ -204,6 +219,10 @@ export async function zcloudExtractor(
     const $ = cheerio.load(vcloudText);
     // console.log("vcloudRes", $.text());
 
+    // Clearance is for ZCloud only, never for third-party server requests.
+    const serverHeaders = Object.fromEntries(
+      Object.entries(headers).filter(([name]) => name.toLowerCase() !== "cookie"),
+    );
     const linkClass = $("a.server[href], a.btn-success.btn-lg.h6[href]");
     for (const element of linkClass) {
       const itm = $(element);
@@ -240,7 +259,7 @@ export async function zcloudExtractor(
           try {
             const newLinkRes = await fetch(link, {
               method: "HEAD",
-              headers,
+              headers: serverHeaders,
               signal,
               redirect: "manual",
             });
@@ -260,7 +279,7 @@ export async function zcloudExtractor(
             } else {
               const newLinkRes2 = await fetch(newLink, {
                 method: "HEAD",
-                headers,
+                headers: serverHeaders,
                 signal,
                 redirect: "manual",
               });
