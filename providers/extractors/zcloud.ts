@@ -204,7 +204,7 @@ export async function zcloudExtractor(
     const $ = cheerio.load(vcloudText);
     // console.log("vcloudRes", $.text());
 
-    const linkClass = $(".server");
+    const linkClass = $("a.server[href], a.btn-success.btn-lg.h6[href]");
     for (const element of linkClass) {
       const itm = $(element);
       let link = itm.attr("href") || "";
