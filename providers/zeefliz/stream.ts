@@ -99,11 +99,10 @@ export async function getStream({
             },
           );
           // console.log('filepressStreamLink', filepressStreamLink.data);
-          streamLinks.push({
-            server: "filepress",
-            link: filepressStreamLink.data?.data?.[0],
-            type: "mkv",
-          });
+          const fileUrl = filepressStreamLink.data?.data?.[0];
+          if (typeof fileUrl === "string" && /^https?:\/\//i.test(fileUrl)) {
+            streamLinks.push({ server: "filepress", link: fileUrl, type: "mkv" });
+          }
         }
       } catch (error) {
         console.log("filepress error: ");
@@ -112,26 +111,31 @@ export async function getStream({
     }
 
     let hubStreams;
-    if (link.includes("zcloud")) {
-      hubStreams = await zcloudExtractor(
-        link,
-        signal,
-        axios,
-        cheerio,
-        headers,
-        providerContext,
-      );
-    } else {
-      hubStreams = await hubcloudExtractor(
-        link,
-        signal,
-        axios,
-        cheerio,
-        headers,
-        providerContext,
-        isDownload,
-        "zeefliz",
-      );
+    try {
+      if (link.includes("zcloud")) {
+        hubStreams = await zcloudExtractor(
+          link,
+          signal,
+          axios,
+          cheerio,
+          headers,
+          providerContext,
+        );
+      } else {
+        hubStreams = await hubcloudExtractor(
+          link,
+          signal,
+          axios,
+          cheerio,
+          headers,
+          providerContext,
+          isDownload,
+          "zeefliz",
+        );
+      }
+    } catch (error) {
+      if (signal?.aborted || streamLinks.length === 0) throw error;
+      return streamLinks;
     }
 
     if (Array.isArray(hubStreams) && hubStreams.length > 0) {
