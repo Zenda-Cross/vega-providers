@@ -72,6 +72,23 @@ function getLanguageCodes(title: string): string {
   return matches.length > 0 ? [...new Set(matches)].join(", ") : "JA/EN";
 }
 
+const subtitleField = /(?:[💬🗨🗯]\uFE0F?|\b(?:subs?|subtitles?)\s*:)\s*((?:[^\n🎧💬🗨🗯]|\uFE0F)*)/giu;
+const languageFlag = /[\u{1F1E6}-\u{1F1FF}]{2}/gu;
+
+function subtitleCodes(field: string): string[] {
+  return field.split(/[,/|•·]+/).flatMap(part => {
+    const flags = part.match(languageFlag);
+    if (flags?.length) {
+      return flags.map(flag => [...flag].map(character =>
+        String.fromCharCode(65 + character.codePointAt(0)! - 0x1f1e6),
+      ).join("")).map(code => code === "CN" ? "ZH" : code);
+    }
+    const label = part.trim().toUpperCase();
+    const known = languageCodes.find(([name]) => name === label)?.[1];
+    return known ? [known] : /^[A-Z]{2,3}(?:-[A-Z]{2,8})*$/.test(label) ? [label] : [];
+  });
+}
+
 function formatBytes(bytes?: number): string {
   if (!bytes || isNaN(bytes)) return "";
   const gb = bytes / (1024 * 1024 * 1024);
@@ -149,8 +166,22 @@ function extractSizeBytes(text: string, s?: any): { label: string; bytes: number
 }
 
 function fileSizeBytes(s: any): number {
-  const value = s?.behaviorHints?.fileSize ?? s?.fileSize;
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+  for (const value of [s?.behaviorHints?.fileSize, s?.fileSize]) {
+    const bytes = typeof value === "string" && /^\d+$/.test(value.trim())
+      ? Number(value)
+      : value;
+    if (typeof bytes === "number" && Number.isSafeInteger(bytes) && bytes > 0) return bytes;
+  }
+  return 0;
+}
+
+function fileIndex(value: unknown): number | undefined {
+  const index = typeof value === "string" && /^\d+$/.test(value.trim())
+    ? Number(value)
+    : value;
+  return typeof index === "number" && Number.isSafeInteger(index) && index >= 0
+    ? index
+    : undefined;
 }
 
 function torrentHash(s: any): string {
@@ -186,17 +217,25 @@ async function getEpisodeFileSizes(
       if (!hash) continue;
       const matches = candidates.filter(candidate => {
         if (torrentHash(candidate) !== hash) return false;
-        const index = stream.fileIdx, candidateIndex = candidate.fileIdx;
-        if (Number.isInteger(index) && index >= 0 && Number.isInteger(candidateIndex) && candidateIndex >= 0) {
+        const index = fileIndex(stream.fileIdx);
+        const candidateIndex = fileIndex(candidate.fileIdx);
+        if (index !== undefined && candidateIndex !== undefined) {
           return index === candidateIndex;
         }
         const name = filename(stream);
         return /\.(mkv|mp4|avi|webm|m4v|ts)$/i.test(name) && name === filename(candidate);
       });
       if (!matches.length) continue;
-      const selected = matches[0];
-      const size = extractSizeBytes(`${selected.description || ""} ${selected.title || ""}`, selected);
-      if (size.bytes > 0) sizes.set(stream, size);
+      for (const selected of matches) {
+        const bytes = fileSizeBytes(selected);
+        const size = bytes
+          ? {label: formatBytes(bytes), bytes}
+          : extractSizeBytes(`${selected.description || ""} ${selected.title || ""}`, selected);
+        if (size.bytes > 0) {
+          sizes.set(stream, size);
+          break;
+        }
+      }
     }
   } catch {
     // Optional enrichment must not hide playable streams or report a pack as a file.
@@ -469,7 +508,8 @@ function parseStreamItem(
   const { label: seedersLabel, count: seederCount } = extractSeeders(combinedText, s);
   const { label: sizeLabel, bytes: sizeBytes } = episodeSize ?? extractSizeBytes(combinedText, s);
   const formatTags = extractFormatTags(combinedText);
-  const language = getLanguageCodes(combinedText);
+  const subtitleText = [s.name, s.description, s.title].filter(Boolean).join("\n");
+  const language = getLanguageCodes(subtitleText.replace(subtitleField, ""));
 
   const debridBadge = (s.name || "").match(
     /\[(RD\+?|AD\+?|PM\+?|TB\+?|DL\+?|EN\+?|RD download|AD download)\]/i,
@@ -501,8 +541,6 @@ function parseStreamItem(
     tags.push(sizeLabel);
   }
 
-  const tag = tags.join(" • ") || undefined;
-
   let subtitles: TextTracks | undefined = undefined;
   if (Array.isArray(s.subtitles) && s.subtitles.length > 0) {
     subtitles = s.subtitles.map((sub: any) => ({
@@ -512,6 +550,21 @@ function parseStreamItem(
       uri: sub.url,
     }));
   }
+
+  const subtitleLanguages = Array.isArray(s.subtitles)
+    ? [...new Set<string>(s.subtitles.flatMap((sub: any) =>
+        typeof sub?.url === "string" && sub.url && typeof sub.lang === "string"
+          ? [sub.lang.trim().toUpperCase()]
+          : [],
+      ).filter(Boolean))]
+    : [];
+  const reportedSubtitles = new Set([
+    ...subtitleLanguages,
+    ...[...subtitleText.matchAll(subtitleField)].flatMap(match => subtitleCodes(match[1])),
+  ]);
+  if (reportedSubtitles.size > 0) tags.push(`Subs: ${[...reportedSubtitles].join(", ")}`);
+
+  const tag = tags.join(" • ") || undefined;
 
   return {
     stream: {
