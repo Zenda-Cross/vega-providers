@@ -29,8 +29,6 @@ export const getPosts = async function ({
       const id = result?.imdb_id || result?.id;
       const type = result?.type;
       const image = result?.poster;
-      const rating = result?.imdbRating || result?.rating;
-      const tag = rating ? `${rating}★` : undefined;
       if (id) {
         catalog.push({
           title: title,
@@ -41,7 +39,6 @@ export const getPosts = async function ({
                 aspectRatio: 16 / 9,
               }
             : { image }),
-          tag,
         });
       }
     });
@@ -87,14 +84,11 @@ export const getSearchPosts = async function ({
       const id = result?.imdb_id || result?.id;
       const image = result?.poster;
       const type = result?.type;
-      const rating = result?.imdbRating || result?.rating;
-      const tag = rating ? `${rating}★` : undefined;
       if (id) {
         catalog.push({
           title: title,
           link: `https://v3-cinemeta.strem.io/meta/${type}/${id}.json`,
           image: image,
-          tag,
         });
       }
     });
@@ -108,14 +102,11 @@ export const getSearchPosts = async function ({
       const id = result?.imdb_id || result?.id;
       const image = result?.poster;
       const type = result?.type;
-      const rating = result?.imdbRating || result?.rating;
-      const tag = rating ? `${rating}★` : undefined;
       if (id) {
         catalog.push({
           title: title,
           link: `https://v3-cinemeta.strem.io/meta/${type}/${id}.json`,
           image: image,
-          tag,
         });
       }
     });
