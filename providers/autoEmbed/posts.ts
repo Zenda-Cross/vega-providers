@@ -35,10 +35,12 @@ export const getPosts = async function ({
         catalog.push({
           title: title,
           link: `https://v3-cinemeta.strem.io/meta/${type}/${id}.json`,
-          image: image,
           ...(providerValue === "autoEmbed" && /^tt\d+$/.test(id) && (type === "movie" || type === "series")
-            ? {homeImage: `https://postersplus.slokker.cc/poster?imdb_id=${id}&stremio_id=${id}&type=${type}&${POSTERS_PLUS_OPTIONS}`}
-            : {}),
+            ? {
+                image: `https://postersplus.slokker.cc/poster?imdb_id=${id}&stremio_id=${id}&type=${type}&${POSTERS_PLUS_OPTIONS}`,
+                aspectRatio: 16 / 9,
+              }
+            : { image }),
           tag,
         });
       }
