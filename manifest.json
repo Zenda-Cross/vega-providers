@@ -543,5 +543,14 @@
     "type": "india",
     "disabled": false,
     "moduleVersionHeader": true
+  },
+  {
+    "display_name": "Kartoons2",
+    "value": "kartoons2",
+    "version": "1.00",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/kartoons.png",
+    "type": "anime",
+    "disabled": false
   }
+
 ]
