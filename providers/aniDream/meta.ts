@@ -29,7 +29,7 @@ export const getMeta = async function ({
     const [info, episodes, logoRes] = await Promise.all([
       callServerFn<any>(
         SERVER_FNS.INFO,
-        { id: animeId, type: "ANIME", watchOrder: true },
+        { id: animeId, type: "ANIME", watchOrder: false },
         { providerContext, baseUrl, referer },
       ),
       callServerFn<any[]>(
@@ -64,7 +64,7 @@ export const getMeta = async function ({
         : undefined;
 
     const tags = [
-      info.format,
+      info.format === "TV" ? "TV Series" : info.format,
       info.status,
       ...(Array.isArray(info.genres) ? info.genres : []),
     ]
@@ -76,49 +76,7 @@ export const getMeta = async function ({
       isMovie,
     });
 
-    const linkList: Link[] = [];
-    const watchOrder = Array.isArray(info.watch_order)
-      ? info.watch_order.filter(
-          (item: any) =>
-            item &&
-            item.type === "ANIME" &&
-            Number.isFinite(Number(item.id)) &&
-            (Number(item.episodes_aired || 0) > 0 || Number(item.id) === animeId),
-        )
-      : [];
-
-    if (watchOrder.length > 1) {
-      const seenSeasonIds = new Set<number>();
-      for (const entry of watchOrder) {
-        const entryId = Number(entry.id);
-        if (seenSeasonIds.has(entryId)) continue;
-        seenSeasonIds.add(entryId);
-
-        const seasonTitle =
-          entry.label || extractMediaTitle(entry.title) || `Part ${entryId}`;
-
-        if (entryId === animeId) {
-          if (directLinks.length > 0) {
-            linkList.push({
-              title: seasonTitle,
-              directLinks,
-            });
-          }
-        } else {
-          linkList.push({
-            title: seasonTitle,
-            episodesLink: buildAnimeUrl(baseUrl, entryId),
-          });
-        }
-      }
-    }
-
-    if (linkList.length === 0 && directLinks.length > 0) {
-      linkList.push({
-        title,
-        directLinks,
-      });
-    }
+    const linkList: Link[] = directLinks.length > 0 ? [{ title, directLinks }] : [];
 
     return {
       title,

@@ -193,7 +193,7 @@ test("catalog, posts deduplication, and search pass AniDream serverFn headers", 
   }
 });
 
-test("meta and episodes resolve synopsis, rating, backdrop, poster, logo, watch_order, and episode links", async () => {
+test("meta and episodes resolve synopsis, rating, backdrop, poster, logo, and only the selected title episode links", async () => {
   const { decodeSeroval } = createSerovalHelper();
   let seenLogoPayload = null;
   const ctx = createBaseContext(async (_method, url) => {
@@ -251,6 +251,7 @@ test("meta and episodes resolve synopsis, rating, backdrop, poster, logo, watch_
 
   assert.equal(info.title, "Attack on Titan");
   assert.equal(info.type, "series");
+  assert.equal(info.tags[0], "TV Series");
   assert.equal(info.image, "https://image.tmdb.org/t/p/original/aot-bg.jpg");
   assert.equal(info.poster, "https://example.com/aot-cover.jpg");
   assert.equal(info.logo, "https://image.tmdb.org/t/p/original/aot-logo.png");
@@ -262,13 +263,12 @@ test("meta and episodes resolve synopsis, rating, backdrop, poster, logo, watch_
   assert.equal(info.rating, "8.5");
   assert.equal(info.tmdbId, "1429");
   assert.equal(info.synopsis, "Titans!\n\nWalls & humanity.");
-  assert.equal(info.linkList.length, 2);
+  assert.equal(info.linkList.length, 1);
   assert.equal(info.linkList[0].directLinks[0].link, "https://anidream.to/watch?id=16498&n=1&dub=1");
-  assert.equal(info.linkList[1].episodesLink, "https://anidream.to/anime/20958");
 
   const epMod = loadBrowserModule("episodes");
   const eps = await epMod.getEpisodes({
-    url: info.linkList[1].episodesLink,
+    url: "https://anidream.to/anime/20958",
     providerContext: ctx,
   });
   assert.equal(eps.length, 1);
