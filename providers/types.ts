@@ -12,6 +12,7 @@ export interface Post {
   title: string;
   link: string;
   image: string;
+  homeImage?: string;
   provider?: string;
   aspectRatio?: number | string;
   borderRadius?: number;

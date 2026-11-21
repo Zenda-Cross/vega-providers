@@ -1,8 +1,12 @@
 import { Post, ProviderContext } from "../types";
 
+const POSTERS_PLUS_OPTIONS =
+  "shape=landscape&pc=stremio_tv_nuvio&tg=medium&bp=top_left&_is=1.05&_soo10=1&fti=1&mw=lb:.5,im:.5&tw=tk:.5,im:.5&amw=mal:.5,al:.5&atw=mal:.5,al:.5&fbs=photoreal&slr=1.20&shr=0.135&bdm=7&bms=5";
+
 export const getPosts = async function ({
   filter,
   signal,
+  providerValue,
   providerContext,
 }: {
   filter: string;
@@ -32,6 +36,9 @@ export const getPosts = async function ({
           title: title,
           link: `https://v3-cinemeta.strem.io/meta/${type}/${id}.json`,
           image: image,
+          ...(providerValue === "autoEmbed" && /^tt\d+$/.test(id) && (type === "movie" || type === "series")
+            ? {homeImage: `https://postersplus.slokker.cc/poster?imdb_id=${id}&stremio_id=${id}&type=${type}&${POSTERS_PLUS_OPTIONS}`}
+            : {}),
           tag,
         });
       }
