@@ -399,7 +399,23 @@ export const getStream = async function ({
       })),
     );
     if (isDownload) {
-      const preferred = await providerContext.kvStore?.get<string>("downloadQuality");
+      const [preferred, subtitlePreference] = await Promise.all([
+        providerContext.kvStore?.get<string>("downloadQuality"),
+        providerContext.kvStore?.get<string>("downloadSubtitle"),
+      ]);
+      const normalizeLanguage = (value: string) => value.trim().toLowerCase().replace(/_/g, "-");
+      const language = normalizeLanguage(subtitlePreference || "");
+      if (language) {
+        for (const { subtitles } of streams) {
+          let index = subtitles.findIndex(track =>
+            normalizeLanguage(track.language) === language || normalizeLanguage(track.title) === language,
+          );
+          if (index < 0) {
+            index = subtitles.findIndex(track => normalizeLanguage(track.language).startsWith(language + "-"));
+          }
+          if (index > 0) subtitles.unshift(...subtitles.splice(index, 1));
+        }
+      }
       const target = preferred === "highest" || !preferred ? 0 : Number(preferred);
       streams.sort((a, b) => {
         const qa = Number(a.quality) || 0;

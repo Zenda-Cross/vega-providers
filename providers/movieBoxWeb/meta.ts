@@ -129,7 +129,7 @@ export const getMeta = async function ({
       synopsis: subject.description || "",
       imdbId: "",
       type: isSeries ? "series" : "movie",
-      quickDownload: true,
+      quickDownload: (await providerContext.kvStore?.get<boolean>("quickDownload")) !== false,
       tags,
       cast: subject.stars?.map((star) => star.name || "").filter(Boolean),
       rating: subject.imdbRatingValue || "",

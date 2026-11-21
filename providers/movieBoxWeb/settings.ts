@@ -2,6 +2,19 @@ import { SettingsField } from "../types";
 
 export const getSettingsSchema = async function (): Promise<SettingsField[]> {
   return [{
+    key: "quickDownload",
+    type: "toggle",
+    label: "Quick Download",
+    description: "Turn off to choose download options manually.",
+    defaultValue: true,
+  }, {
+    key: "downloadSubtitle",
+    type: "text",
+    label: "Quick download subtitle language",
+    description: "Enter a language name or code. Uses the first available subtitle if there is no match.",
+    placeholder: "English or en",
+    defaultValue: "",
+  }, {
     key: "downloadQuality",
     type: "select",
     label: "Quick download quality",
