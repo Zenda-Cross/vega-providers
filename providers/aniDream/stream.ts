@@ -218,60 +218,6 @@ export const getStream = async function ({
       throw new Error(`No playback sources found for AniList ${anilistId} episode ${episode}`);
     }
 
-    if (isDownload) {
-      const seenCodes = new Set<string>();
-      const downloadTargets: Array<{
-        fileCode: string;
-        audioLabel: string;
-        skip?: SkipInterval[];
-      }> = [];
-
-      for (const entry of allResults) {
-        const data = entry.pb.data;
-        const fileCode = String(data?.fileCode || "").trim();
-        if (!fileCode || seenCodes.has(fileCode)) continue;
-        seenCodes.add(fileCode);
-
-        downloadTargets.push({
-          fileCode,
-          audioLabel: formatAudioLabel(data?.audio, entry.dub),
-          skip: mapChaptersToSkip(data?.chapters),
-        });
-      }
-
-      if (downloadTargets.length === 0) {
-        throw new Error("No FlixCloud download codes available for this episode");
-      }
-
-      const resolvedStreams: Stream[] = [];
-      let lastError: unknown = null;
-
-      for (const target of downloadTargets) {
-        try {
-          const mkv = await resolveFlixCloudMkv(target.fileCode, {
-            providerContext,
-            signal,
-          });
-          resolvedStreams.push({
-            server: `FlixCloud MKV${mkv.sizeHuman ? ` (${mkv.sizeHuman})` : ""}${target.audioLabel}`,
-            link: mkv.url,
-            type: "mkv",
-            ...(mkv.quality ? { quality: mkv.quality } : {}),
-            ...(mkv.sizeHuman ? { tag: mkv.sizeHuman } : {}),
-            ...(target.skip ? { skip: target.skip } : {}),
-          });
-        } catch (err) {
-          lastError = err;
-        }
-      }
-
-      if (resolvedStreams.length === 0 && lastError) {
-        throw lastError;
-      }
-
-      return resolvedStreams;
-    }
-
     const streams: Stream[] = [];
     const seenUrls = new Set<string>();
 
@@ -284,7 +230,7 @@ export const getStream = async function ({
         DEFAULT_USER_AGENT,
     };
 
-    for (const entry of allResults) {
+    for (const entry of isDownload ? [] : allResults) {
       const data = entry.pb.data;
       const streamUrl = typeof data?.streamUrl === "string" ? data.streamUrl.trim() : "";
       if (!streamUrl || seenUrls.has(streamUrl)) continue;
@@ -304,7 +250,57 @@ export const getStream = async function ({
       });
     }
 
-    return streams;
+    const seenCodes = new Set<string>();
+    const downloadTargets: Array<{
+      fileCode: string;
+      audioLabel: string;
+      skip?: SkipInterval[];
+    }> = [];
+
+    for (const entry of allResults) {
+      const data = entry.pb.data;
+      const fileCode = String(data?.fileCode || "").trim();
+      if (!fileCode || seenCodes.has(fileCode)) continue;
+      seenCodes.add(fileCode);
+
+      downloadTargets.push({
+        fileCode,
+        audioLabel: formatAudioLabel(data?.audio, entry.dub),
+        skip: mapChaptersToSkip(data?.chapters),
+      });
+    }
+
+    if (isDownload && downloadTargets.length === 0) {
+      throw new Error("No FlixCloud download codes available for this episode");
+    }
+
+    const resolvedStreams: Stream[] = [];
+    let lastError: unknown = null;
+
+    for (const target of downloadTargets) {
+      try {
+        const mkv = await resolveFlixCloudMkv(target.fileCode, {
+          providerContext,
+          signal,
+        });
+        resolvedStreams.push({
+          server: `FlixCloud MKV${mkv.sizeHuman ? ` (${mkv.sizeHuman})` : ""}${target.audioLabel}`,
+          link: mkv.url,
+          type: "mkv",
+          ...(mkv.quality ? { quality: mkv.quality } : {}),
+          ...(mkv.sizeHuman ? { tag: mkv.sizeHuman } : {}),
+          ...(target.skip ? { skip: target.skip } : {}),
+        });
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (streams.length === 0 && resolvedStreams.length === 0 && lastError) {
+      throw lastError;
+    }
+
+    return [...streams, ...resolvedStreams];
   } catch (err) {
     throwProviderError("AniDream", "stream", err);
   }

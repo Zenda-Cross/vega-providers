@@ -456,6 +456,14 @@ test("getStream resolves FlixCloud DDL MKV (not m3u8) when isDownload is true an
     streams[0].link,
     "https://dl.spacedl.top/dl/bfaf6c24/hash.mkv?exp=123&sig=abc",
   );
+
+  const playback = await streamMod.getStream({
+    link: "https://anidream.to/watch?id=178090&n=1&dub=1",
+    type: "series",
+    providerContext: ctx,
+  });
+  assert.deepEqual(Array.from(playback, (stream) => stream.type), ["m3u8", "m3u8", "mkv"]);
+  assert.equal(playback[2].link, streams[0].link);
 });
 
 test("flixcloud handles OkHttp auto-redirect responseURL and 405 Range fallback", async () => {
