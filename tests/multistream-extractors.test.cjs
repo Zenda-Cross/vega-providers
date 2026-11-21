@@ -8,7 +8,7 @@ function load(entry) {
   const code = buildSync({entryPoints: [entry], bundle: true, platform: 'browser', format: 'cjs', write: false}).outputFiles[0].text;
   const module = {exports: {}};
   // Deliberately omit require, Buffer, atob, WebCrypto and TextDecoder.
-  vm.runInNewContext(code, {module, exports: module.exports, URLSearchParams, console});
+  vm.runInNewContext(code, {module, exports: module.exports, URL, URLSearchParams, console});
   return module.exports;
 }
 function encrypt(url) {
@@ -99,4 +99,28 @@ test('Cinejoy uses the current server list immediately and skips failed HLS mani
     assert.equal(result[0].quality, '2160');
   }
   assert.equal(directoryCalls, 1);
+});
+
+test('111477 uses the configured series route and retains direct file metadata', async () => {
+  const {extractSt111477Streams} = load('providers/extractors/st111477.ts');
+  const signal = new AbortController().signal;
+  const streams = await extractSt111477Streams({
+    imdbId:'tt12345',tmdbId:'12',season:2,episode:3,isMovie:false,signal,
+    providerContext:{
+      kvStore:{get:async key => key.endsWith('Manifest') ? 'stremio://st.111477.xyz/config/example_token/manifest.json' : undefined},
+      axios:{get:async (url, opts) => {
+        assert.equal(url,'https://st.111477.xyz/config/example_token/stream/series/tt12345:2:3.json');
+        assert.equal(opts.signal,signal);
+        return {data:{streams:[
+          {url:'https://st.111477.xyz/slowdown',title:'Rate limited'},
+          {url:'https://video.example/file',title:'Episode.1080p.mkv [a11 2.6 GB]'},
+          {url:'https://video.example/file',title:'Duplicate'},
+        ]}};
+      }},
+    },
+  });
+  assert.equal(streams.length,1);
+  assert.equal(streams[0].type,'mkv');
+  assert.equal(streams[0].quality,'1080');
+  assert.equal(streams[0].tag,'2.6 GB');
 });

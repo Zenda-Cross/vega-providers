@@ -87,7 +87,9 @@ async function getCinejoyChunkUrl(
         signal,
       });
       const appText = typeof appRes.data === "string" ? appRes.data : "";
-      const node25Match = appText.match(/nodes\/25\.[a-zA-Z0-9_-]+\.js/);
+        const movieNode = appText.match(/"\/watch\/movie\/\[id\]"\s*:\s*\[(\d+)/)?.[1];
+        const node25Match = [...appText.matchAll(/nodes\/(\d+)\.[a-zA-Z0-9_-]+\.js/g)]
+          .find(match => match[1] === (movieNode ?? "25"));
       if (node25Match) {
         const node25Res = await axios.get(
           `https://cinejoy.pk/_app/immutable/${node25Match[0]}`,

@@ -3,6 +3,7 @@ import { fetchTheIntroDbSkipTimings } from "../theintrodb";
 import { extractCinejoyStreams } from "../extractors/cinejoy";
 import { extractMovyStreams } from "../extractors/movy";
 import { extractVidstuckStreams } from "../extractors/vidstuck";
+import { extractSt111477Streams } from "../extractors/st111477";
 
 export const getStream = async ({
   link: id,
@@ -90,9 +91,12 @@ export const getStream = async ({
       }
     }
 
-    if (!tmdbId) {
-      return [];
-    }
+    const st111477Promise = extractSt111477Streams({
+      imdbId, tmdbId, season: Number(season), episode: Number(episode),
+      isMovie, providerContext, signal,
+    }).catch(() => [] as Stream[]);
+
+    if (!tmdbId) return st111477Promise;
 
     // 1. Fetch skip timings in parallel with stream extraction
     const skipPromise = (async (): Promise<SkipInterval[] | undefined> => {
@@ -159,12 +163,14 @@ export const getStream = async ({
       return [] as Stream[];
     });
 
-    const [streamSkip, cjStreams, movyStreams, vsStreams] = await Promise.all([
+    const [streamSkip, cjStreams, movyStreams, vsStreams, st111477Streams] = await Promise.all([
       skipPromise,
       cinejoyPromise,
       movyPromise,
       vidstuckPromise,
+      st111477Promise,
     ]);
+    streams.push(...st111477Streams.map(stream => ({ ...stream, skip: streamSkip })));
 
     (cjStreams || []).forEach((s) => {
       streams.push({ ...s, skip: streamSkip });

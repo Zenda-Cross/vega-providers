@@ -663,7 +663,7 @@ function opensslDecrypt(b64Ciphertext: string, passphrase: string): string {
   }
 }
 
-export async function extractVidstuckStreams({
+async function extractFromVidstuckOrigin(baseUrl: string, {
   tmdbId,
   imdbId,
   title,
@@ -692,21 +692,21 @@ export async function extractVidstuckStreams({
 
   if (!tmdbId) return [];
 
-  const embedUrl = `${BASE_URL}/embed/${mediaType}/${tmdbId}${
+  const embedUrl = `${baseUrl}/embed/${mediaType}/${tmdbId}${
     isMovie ? "" : `/${season || 1}/${episode || 1}`
   }`;
 
   const headers = {
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    Origin: BASE_URL,
+    Origin: baseUrl,
     Referer: embedUrl,
     ...(commonHeaders || {}),
   };
 
   const streamHeaders = {
-    Referer: `${BASE_URL}/`,
-    Origin: BASE_URL,
+    Referer: `${baseUrl}/`,
+    Origin: baseUrl,
     "User-Agent": headers["User-Agent"],
   };
 
@@ -730,7 +730,7 @@ export async function extractVidstuckStreams({
   const subPromise = (async (): Promise<TextTracks> => {
     try {
       const subTokenRes = await axios.post(
-        `${BASE_URL}/backend/raider`,
+        `${baseUrl}/backend/raider`,
         {
           [API_KEYS.tmdbId]: Number(tmdbId),
           [API_KEYS.mediaType]: mediaType,
@@ -760,7 +760,7 @@ export async function extractVidstuckStreams({
         subParams.set(API_KEYS.episode, String(episode || 1));
       }
 
-      const res = await axios.get(`${BASE_URL}/backend/subtitle?${subParams.toString()}`, {
+      const res = await axios.get(`${baseUrl}/backend/subtitle?${subParams.toString()}`, {
         headers,
         timeout: 4000,
         signal,
@@ -796,7 +796,7 @@ export async function extractVidstuckStreams({
       }
 
       const tokenRes = await axios.post(
-        `${BASE_URL}/backend/raider`,
+        `${baseUrl}/backend/raider`,
         postPayload,
         { headers, timeout: 4500, signal }
       );
@@ -822,7 +822,7 @@ export async function extractVidstuckStreams({
       }
 
       const srvRes = await axios.get(
-        `${BASE_URL}/backend/servers/${srv.id}?${getParams.toString()}`,
+        `${baseUrl}/backend/servers/${srv.id}?${getParams.toString()}`,
         { headers, timeout: 5000, signal }
       );
 
@@ -838,7 +838,7 @@ export async function extractVidstuckStreams({
 
         const finalUrl = decrypted.startsWith("http")
           ? decrypted
-          : `${BASE_URL}${decrypted}`;
+          : `${baseUrl}${decrypted}`;
 
         const isDash = item.type === "dash" || finalUrl.includes("database/andromeda");
         const isM3u8 =
@@ -869,4 +869,12 @@ export async function extractVidstuckStreams({
 
   await Promise.allSettled(tasks);
   return streams;
+}
+
+export async function extractVidstuckStreams(
+  args: Parameters<typeof extractFromVidstuckOrigin>[1],
+): Promise<Stream[]> {
+  const streams = await extractFromVidstuckOrigin(BASE_URL, args);
+  if (streams.length || args.signal?.aborted) return streams;
+  return extractFromVidstuckOrigin("https://0vidads.top", args);
 }
