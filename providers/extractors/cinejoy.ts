@@ -1,11 +1,16 @@
 import { ProviderContext, Stream, TextTracks } from "../types";
 
-let cachedCode: string | null = null;
-let cachedChunkUrl: string | null = null;
-let cachedServers: any[] = [
+const CINEJOY_ORIGIN = "https://cinejoy.pk";
+const FALLBACK_SERVERS: Array<{ name: string; status?: string; "4k"?: boolean }> = [
+  { name: "Light", "4k": true },
   { name: "Nebula" },
-  { name: "Solara" },
-  { name: "Athens" },
+  { name: "Sirius", "4k": true },
+  { name: "Polaris" },
+];
+
+let cachedCode: string | null = null;
+let cachedServers: Array<{ name: string; status?: string; "4k"?: boolean }> = [
+  ...FALLBACK_SERVERS,
 ];
 let lastServerFetchTime = 0;
 
@@ -32,13 +37,13 @@ function safeAtob(input: string): string {
   if (typeof atob !== "undefined") return atob(input);
   const chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
-  let str = String(input).replace(/=+$/, "");
+  const str = String(input).replace(/=+$/, "");
   let output = "";
   if (str.length % 4 === 1) {
     throw new Error("Invalid atob length");
   }
   for (
-    let bc = 0, bs = 0, buffer, i = 0;
+    let bc = 0, bs = 0, buffer: any, i = 0;
     (buffer = str.charAt(i++));
     ~buffer && ((bs = bc % 4 ? bs * 64 + buffer : buffer), bc++ % 4)
       ? (output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6))))
@@ -49,78 +54,430 @@ function safeAtob(input: string): string {
   return output;
 }
 
-async function getCinejoyChunkUrl(
-  axios: any,
-  headers: any,
-  signal?: AbortSignal
-): Promise<string> {
-  if (cachedChunkUrl) return cachedChunkUrl;
-
-  const defaultUrl = "https://cinejoy.pk/_app/immutable/chunks/DHJgaGwg.js";
-  try {
-    const res = await axios.get(defaultUrl, { headers, timeout: 5000, signal });
-    if (
-      typeof res.data === "string" &&
-      res.data.includes("WebAssembly") &&
-      res.data.includes('+"/g"')
-    ) {
-      cachedChunkUrl = defaultUrl;
-      cachedCode = res.data;
-      return defaultUrl;
+function toUint8Array(rawData: any): Uint8Array {
+  if (!rawData) return new Uint8Array(0);
+  if (rawData instanceof Uint8Array) return rawData;
+  if (rawData instanceof ArrayBuffer) return new Uint8Array(rawData);
+  if (ArrayBuffer.isView(rawData)) {
+    return new Uint8Array(rawData.buffer, rawData.byteOffset, rawData.byteLength);
+  }
+  if (typeof rawData === "string") {
+    if (typeof TextEncoder !== "undefined") {
+      return new TextEncoder().encode(rawData);
     }
-  } catch {}
+    const out = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; i++) out[i] = rawData.charCodeAt(i) & 0xff;
+    return out;
+  }
+  return new Uint8Array(0);
+}
 
-  try {
-    const homeRes = await axios.get("https://cinejoy.pk", {
-      headers,
-      timeout: 6000,
-      signal,
-    });
-    const html = typeof homeRes.data === "string" ? homeRes.data : "";
-    const appMatch = html.match(
-      /_app\/immutable\/entry\/app\.[a-zA-Z0-9_-]+\.js/
-    );
-    if (appMatch) {
-      const appRes = await axios.get(`https://cinejoy.pk/${appMatch[0]}`, {
-        headers,
-        timeout: 6000,
-        signal,
-      });
-      const appText = typeof appRes.data === "string" ? appRes.data : "";
-        const movieNode = appText.match(/"\/watch\/movie\/\[id\]"\s*:\s*\[(\d+)/)?.[1];
-        const node25Match = [...appText.matchAll(/nodes\/(\d+)\.[a-zA-Z0-9_-]+\.js/g)]
-          .find(match => match[1] === (movieNode ?? "25"));
-      if (node25Match) {
-        const node25Res = await axios.get(
-          `https://cinejoy.pk/_app/immutable/${node25Match[0]}`,
-          { headers, timeout: 6000, signal }
-        );
-        const node25Text =
-          typeof node25Res.data === "string" ? node25Res.data : "";
-        const chunkMatches = [
-          ...node25Text.matchAll(/chunks\/([a-zA-Z0-9_-]+\.js)/g),
-        ].map((m: any) => m[1]);
+function decodeUtf8(uint8: Uint8Array): string {
+  if (typeof TextDecoder !== "undefined") {
+    try {
+      return new TextDecoder("utf-8").decode(uint8);
+    } catch {}
+  }
+  let out = "";
+  for (let i = 0; i < uint8.length; i++) {
+    out += String.fromCharCode(uint8[i]);
+  }
+  return out;
+}
 
-        for (const ch of chunkMatches) {
-          const chUrl = `https://cinejoy.pk/_app/immutable/chunks/${ch}`;
-          const chRes = await axios.get(chUrl, { headers, timeout: 6000, signal });
-          const chText = typeof chRes.data === "string" ? chRes.data : "";
-          if (chText.includes("WebAssembly") && chText.includes('+"/g"')) {
-            cachedChunkUrl = chUrl;
-            cachedCode = chText;
-            return chUrl;
-          }
-        }
+function parseExportMap(code: string): Record<string, string> {
+  const match = code.match(/export\s*\{([^}]+)\}\s*;?\s*$/);
+  if (!match) return {};
+  const map: Record<string, string> = {};
+  for (const part of match[1].split(",")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const asMatch = trimmed.match(/^([A-Za-z_$][A-Za-z0-9_$]*)\s+as\s+([A-Za-z_$][A-Za-z0-9_$]*)$/);
+    if (asMatch) {
+      map[asMatch[2]] = asMatch[1];
+    } else if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(trimmed)) {
+      map[trimmed] = trimmed;
+    }
+  }
+  return map;
+}
+
+function extractImportedLocals(code: string): string[] {
+  const locals = new Set<string>();
+  const importRegex = /^\s*import\s*([\s\S]*?)\s*from\s*["'][^"']+["']\s*;/gm;
+  let m: RegExpExecArray | null;
+  while ((m = importRegex.exec(code)) !== null) {
+    const clause = m[1].trim();
+    const braceMatch = clause.match(/\{([^}]+)\}/);
+    if (braceMatch) {
+      for (const part of braceMatch[1].split(",")) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        const asMatch = trimmed.match(/as\s+([A-Za-z_$][A-Za-z0-9_$]*)$/);
+        const name = asMatch ? asMatch[1] : trimmed;
+        if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name)) locals.add(name);
       }
     }
-  } catch {}
+    const starMatch = clause.match(/\*\s+as\s+([A-Za-z_$][A-Za-z0-9_$]*)/);
+    if (starMatch) locals.add(starMatch[1]);
+    const defMatch = clause.match(/^([A-Za-z_$][A-Za-z0-9_$]*)/);
+    if (defMatch) locals.add(defMatch[1]);
+  }
+  return Array.from(locals);
+}
 
-  cachedChunkUrl = defaultUrl;
-  return defaultUrl;
+function stripModuleSyntax(code: string): string {
+  return code
+    .replace(/^\s*import\s*(?:[\s\S]*?from\s*)?["'][^"']+["']\s*;?/gm, "")
+    .replace(/export\s*\{[^}]+\}\s*;?\s*$/, "");
+}
+
+function buildSandbox(
+  axios: any,
+  headers: Record<string, string>,
+  watchPath: string,
+  importedLocals: string[],
+  signal?: AbortSignal
+): Record<string, any> {
+  const safeCrypto =
+    typeof crypto !== "undefined" && crypto
+      ? typeof crypto.getRandomValues === "function"
+        ? crypto
+        : {
+            ...crypto,
+            getRandomValues: (arr: Uint8Array) => {
+              for (let i = 0; i < arr.length; i++) {
+                arr[i] = Math.floor(Math.random() * 256);
+              }
+              return arr;
+            },
+          }
+      : {
+          getRandomValues: (arr: Uint8Array) => {
+            for (let i = 0; i < arr.length; i++) {
+              arr[i] = Math.floor(Math.random() * 256);
+            }
+            return arr;
+          },
+        };
+
+  const locationObj = {
+    origin: CINEJOY_ORIGIN,
+    href: `${CINEJOY_ORIGIN}${watchPath}`,
+    pathname: watchPath,
+    host: "cinejoy.pk",
+    hostname: "cinejoy.pk",
+  };
+
+  const sandbox: Record<string, any> = {
+    console: { log: () => {}, warn: () => {}, error: () => {} },
+    Map,
+    Set,
+    Promise,
+    TextEncoder: typeof TextEncoder !== "undefined" ? TextEncoder : undefined,
+    TextDecoder: typeof TextDecoder !== "undefined" ? TextDecoder : undefined,
+    URL: typeof URL !== "undefined" ? URL : undefined,
+    URLSearchParams:
+      typeof URLSearchParams !== "undefined" ? URLSearchParams : undefined,
+    setTimeout: typeof setTimeout !== "undefined" ? setTimeout : undefined,
+    clearTimeout: typeof clearTimeout !== "undefined" ? clearTimeout : undefined,
+    setInterval: typeof setInterval !== "undefined" ? setInterval : undefined,
+    clearInterval:
+      typeof clearInterval !== "undefined" ? clearInterval : undefined,
+    AbortController:
+      typeof AbortController !== "undefined" ? AbortController : undefined,
+    btoa: safeBtoa,
+    atob: safeAtob,
+    crypto: safeCrypto,
+    WebAssembly: typeof WebAssembly !== "undefined" ? WebAssembly : undefined,
+    caches: {
+      open: async () => ({
+        match: async () => null,
+        put: async () => {},
+      }),
+    },
+    location: locationObj,
+    window: {
+      location: locationObj,
+      localStorage: { getItem: () => null, setItem: () => {} },
+    },
+    document: {
+      referrer: `${CINEJOY_ORIGIN}/`,
+      title: "Cinejoy",
+      createElement: () => ({}),
+      head: { appendChild: () => {} },
+      body: { appendChild: () => {} },
+    },
+    navigator: {
+      onLine: true,
+      userAgent: headers["User-Agent"],
+    },
+    fetch: async (u: any, opts?: any) => {
+      const url = typeof u === "string" ? u : String(u);
+      let bodyData = opts?.body;
+      if (bodyData instanceof ArrayBuffer) {
+        bodyData = new Uint8Array(bodyData);
+      }
+      try {
+        const fetchRes = await axios({
+          url,
+          method: opts?.method || "GET",
+          headers: {
+            ...headers,
+            ...(opts?.headers || {}),
+          },
+          data: bodyData,
+          responseType: "arraybuffer",
+          timeout: 12000,
+          signal,
+        });
+        const uint8 = toUint8Array(fetchRes.data);
+        return {
+          ok: fetchRes.status >= 200 && fetchRes.status < 300,
+          status: fetchRes.status,
+          text: async () => decodeUtf8(uint8),
+          json: async () => JSON.parse(decodeUtf8(uint8)),
+          arrayBuffer: async () =>
+            uint8.buffer.slice(
+              uint8.byteOffset,
+              uint8.byteOffset + uint8.byteLength
+            ),
+          headers: new Map(Object.entries(fetchRes.headers || {})),
+        };
+      } catch (e: any) {
+        const uint8 = e?.response?.data
+          ? toUint8Array(e.response.data)
+          : new Uint8Array(0);
+        return {
+          ok: false,
+          status: e?.response?.status || 500,
+          text: async () => decodeUtf8(uint8),
+          json: async () => (uint8.length ? JSON.parse(decodeUtf8(uint8)) : {}),
+          arrayBuffer: async () =>
+            uint8.buffer.slice(
+              uint8.byteOffset,
+              uint8.byteOffset + uint8.byteLength
+            ),
+          headers: new Map(Object.entries(e?.response?.headers || {})),
+        };
+      }
+    },
+  };
+
+  for (const local of importedLocals) {
+    if (!(local in sandbox)) {
+      sandbox[local] = {};
+    }
+  }
+  sandbox.globalThis = sandbox;
+  sandbox.self = sandbox;
+  return sandbox;
+}
+
+function evaluateCinejoyChunk(
+  code: string,
+  sandbox: Record<string, any>
+): Record<string, any> {
+  const exportMap = parseExportMap(code);
+  const strippedCode = stripModuleSyntax(code);
+  const returnEntries = Object.entries(exportMap).map(
+    ([exported, local]) =>
+      `${JSON.stringify(exported)}: (typeof ${local} !== "undefined" ? ${local} : undefined)`
+  );
+  const returnExpr = `{ ${returnEntries.join(", ")} }`;
+
+  try {
+    const runner = new Function(
+      "sandbox",
+      `with(sandbox){\n${strippedCode}\n;return ${returnExpr};\n}`
+    );
+    return runner(sandbox) || {};
+  } catch {
+    const keys = Object.keys(sandbox).filter((k) =>
+      /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k)
+    );
+    const values = keys.map((k) => sandbox[k]);
+    const runner = new Function(
+      ...keys,
+      `${strippedCode}\n;return ${returnExpr};\n`
+    );
+    return runner(...values) || {};
+  }
+}
+
+function selectResolver(
+  exportsObj: Record<string, any>
+): ((...args: any[]) => Promise<any>) | null {
+  if (typeof exportsObj.s === "function") {
+    return exportsObj.s;
+  }
+  for (const val of Object.values(exportsObj)) {
+    if (typeof val === "function" && val.length === 4) {
+      const src = String(val);
+      if (
+        src.includes("result") &&
+        src.includes("providers") &&
+        src.includes("failure")
+      ) {
+        return val as (...args: any[]) => Promise<any>;
+      }
+    }
+  }
+  return null;
+}
+
+async function discoverCinejoyChunk(
+  axios: any,
+  headers: Record<string, string>,
+  isMovie: boolean,
+  signal?: AbortSignal
+): Promise<string | null> {
+  if (cachedCode) return cachedCode;
+
+  const homeRes = await axios.get(`${CINEJOY_ORIGIN}/`, {
+    headers,
+    timeout: 6000,
+    signal,
+  });
+  const html = typeof homeRes.data === "string" ? homeRes.data : "";
+  const appMatch = html.match(
+    /_app\/immutable\/entry\/app\.[A-Za-z0-9_-]+\.js/
+  );
+  if (!appMatch) return null;
+
+  const appRes = await axios.get(`${CINEJOY_ORIGIN}/${appMatch[0]}`, {
+    headers,
+    timeout: 6000,
+    signal,
+  });
+  const appText = typeof appRes.data === "string" ? appRes.data : "";
+
+  const movieNodeId = appText.match(
+    /"\/watch\/movie\/\[id\]"\s*:\s*\[(\d+)/
+  )?.[1];
+  const tvNodeId = appText.match(
+    /"\/watch\/tv\/\[id\][^"]*"\s*:\s*\[(\d+)/
+  )?.[1];
+  const targetNodeId = isMovie
+    ? movieNodeId || tvNodeId
+    : tvNodeId || movieNodeId;
+  if (!targetNodeId) return null;
+
+  const nodeMatches = [...appText.matchAll(/nodes\/(\d+)\.[A-Za-z0-9_-]+\.js/g)];
+  const nodeMatch =
+    nodeMatches.find((m) => m[1] === targetNodeId) ||
+    (movieNodeId ? nodeMatches.find((m) => m[1] === movieNodeId) : undefined);
+  if (!nodeMatch) return null;
+
+  const nodeRes = await axios.get(
+    `${CINEJOY_ORIGIN}/_app/immutable/${nodeMatch[0]}`,
+    { headers, timeout: 6000, signal }
+  );
+  const nodeText = typeof nodeRes.data === "string" ? nodeRes.data : "";
+
+  const chunkNames = Array.from(
+    new Set(
+      [...nodeText.matchAll(/chunks\/([A-Za-z0-9_-]+\.js)/g)].map((m) => m[1])
+    )
+  );
+
+  for (const ch of chunkNames) {
+    try {
+      const chRes = await axios.get(
+        `${CINEJOY_ORIGIN}/_app/immutable/chunks/${ch}`,
+        { headers, timeout: 6000, signal }
+      );
+      const chText = typeof chRes.data === "string" ? chRes.data : "";
+      if (!chText.includes("WebAssembly")) continue;
+      if (!/export\s*\{[^}]+\}\s*;?\s*$/.test(chText)) continue;
+
+      const probeSandbox = buildSandbox(
+        axios,
+        headers,
+        "/",
+        extractImportedLocals(chText),
+        signal
+      );
+      const probeExports = evaluateCinejoyChunk(chText, probeSandbox);
+      const hasFourArgFn = Object.values(probeExports).some(
+        (v) => typeof v === "function" && v.length === 4
+      );
+      if (hasFourArgFn) {
+        cachedCode = chText;
+        return chText;
+      }
+    } catch {
+      // Try next chunk
+    }
+  }
+
+  return null;
+}
+
+function mapCaption(c: any): TextTracks[number] | null {
+  const uri = c?.url || c?.file;
+  if (!uri) return null;
+  const langRaw = c.language || c.lang || "en";
+  return {
+    title: c.display || c.label || c.language || "Subtitle",
+    language: String(langRaw).slice(0, 2).toLowerCase(),
+    type:
+      c.type === "vtt" || String(uri).endsWith(".vtt")
+        ? "text/vtt"
+        : "application/x-subrip",
+    uri: String(uri),
+  };
+}
+
+function raceWithTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  signal?: AbortSignal
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("Aborted"));
+      return;
+    }
+    let settled = false;
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error("Aborted"));
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", onAbort);
+      reject(new Error("Server timeout"));
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    promise.then(
+      (val) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        resolve(val);
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        reject(err);
+      }
+    );
+  });
 }
 
 export async function extractCinejoyStreams({
   tmdbId,
+  imdbId,
+  title,
+  year,
   season,
   episode,
   type,
@@ -128,6 +485,9 @@ export async function extractCinejoyStreams({
   signal,
 }: {
   tmdbId: string;
+  imdbId?: string;
+  title?: string;
+  year?: string;
   season?: number | string;
   episode?: number | string;
   type: string;
@@ -136,39 +496,36 @@ export async function extractCinejoyStreams({
 }): Promise<Stream[]> {
   const { axios, commonHeaders } = providerContext;
   const isMovie = type === "movie";
+  const mediaType = isMovie ? "movie" : "tv";
 
   if (!tmdbId) return [];
+
+  const watchPath = `/watch/${mediaType}/${tmdbId}${
+    isMovie ? "" : `/${season || 1}/${episode || 1}`
+  }`;
 
   const headers = {
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    Origin: "https://cinejoy.pk",
-    Referer: `https://cinejoy.pk/watch/${isMovie ? "movie" : "tv"}/${tmdbId}${
-      isMovie ? "" : `/${season || 1}/${episode || 1}`
-    }`,
+    Origin: CINEJOY_ORIGIN,
+    Referer: `${CINEJOY_ORIGIN}${watchPath}`,
     ...(commonHeaders || {}),
   };
 
   try {
-    // 1. Fetch chunk code if not cached
-    if (!cachedCode) {
-      const chunkUrl = await getCinejoyChunkUrl(axios, headers, signal);
-      if (!cachedCode) {
-        const chunkRes = await axios.get(chunkUrl, { headers, timeout: 8000, signal });
-        cachedCode = chunkRes.data;
-      }
-    }
+    const chunkCode = await discoverCinejoyChunk(axios, headers, isMovie, signal);
+    if (!chunkCode) return [];
 
-    // Refresh before resolving, including the first request in a new sandbox.
-    // Keep the fallback list when the server directory is unavailable.
     if (Date.now() - lastServerFetchTime > 300000) {
       try {
-        const sRes = await axios.get("https://api.wing.st/servers", {
-          headers, timeout: 5000, signal,
+        const sRes = await axios.get("https://api2.wing.st/servers", {
+          headers,
+          timeout: 5000,
+          signal,
         });
         if (Array.isArray(sRes.data?.servers) && sRes.data.servers.length) {
           const available = sRes.data.servers.filter(
-            (s: any) => s && s.name && s.name !== "Lisbon" && s.status !== "offline"
+            (s: any) => s && s.name && s.status !== "offline"
           );
           if (available.length) {
             cachedServers = available;
@@ -178,236 +535,129 @@ export async function extractCinejoyStreams({
       } catch {}
     }
 
-    // 3. Start fetching external subtitles concurrently
-    const subPromise = (async (): Promise<any[]> => {
+    const subPromise = (async (): Promise<TextTracks> => {
       try {
         const subUrl = `https://subs.wing.st/subtitles?tmdb=${tmdbId}${
           isMovie ? "" : `&season=${season || 1}&episode=${episode || 1}`
         }`;
         const subRes = await axios.get(subUrl, { headers, timeout: 5000, signal });
-        if (Array.isArray(subRes.data)) {
-          return subRes.data
-            .filter((sub: any) => sub && sub.url)
-            .map((sub: any) => ({
-              title: sub.display || sub.language || "Subtitle",
-              language: (sub.language || "en").slice(0, 2).toLowerCase(),
-              type: sub.type === "vtt" ? ("text/vtt" as const) : ("application/x-subrip" as const),
-              uri: sub.url,
-            }));
-        }
-      } catch {}
-      return [];
+        const rawList = Array.isArray(subRes.data)
+          ? subRes.data
+          : Array.isArray(subRes.data?.subtitles)
+          ? subRes.data.subtitles
+          : [];
+        return rawList
+          .map(mapCaption)
+          .filter((s: TextTracks[number] | null): s is TextTracks[number] =>
+            Boolean(s)
+          );
+      } catch {
+        return [];
+      }
     })();
 
-    // 4. Setup sandbox execution (zero Node.js dependencies, 100% WebWorker compatible)
-    const sandbox: any = {
-      console: { log: () => {}, warn: () => {}, error: () => {} },
-      caches: { open: async () => ({ match: () => null, put: () => {} }) },
-      Map: Map,
-      Set: Set,
-      window: {
-        location: {
-          origin: "https://cinejoy.pk",
-          href: `https://cinejoy.pk/watch/${isMovie ? "movie" : "tv"}/${tmdbId}${
-            isMovie ? "" : `/${season || 1}/${episode || 1}`
-          }`,
-          pathname: `/watch/${isMovie ? "movie" : "tv"}/${tmdbId}${
-            isMovie ? "" : `/${season || 1}/${episode || 1}`
-          }`,
-          host: "cinejoy.pk",
-          hostname: "cinejoy.pk",
-        },
-        localStorage: { getItem: () => null, setItem: () => {} },
-      },
-      document: {
-        referrer: "https://cinejoy.pk/",
-        title: "Cinejoy",
-        createElement: () => ({}),
-        head: { appendChild: () => {} },
-        body: { appendChild: () => {} },
-      },
-      navigator: { onLine: true },
-      URLSearchParams:
-        typeof URLSearchParams !== "undefined" ? URLSearchParams : undefined,
-      TextEncoder: typeof TextEncoder !== "undefined" ? TextEncoder : undefined,
-      TextDecoder: typeof TextDecoder !== "undefined" ? TextDecoder : undefined,
-      crypto: typeof crypto !== "undefined" ? crypto : undefined,
-      btoa: safeBtoa,
-      atob: safeAtob,
-      WebAssembly:
-        typeof WebAssembly !== "undefined" ? WebAssembly : undefined,
-      fetch: async (u: string, opts: any) => {
-        try {
-          const fetchRes = await axios({
-            url: u,
-            method: opts?.method || "GET",
-            headers: {
-              ...headers,
-              ...(opts?.headers || {}),
-            },
-            data: opts?.body,
-            responseType: "arraybuffer",
-            timeout: 6000,
-            signal,
-          });
-          const rawData = fetchRes.data;
-          const uint8 = new Uint8Array(rawData);
-          return {
-            ok: fetchRes.status >= 200 && fetchRes.status < 300,
-            status: fetchRes.status,
-            text: async () => {
-              try {
-                return new TextDecoder().decode(uint8);
-              } catch {
-                return String.fromCharCode.apply(null, Array.from(uint8));
-              }
-            },
-            json: async () => {
-              const str = new TextDecoder().decode(uint8);
-              return JSON.parse(str);
-            },
-            arrayBuffer: async () => uint8.buffer,
-            headers: new Map(Object.entries(fetchRes.headers || {})),
-          };
-        } catch (e: any) {
-          const data = e.response?.data
-            ? new Uint8Array(e.response.data)
-            : new Uint8Array(0);
-          return {
-            ok: false,
-            status: e.response?.status || 500,
-            text: async () => new TextDecoder().decode(data),
-            json: async () =>
-              data.length ? JSON.parse(new TextDecoder().decode(data)) : {},
-            arrayBuffer: async () => data.buffer,
-            headers: new Map(),
-          };
-        }
-      },
-    };
-
-    const cleanCode = (cachedCode || "")
-      .replace(/import[^;]+;/g, "")
-      .replace(/export\s*\{[^}]+\};?/g, "");
-
-    // Run using Function constructor
-    const runner = new Function(
-      "sandbox",
-      `with(sandbox) {
-        const u = new Proxy({}, { get: () => () => ({}) });
-        const B = () => ({});
-        const nW = () => ({});
-        ${cleanCode};
-        return {
-          resolveMovie: typeof pW !== "undefined" ? pW : (typeof k !== "undefined" ? k : null),
-          resolveTv: typeof qW !== "undefined" ? qW : (typeof l !== "undefined" ? l : null),
-        };
-      }`
+    const sandbox = buildSandbox(
+      axios,
+      headers,
+      watchPath,
+      extractImportedLocals(chunkCode),
+      signal
     );
-    const exportsObj = runner(sandbox);
+    const exportsObj = evaluateCinejoyChunk(chunkCode, sandbox);
+    const resolver = selectResolver(exportsObj);
+    if (!resolver) return [];
 
     const activeServers = (cachedServers || []).filter(
-      (s: any) => s && s.name !== "Lisbon" && s.status !== "offline"
+      (s) => s && s.name && s.status !== "offline"
     );
-    const streams: Stream[] = [];
 
-    // 5. Query active servers in parallel with per-server timeout
     const externalSubtitles = await subPromise;
-
     const streamHeaders = {
-      Referer: "https://cinejoy.pk/",
-      Origin: "https://cinejoy.pk",
+      Referer: `${CINEJOY_ORIGIN}/`,
+      Origin: CINEJOY_ORIGIN,
       "User-Agent": headers["User-Agent"],
     };
 
+    const resolverParams: Record<string, any> = {
+      tmdbId: String(tmdbId),
+      ...(imdbId ? { imdbId } : {}),
+      ...(year ? { year } : {}),
+      ...(title ? { title } : {}),
+      ...(!isMovie
+        ? { season: Number(season || 1), episode: Number(episode || 1) }
+        : {}),
+    };
+
+    const streams: Stream[] = [];
+    const seenLinks = new Set<string>();
+
     const tasks = activeServers.map(async (srv) => {
-      const serverName = srv.name;
       try {
-        const serverQuery = (async () => {
-          let resData: any = null;
-          if (isMovie && exportsObj.resolveMovie) {
-            resData = await exportsObj.resolveMovie(serverName, String(tmdbId));
-          } else if (!isMovie && exportsObj.resolveTv) {
-            resData = await exportsObj.resolveTv(
-              serverName,
-              String(tmdbId),
-              Number(season || 1),
-              Number(episode || 1)
-            );
-          }
-          return resData;
-        })();
-
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Server timeout")), 5000)
+        const res = await raceWithTimeout(
+          resolver(mediaType, resolverParams, () => {}, srv.name),
+          12000,
+          signal
         );
+        const result = res?.result;
+        if (!result || !result.url) return;
 
-        const resData: any = await Promise.race([serverQuery, timeoutPromise]);
+        const streamUrl = String(result.url);
+        if (seenLinks.has(streamUrl)) return;
 
-        if (resData?.stream && Array.isArray(resData.stream)) {
-          for (const item of resData.stream) {
-            const rawSubs = [
-              ...(item.captions || []).map((c: any) => ({
-                title: c.id || c.language || "Subtitle",
-                uri: c.url,
-                type: (c.url && c.url.endsWith(".vtt") ? "text/vtt" : "application/x-subrip") as const,
-                language: (c.language || c.id || "en").slice(0, 2).toLowerCase(),
-              })),
-              ...externalSubtitles,
-            ];
+        const streamType =
+          result.sourceType === "hls"
+            ? "m3u8"
+            : result.sourceType || "mp4";
 
-            const seenSubs = new Set<string>();
-            const subtitles: TextTracks = [];
-            for (const s of rawSubs) {
-              if (s && s.uri && !seenSubs.has(s.uri)) {
-                seenSubs.add(s.uri);
-                subtitles.push(s);
-              }
+        if (streamType === "m3u8") {
+          try {
+            const playlist = await axios.get(streamUrl, {
+              headers: streamHeaders,
+              timeout: 4000,
+              signal,
+            });
+            if (
+              typeof playlist.data !== "string" ||
+              !playlist.data.trimStart().startsWith("#EXTM3U")
+            ) {
+              return;
             }
-
-            if (item.type === "hls" && item.playlist) {
-              if (
-                serverName === "Lisbon" ||
-                item.playlist.includes("cheaptruckrepairs")
-              ) {
-                continue;
-              }
-              // Some resolvers return a URL even while its upstream is down.
-              // Check the manifest before offering it to the player.
-              try {
-                const playlist = await axios.get(item.playlist, {
-                  headers: streamHeaders, timeout: 4000, signal,
-                });
-                if (typeof playlist.data !== "string" || !playlist.data.trimStart().startsWith("#EXTM3U")) continue;
-              } catch { continue; }
-              streams.push({
-                server: `Cinejoy - ${serverName}${srv["4k"] ? " (4K)" : ""}`,
-                link: item.playlist,
-                type: "m3u8",
-                quality: srv["4k"] ? "2160" : "1080",
-                subtitles: subtitles.length ? subtitles : undefined,
-                headers: streamHeaders,
-              });
-            } else if (item.type === "file" && item.qualities) {
-              for (const [qKey, qVal] of Object.entries<any>(item.qualities)) {
-                if (qVal?.url) {
-                  streams.push({
-                    server: `Cinejoy - ${serverName} (${item.id || qKey})`,
-                    link: qVal.url,
-                    type: qVal.type || "mp4",
-                    quality: qKey.includes("1080")
-                      ? "1080"
-                      : qKey.includes("720")
-                      ? "720"
-                      : undefined,
-                    subtitles: subtitles.length ? subtitles : undefined,
-                    headers: streamHeaders,
-                  });
-                }
-              }
-            }
+          } catch {
+            return;
           }
         }
+
+        if (seenLinks.has(streamUrl)) return;
+        seenLinks.add(streamUrl);
+
+        const rawSubs = [
+          ...(Array.isArray(result.captions)
+            ? result.captions
+                .map(mapCaption)
+                .filter(
+                  (s: TextTracks[number] | null): s is TextTracks[number] =>
+                    Boolean(s)
+                )
+            : []),
+          ...externalSubtitles,
+        ];
+        const seenSubs = new Set<string>();
+        const subtitles: TextTracks = [];
+        for (const s of rawSubs) {
+          if (s.uri && !seenSubs.has(s.uri)) {
+            seenSubs.add(s.uri);
+            subtitles.push(s);
+          }
+        }
+
+        streams.push({
+          server: `Cinejoy - ${srv.name}${srv["4k"] ? " (4K)" : ""}`,
+          link: streamUrl,
+          type: streamType,
+          quality: srv["4k"] ? "2160" : "1080",
+          subtitles: subtitles.length ? subtitles : undefined,
+          headers: streamHeaders,
+        });
       } catch {
         // Skip server if unavailable or timed out
       }
@@ -420,4 +670,3 @@ export async function extractCinejoyStreams({
     return [];
   }
 }
-
