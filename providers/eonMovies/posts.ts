@@ -14,7 +14,7 @@ async function fetchPosts(
   signal: AbortSignal,
   providerContext: ProviderContext,
 ): Promise<Post[]> {
-  const response = await providerContext.axios.get(url, { signal });
+  const response = await providerContext.axios.get(url, { signal, headers: providerContext.commonHeaders });
   const $ = providerContext.cheerio.load(response.data || "");
   const posts: Post[] = [];
 
@@ -32,7 +32,7 @@ async function fetchPosts(
       "";
 
     if (title && link && image) {
-      posts.push({ title, link: toPath(link, baseUrl), image });
+      posts.push({ title, link: toPath(link, baseUrl), image: new URL(image, `${baseUrl}/`).href });
     }
   });
 

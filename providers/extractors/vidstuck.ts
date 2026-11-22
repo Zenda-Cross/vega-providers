@@ -11,11 +11,11 @@ interface VidstuckServerConfig {
 }
 
 const VIDSTUCK_SERVERS: VidstuckServerConfig[] = [
-  { id: "orion", displayName: "Vidstuck - Orion (Multi-Audio)", quality: "1080" },
-  { id: "andromeda", displayName: "Vidstuck - Andromeda (1080p)", quality: "1080" },
-  { id: "atlas", displayName: "Vidstuck - Atlas", quality: "1080" },
-  { id: "daedalus", displayName: "Vidstuck - Daedalus", quality: "1080" },
-  { id: "ursa", displayName: "Vidstuck - Ursa", quality: "1080" },
+  { id: "andromeda", displayName: "Vidstuck - Andromeda" },
+  { id: "orion", displayName: "Vidstuck - Orion" },
+  { id: "atlas", displayName: "Vidstuck - Atlas" },
+  { id: "milkyway", displayName: "Vidstuck - Milky Way" },
+  { id: "berkas", displayName: "Vidstuck - Berkas" },
 ];
 
 /* ================================================================== */
@@ -597,6 +597,26 @@ function md5(bytes: Uint8Array): Uint8Array {
   return out;
 }
 
+const B64_ALPHABET =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+function encodeBase64FromUint8(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i];
+    const has1 = i + 1 < bytes.length;
+    const has2 = i + 2 < bytes.length;
+    const b1 = has1 ? bytes[i + 1] : 0;
+    const b2 = has2 ? bytes[i + 2] : 0;
+    const triplet = (b0 << 16) | (b1 << 8) | b2;
+    out += B64_ALPHABET[(triplet >> 18) & 0x3f];
+    out += B64_ALPHABET[(triplet >> 12) & 0x3f];
+    out += has1 ? B64_ALPHABET[(triplet >> 6) & 0x3f] : "=";
+    out += has2 ? B64_ALPHABET[triplet & 0x3f] : "=";
+  }
+  return out;
+}
+
 function decodeBase64ToUint8(str: string): Uint8Array {
   const clean = str.replace(/-/g, "+").replace(/_/g, "/");
   const pad = clean.padEnd(4 * Math.ceil(clean.length / 4), "=");
@@ -606,17 +626,212 @@ function decodeBase64ToUint8(str: string): Uint8Array {
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
     return u8;
   }
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   const bytes: number[] = [];
-  let value = 0, bits = 0;
+  let value = 0;
+  let bits = 0;
   for (const ch of pad.replace(/=+$/, "")) {
-    const digit = alphabet.indexOf(ch);
+    const digit = B64_ALPHABET.indexOf(ch);
     if (digit < 0) throw new Error("Invalid Vidstuck base64");
     value = (value << 6) | digit;
     bits += 6;
-    if (bits >= 8) { bits -= 8; bytes.push((value >>> bits) & 255); }
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((value >>> bits) & 255);
+    }
   }
   return new Uint8Array(bytes);
+}
+
+function decodeUtf8(bytes: Uint8Array): string {
+  if (typeof TextDecoder !== "undefined") {
+    return new TextDecoder("utf-8").decode(bytes);
+  }
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) {
+    out += String.fromCharCode(bytes[i]);
+  }
+  return out;
+}
+
+function encodeUtf8(str: string): Uint8Array {
+  if (typeof TextEncoder !== "undefined") {
+    return new TextEncoder().encode(str);
+  }
+  const bytes: number[] = [];
+  for (let i = 0; i < str.length; i++) {
+    let code = str.charCodeAt(i);
+    if (code < 0x80) {
+      bytes.push(code);
+    } else if (code < 0x800) {
+      bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+    } else if (code >= 0xd800 && code <= 0xdbff && i + 1 < str.length) {
+      const next = str.charCodeAt(++i);
+      code = 0x10000 + ((code - 0xd800) << 10) + (next - 0xdc00);
+      bytes.push(
+        0xf0 | (code >> 18),
+        0x80 | ((code >> 12) & 0x3f),
+        0x80 | ((code >> 6) & 0x3f),
+        0x80 | (code & 0x3f)
+      );
+    } else {
+      bytes.push(
+        0xe0 | (code >> 12),
+        0x80 | ((code >> 6) & 0x3f),
+        0x80 | (code & 0x3f)
+      );
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+function evpBytesToKey(
+  passphrase: string,
+  salt: Uint8Array
+): { key: Uint8Array; iv: Uint8Array } {
+  const passBytes = encodeUtf8(passphrase);
+  const derived: number[] = [];
+  let d: Uint8Array = new Uint8Array(0);
+  while (derived.length < 48) {
+    const toHash = new Uint8Array(d.length + passBytes.length + salt.length);
+    toHash.set(d, 0);
+    toHash.set(passBytes, d.length);
+    toHash.set(salt, d.length + passBytes.length);
+    d = md5(toHash);
+    for (let i = 0; i < d.length && derived.length < 48; i++) {
+      derived.push(d[i]);
+    }
+  }
+  return {
+    key: new Uint8Array(derived.slice(0, 32)),
+    iv: new Uint8Array(derived.slice(32, 48)),
+  };
+}
+
+function keySchedule256Encrypt(keyBytes: Uint8Array): Uint8Array {
+  const w = new Uint8Array(240);
+  w.set(keyBytes.subarray(0, 32), 0);
+  let rconIdx = 0;
+  for (let i = 8; i < 60; i++) {
+    let t0 = w[(i - 1) * 4];
+    let t1 = w[(i - 1) * 4 + 1];
+    let t2 = w[(i - 1) * 4 + 2];
+    let t3 = w[(i - 1) * 4 + 3];
+    if (i % 8 === 0) {
+      const tmp = t0;
+      t0 = AES_S[t1] ^ AES_RCON[rconIdx++];
+      t1 = AES_S[t2];
+      t2 = AES_S[t3];
+      t3 = AES_S[tmp];
+    } else if (i % 8 === 4) {
+      t0 = AES_S[t0];
+      t1 = AES_S[t1];
+      t2 = AES_S[t2];
+      t3 = AES_S[t3];
+    }
+    const base = (i - 8) * 4;
+    w[i * 4] = w[base] ^ t0;
+    w[i * 4 + 1] = w[base + 1] ^ t1;
+    w[i * 4 + 2] = w[base + 2] ^ t2;
+    w[i * 4 + 3] = w[base + 3] ^ t3;
+  }
+  return w;
+}
+
+function xtime(x: number): number {
+  return ((x << 1) ^ (x & 0x80 ? 0x1b : 0)) & 0xff;
+}
+
+function encryptAesBlock(block: Uint8Array, w: Uint8Array): Uint8Array {
+  const s = new Uint8Array(16);
+  for (let i = 0; i < 16; i++) s[i] = block[i] ^ w[i];
+
+  for (let r = 1; r <= 14; r++) {
+    for (let i = 0; i < 16; i++) s[i] = AES_S[s[i]];
+
+    let tmp = s[1];
+    s[1] = s[5];
+    s[5] = s[9];
+    s[9] = s[13];
+    s[13] = tmp;
+
+    tmp = s[2];
+    s[2] = s[10];
+    s[10] = tmp;
+    tmp = s[6];
+    s[6] = s[14];
+    s[14] = tmp;
+
+    tmp = s[15];
+    s[15] = s[11];
+    s[11] = s[7];
+    s[7] = s[3];
+    s[3] = tmp;
+
+    if (r < 14) {
+      for (let c = 0; c < 4; c++) {
+        const idx = c * 4;
+        const a0 = s[idx];
+        const a1 = s[idx + 1];
+        const a2 = s[idx + 2];
+        const a3 = s[idx + 3];
+        const t = a0 ^ a1 ^ a2 ^ a3;
+        s[idx] = a0 ^ t ^ xtime(a0 ^ a1);
+        s[idx + 1] = a1 ^ t ^ xtime(a1 ^ a2);
+        s[idx + 2] = a2 ^ t ^ xtime(a2 ^ a3);
+        s[idx + 3] = a3 ^ t ^ xtime(a3 ^ a0);
+      }
+    }
+
+    const rkOffset = r * 16;
+    for (let i = 0; i < 16; i++) s[i] ^= w[rkOffset + i];
+  }
+  return s;
+}
+
+function encryptAes256Cbc(
+  plaintext: Uint8Array,
+  key: Uint8Array,
+  iv: Uint8Array
+): Uint8Array {
+  const w = keySchedule256Encrypt(key);
+  const padLen = 16 - (plaintext.length % 16);
+  const padded = new Uint8Array(plaintext.length + padLen);
+  padded.set(plaintext, 0);
+  for (let i = plaintext.length; i < padded.length; i++) padded[i] = padLen;
+
+  const out = new Uint8Array(padded.length);
+  const prev = new Uint8Array(iv);
+  const xored = new Uint8Array(16);
+
+  for (let i = 0; i < padded.length; i += 16) {
+    for (let j = 0; j < 16; j++) xored[j] = padded[i + j] ^ prev[j];
+    const enc = encryptAesBlock(xored, w);
+    out.set(enc, i);
+    prev.set(enc);
+  }
+  return out;
+}
+
+function encryptOpenSSL(plaintext: string, passphrase: string): string {
+  const salt = new Uint8Array(8);
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.getRandomValues === "function"
+  ) {
+    crypto.getRandomValues(salt);
+  } else {
+    for (let i = 0; i < 8; i++) {
+      salt[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  const { key, iv } = evpBytesToKey(passphrase, salt);
+  const cipher = encryptAes256Cbc(encodeUtf8(plaintext), key, iv);
+  const magic = encodeUtf8("Salted__");
+  const combined = new Uint8Array(magic.length + salt.length + cipher.length);
+  combined.set(magic, 0);
+  combined.set(salt, magic.length);
+  combined.set(cipher, magic.length + salt.length);
+  return encodeBase64FromUint8(combined);
 }
 
 function opensslDecrypt(b64Ciphertext: string, passphrase: string): string {
@@ -627,128 +842,145 @@ function opensslDecrypt(b64Ciphertext: string, passphrase: string): string {
     if (magic !== "Salted__") return "";
     const salt = raw.subarray(8, 16);
     const cipher = raw.subarray(16);
-
-    const passBytes = new Uint8Array(passphrase.length);
-    for (let i = 0; i < passphrase.length; i++) {
-      passBytes[i] = passphrase.charCodeAt(i);
-    }
-
-    const derived: number[] = [];
-    let d = new Uint8Array(0);
-    while (derived.length < 48) {
-      const toHash = new Uint8Array(d.length + passBytes.length + salt.length);
-      toHash.set(d, 0);
-      toHash.set(passBytes, d.length);
-      toHash.set(salt, d.length + passBytes.length);
-      d = md5(toHash);
-      for (let i = 0; i < d.length && derived.length < 48; i++) {
-        derived.push(d[i]);
-      }
-    }
-
     if (!cipher.length || cipher.length % 16) return "";
-    const keyBytes = new Uint8Array(derived.slice(0, 32));
-    const ivBytes = new Uint8Array(derived.slice(32, 48));
 
-    const decrypted = decryptAes256Cbc(cipher, keyBytes, ivBytes);
-    let str = "";
-    if (typeof TextDecoder !== "undefined") {
-      str = new TextDecoder("utf-8").decode(decrypted);
-    } else {
-      str = String.fromCharCode.apply(null, Array.from(decrypted));
-    }
+    const { key, iv } = evpBytesToKey(passphrase, salt);
+    const decrypted = decryptAes256Cbc(cipher, key, iv);
+    const str = decodeUtf8(decrypted);
     return str.startsWith("/") || str.startsWith("http") ? str : "";
   } catch {
     return "";
   }
 }
 
-export async function extractVidstuckStreams({
-  tmdbId,
-  imdbId,
-  title,
-  year,
-  date,
-  season,
-  episode,
-  type,
-  providerContext,
-  signal,
-}: {
-  tmdbId: string | number;
-  imdbId?: string;
-  title?: string;
-  year?: string;
-  date?: string;
-  season?: number | string;
-  episode?: number | string;
-  type: string;
-  providerContext: ProviderContext;
-  signal?: AbortSignal;
-}): Promise<Stream[]> {
+function decryptVidstuckLink(rawLink: string): string {
+  if (!rawLink) return "";
+  if (rawLink.startsWith("xArD_")) {
+    try {
+      const inner = decodeUtf8(decodeBase64ToUint8(rawLink.slice(5)));
+      return opensslDecrypt(inner, AES_KEY);
+    } catch {
+      return "";
+    }
+  }
+  return opensslDecrypt(rawLink, AES_KEY);
+}
+
+const API_KEYS = {
+  tmdbId: "a7f39c821d604e5b9157b",
+  mediaType: "c1306d28147a35632e816b",
+  path: "6b491e28392e7561a9384c",
+  season: "d8427b5c82f957c3613e85b",
+  episode: "91c6ea5d1f785c92346b713d",
+  ts: "61d9a5274c8e3b2f8291e6",
+  token: "c492f7a183d0e36c538a716d",
+  title: "5e28c9147a0de29f3674b392a1",
+  year: "b731e6c94f87f8341c306e",
+  date: "e1649139e5814b3027",
+  latestDate: "e95416ad739e5814b3027",
+  imdbId: "f35a814265e871c4933a725f",
+};
+
+function buildTokenBody(
+  tmdbId: string,
+  mediaType: string,
+  path: string,
+  isMovie: boolean,
+  season?: number | string,
+  episode?: number | string
+): Record<string, any> {
+  const seasonNum = Number(season || 1);
+  const episodeNum = Number(episode || 1);
+  const meowPayload: Record<string, any> = {
+    id: tmdbId,
+    media_type: mediaType,
+    path,
+    ...(!isMovie ? { season: seasonNum, episode: episodeNum } : {}),
+  };
+  const body: Record<string, any> = {
+    [API_KEYS.tmdbId]: tmdbId,
+    [API_KEYS.mediaType]: mediaType,
+    [API_KEYS.path]: path,
+    meow: encryptOpenSSL(JSON.stringify(meowPayload), AES_KEY),
+  };
+  if (!isMovie) {
+    body[API_KEYS.season] = seasonNum;
+    body[API_KEYS.episode] = episodeNum;
+  }
+  return body;
+}
+
+async function extractFromVidstuckOrigin(
+  baseUrl: string,
+  {
+    tmdbId,
+    imdbId,
+    title,
+    year,
+    date,
+    latestDate,
+    season,
+    episode,
+    type,
+    providerContext,
+    signal,
+  }: {
+    tmdbId: string | number;
+    imdbId?: string;
+    title?: string;
+    year?: string;
+    date?: string;
+    latestDate?: string;
+    season?: number | string;
+    episode?: number | string;
+    type: string;
+    providerContext: ProviderContext;
+    signal?: AbortSignal;
+  }
+): Promise<Stream[]> {
   const { axios, commonHeaders } = providerContext;
   const isMovie = type === "movie";
   const mediaType = isMovie ? "movie" : "tv";
 
   if (!tmdbId) return [];
+  const tmdbIdStr = String(tmdbId);
 
-  const embedUrl = `${BASE_URL}/embed/${mediaType}/${tmdbId}${
+  const embedUrl = `${baseUrl}/embed/${mediaType}/${tmdbIdStr}${
     isMovie ? "" : `/${season || 1}/${episode || 1}`
   }`;
 
   const headers = {
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    Origin: BASE_URL,
+    Accept: "application/json, text/plain, */*",
+    "Content-Type": "application/json",
+    Origin: baseUrl,
     Referer: embedUrl,
     ...(commonHeaders || {}),
   };
 
   const streamHeaders = {
-    Referer: `${BASE_URL}/`,
-    Origin: BASE_URL,
+    Referer: `${baseUrl}/`,
+    Origin: baseUrl,
     "User-Agent": headers["User-Agent"],
-  };
-
-  const API_KEYS = {
-    tmdbId: "a7f39c821d604e5b91e57b",
-    mediaType: "c81306d28147a35632e816b",
-    server: "6b491e258392e7561a9384c",
-    season: "d8427b5c382f957c3613e85b",
-    episode: "91c6ea75d1f785c92346b713d",
-    ts: "61d9a5274c8e3b2f38291e6",
-    token: "c492f7a183d01e36c538a716d",
-    title: "5e28c9147a06de29f3674b392a1",
-    year: "b731e6c94f867f8341c306e",
-    date: "e16493139e5814b3027",
-    imdbId: "f35a8194265e871c4933a725f",
   };
 
   const effectiveDate = date || (year ? `${year}-01-01` : "2020-01-01");
 
-  // 1. Fetch subtitles in background
   const subPromise = (async (): Promise<TextTracks> => {
     try {
       const subTokenRes = await axios.post(
-        `${BASE_URL}/backend/raider`,
-        {
-          [API_KEYS.tmdbId]: Number(tmdbId),
-          [API_KEYS.mediaType]: mediaType,
-          [API_KEYS.server]: "subtitle",
-          ...(!isMovie && {
-            [API_KEYS.season]: Number(season || 1),
-            [API_KEYS.episode]: Number(episode || 1),
-          }),
-        },
+        `${baseUrl}/backend/andromeda`,
+        buildTokenBody(tmdbIdStr, mediaType, "subtitle", isMovie, season, episode),
         { headers, timeout: 4000, signal }
       );
       const subToken = subTokenRes.data || {};
       if (!subToken.token || !subToken.ts) return [];
 
       const subParams = new URLSearchParams({
-        [API_KEYS.tmdbId]: String(tmdbId),
+        [API_KEYS.tmdbId]: tmdbIdStr,
         [API_KEYS.mediaType]: mediaType,
-        [API_KEYS.server]: "subtitle",
+        [API_KEYS.path]: "subtitle",
         [API_KEYS.ts]: String(subToken.ts),
         [API_KEYS.token]: subToken.token,
         [API_KEYS.date]: effectiveDate,
@@ -760,11 +992,10 @@ export async function extractVidstuckStreams({
         subParams.set(API_KEYS.episode, String(episode || 1));
       }
 
-      const res = await axios.get(`${BASE_URL}/backend/subtitle?${subParams.toString()}`, {
-        headers,
-        timeout: 4000,
-        signal,
-      });
+      const res = await axios.get(
+        `${baseUrl}/backend/subtitle?${subParams.toString()}`,
+        { headers, timeout: 4000, signal }
+      );
 
       const captions = res.data?.captions || [];
       return captions
@@ -772,7 +1003,9 @@ export async function extractVidstuckStreams({
         .map((c: any) => ({
           title: c.display || "Subtitle",
           language: (c.display || "en").slice(0, 2).toLowerCase(),
-          type: (c.file.includes(".vtt") ? "text/vtt" : "application/x-subrip") as const,
+          type: c.file.includes(".vtt")
+            ? ("text/vtt" as const)
+            : ("application/x-subrip" as const),
           uri: c.file,
         }));
     } catch {
@@ -782,22 +1015,11 @@ export async function extractVidstuckStreams({
 
   const streams: Stream[] = [];
 
-  // 2. Query Vidstuck servers in parallel
   const tasks = VIDSTUCK_SERVERS.map(async (srv) => {
     try {
-      const postPayload: any = {
-        [API_KEYS.tmdbId]: Number(tmdbId),
-        [API_KEYS.mediaType]: mediaType,
-        [API_KEYS.server]: srv.id,
-      };
-      if (!isMovie) {
-        postPayload[API_KEYS.season] = Number(season || 1);
-        postPayload[API_KEYS.episode] = Number(episode || 1);
-      }
-
       const tokenRes = await axios.post(
-        `${BASE_URL}/backend/raider`,
-        postPayload,
+        `${baseUrl}/backend/andromeda`,
+        buildTokenBody(tmdbIdStr, mediaType, srv.id, isMovie, season, episode),
         { headers, timeout: 4500, signal }
       );
 
@@ -805,8 +1027,8 @@ export async function extractVidstuckStreams({
       if (!token || !ts) return;
 
       const getParams = new URLSearchParams({
-        [API_KEYS.tmdbId]: String(tmdbId),
-        [API_KEYS.server]: srv.id,
+        [API_KEYS.tmdbId]: tmdbIdStr,
+        [API_KEYS.path]: srv.id,
         [API_KEYS.mediaType]: mediaType,
         [API_KEYS.ts]: String(ts),
         [API_KEYS.token]: token,
@@ -815,6 +1037,7 @@ export async function extractVidstuckStreams({
       if (title) getParams.set(API_KEYS.title, title);
       if (year) getParams.set(API_KEYS.year, year);
       getParams.set(API_KEYS.date, effectiveDate);
+      if (latestDate) getParams.set(API_KEYS.latestDate, latestDate);
       if (imdbId) getParams.set(API_KEYS.imdbId, imdbId);
       if (!isMovie) {
         getParams.set(API_KEYS.season, String(season || 1));
@@ -822,7 +1045,7 @@ export async function extractVidstuckStreams({
       }
 
       const srvRes = await axios.get(
-        `${BASE_URL}/backend/servers/${srv.id}?${getParams.toString()}`,
+        `${baseUrl}/backend/servers/${srv.id}?${getParams.toString()}`,
         { headers, timeout: 5000, signal }
       );
 
@@ -830,34 +1053,37 @@ export async function extractVidstuckStreams({
       if (!Array.isArray(links) || !links.length) return;
 
       const subtitles = await subPromise;
+      const hasMultiAudio =
+        Array.isArray(srvRes.data?.dubs) && srvRes.data.dubs.length > 1;
+      const serverName =
+        hasMultiAudio && !srv.displayName.includes("Multi-Audio")
+          ? `${srv.displayName} (Multi-Audio)`
+          : srv.displayName;
 
       for (const item of links) {
         if (!item || !item.link) continue;
-        const decrypted = opensslDecrypt(item.link, AES_KEY);
+        const decrypted = decryptVidstuckLink(String(item.link));
         if (!decrypted) continue;
 
         const finalUrl = decrypted.startsWith("http")
           ? decrypted
-          : `${BASE_URL}${decrypted}`;
+          : decrypted.startsWith("/")
+          ? `${baseUrl}${decrypted}`
+          : "";
+        if (!finalUrl) continue;
 
-        const isDash = item.type === "dash" || finalUrl.includes("database/andromeda");
-        const isM3u8 =
-          item.type === "hls" ||
-          finalUrl.includes(".m3u8") ||
-          finalUrl.includes("atlas") ||
-          finalUrl.includes("ursa") ||
-          finalUrl.includes("daedalus");
-
-        const hasMultiAudio = Array.isArray(srvRes.data?.dubs) && srvRes.data.dubs.length > 1;
-        const serverName = hasMultiAudio && !srv.displayName.includes("Multi-Audio")
-          ? `${srv.displayName} (Multi-Audio)`
-          : srv.displayName;
+        const streamType =
+          item.type === "dash"
+            ? "dash"
+            : item.type === "hls" || finalUrl.includes(".m3u8")
+            ? "m3u8"
+            : "mp4";
 
         streams.push({
           server: serverName,
           link: finalUrl,
-          type: isDash ? "dash" : isM3u8 ? "m3u8" : "mp4",
-          quality: srv.quality || (item.resolution ? String(item.resolution) : "1080"),
+          type: streamType,
+          quality: item.resolution ? String(item.resolution) : "1080",
           subtitles: subtitles.length ? subtitles : undefined,
           headers: streamHeaders,
         });
@@ -869,4 +1095,12 @@ export async function extractVidstuckStreams({
 
   await Promise.allSettled(tasks);
   return streams;
+}
+
+export async function extractVidstuckStreams(
+  args: Parameters<typeof extractFromVidstuckOrigin>[1],
+): Promise<Stream[]> {
+  const streams = await extractFromVidstuckOrigin(BASE_URL, args);
+  if (streams.length || args.signal?.aborted) return streams;
+  return extractFromVidstuckOrigin("https://0vidads.top", args);
 }

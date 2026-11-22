@@ -1,8 +1,12 @@
 import { Post, ProviderContext } from "../types";
 
+const POSTERS_PLUS_OPTIONS =
+  "shape=landscape&pc=stremio_tv_nuvio&tg=medium&bp=top_left&_is=1.05&_soo10=1&fti=1&mw=lb:.5,im:.5&tw=tk:.5,im:.5&amw=mal:.5,al:.5&atw=mal:.5,al:.5&fbs=photoreal&slr=1.20&shr=0.135&bdm=7&bms=5";
+
 export const getPosts = async function ({
   filter,
   signal,
+  providerValue,
   providerContext,
 }: {
   filter: string;
@@ -25,14 +29,16 @@ export const getPosts = async function ({
       const id = result?.imdb_id || result?.id;
       const type = result?.type;
       const image = result?.poster;
-      const rating = result?.imdbRating || result?.rating;
-      const tag = rating ? `${rating}★` : undefined;
       if (id) {
         catalog.push({
           title: title,
           link: `https://v3-cinemeta.strem.io/meta/${type}/${id}.json`,
-          image: image,
-          tag,
+          ...(providerValue === "autoEmbed" && /^tt\d+$/.test(id) && (type === "movie" || type === "series")
+            ? {
+                image: `https://postersplus.slokker.cc/poster?imdb_id=${id}&stremio_id=${id}&type=${type}&${POSTERS_PLUS_OPTIONS}`,
+                aspectRatio: 16 / 9,
+              }
+            : { image }),
         });
       }
     });
@@ -78,14 +84,11 @@ export const getSearchPosts = async function ({
       const id = result?.imdb_id || result?.id;
       const image = result?.poster;
       const type = result?.type;
-      const rating = result?.imdbRating || result?.rating;
-      const tag = rating ? `${rating}★` : undefined;
       if (id) {
         catalog.push({
           title: title,
           link: `https://v3-cinemeta.strem.io/meta/${type}/${id}.json`,
           image: image,
-          tag,
         });
       }
     });
@@ -99,14 +102,11 @@ export const getSearchPosts = async function ({
       const id = result?.imdb_id || result?.id;
       const image = result?.poster;
       const type = result?.type;
-      const rating = result?.imdbRating || result?.rating;
-      const tag = rating ? `${rating}★` : undefined;
       if (id) {
         catalog.push({
           title: title,
           link: `https://v3-cinemeta.strem.io/meta/${type}/${id}.json`,
           image: image,
-          tag,
         });
       }
     });

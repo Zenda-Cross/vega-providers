@@ -1,3 +1,4 @@
+import { getPage } from "./request";
 import { Stream, ProviderContext, EpisodeLink } from "../types";
 import { throwProviderError } from "../providerErrors";
 import { hubcloudExtractor } from "../extractors/hubcloud";
@@ -70,10 +71,7 @@ export const getStream = async function ({
     // 4. Resolve unblockedgames / redirect gateways
     if (targetUrl.includes("unblockedgames") || targetUrl.includes("leechpro")) {
       try {
-        const res = await axios.get(targetUrl, {
-          headers: commonHeaders,
-          signal,
-        });
+        const res = await getPage(targetUrl, providerContext, signal, commonHeaders);
         const html = typeof res.data === "string" ? res.data : "";
         const refreshMatch = html.match(/content=["']\d+;\s*url=(.*?)["']/i);
         const replaceMatch = html.match(/location\.replace\(["']([^"']+)["']\)/i);
@@ -157,7 +155,7 @@ async function modGetEpisodeLinks({
     if (cleanUrl.includes("url=")) {
       cleanUrl = atob(cleanUrl.split("url=")[1]);
     }
-    const res = await axios.get(cleanUrl, { headers: commonHeaders });
+    const res = await getPage(cleanUrl, providerContext, undefined, commonHeaders);
     const html = res.data;
     let $ = cheerio.load(html);
     if (url.includes("url=")) {
@@ -165,7 +163,7 @@ async function modGetEpisodeLinks({
         .attr("content")
         ?.split("url=")[1];
       if (newUrl) {
-        const res2 = await axios.get(newUrl, { headers: commonHeaders });
+        const res2 = await getPage(newUrl, providerContext, undefined, commonHeaders);
         $ = cheerio.load(res2.data);
       }
     }

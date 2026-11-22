@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { getPage } from "./request";
 import { getBaseUrl } from "../getBaseUrl";
 import { throwProviderError } from "../providerErrors";
 
@@ -24,6 +25,7 @@ export const getPosts = async function ({
     axios,
     cheerio,
     operation: "posts",
+    providerContext,
   });
 };
 
@@ -49,6 +51,7 @@ export const getSearchPosts = async function ({
     axios,
     cheerio,
     operation: "search posts",
+    providerContext,
   });
 };
 
@@ -59,6 +62,7 @@ async function posts({
   axios,
   cheerio,
   operation,
+  providerContext,
 }: {
   baseUrl: string;
   url: string;
@@ -66,9 +70,10 @@ async function posts({
   axios: ProviderContext["axios"];
   cheerio: ProviderContext["cheerio"];
   operation: string;
+  providerContext: ProviderContext;
 }): Promise<Post[]> {
   try {
-    const res = await axios.get(url, { signal });
+    const res = await getPage(url, providerContext, signal);
     const data = res.data;
     const $ = cheerio.load(data);
     const catalog: Post[] = [];
@@ -77,13 +82,15 @@ async function posts({
       .map((i, element) => {
         const title = $(element).find("a").attr("title");
         const link = $(element).find("a").attr("href");
-        const image = $(element).find("img").attr("src");
+        const img = $(element).find("img").first();
+        const image = img.attr("data-lazy-src") || img.attr("data-src") ||
+          (img.attr("data-srcset") || img.attr("srcset") || "").split(",")[0].trim().split(/\s+/)[0] || img.attr("src");
         if (title && link && image) {
           const postUrl = new URL(link, `${baseUrl}/`);
           catalog.push({
             title: title,
             link: `${postUrl.pathname}${postUrl.search}${postUrl.hash}`,
-            image: image,
+            image: new URL(image, `${baseUrl}/`).href,
           });
         }
       });

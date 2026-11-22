@@ -12,14 +12,9 @@ let cachedProxyAction = "40be6d9fdcc81dd69cf943cccce3e8fcf190219950";
 let cachedDriveAction = "40e5348909ff78510ee46337a237c1352fcc630ad2";
 
 function getStreamQuality(label: string): StreamQuality | undefined {
-  const resolution = Number(label.match(/\b(\d{3,4})p\b/i)?.[1]);
-  if (!resolution) return undefined;
-  if (resolution >= 2160) return "2160";
-  if (resolution >= 1080) return "1080";
-  if (resolution >= 720) return "720";
-  if (resolution >= 480) return "480";
-  if (resolution >= 360) return "360";
-  return undefined;
+  const resolution = label.match(/(?:^|[^0-9])(\d{3,4})p(?=$|[^a-z0-9])/i)?.[1];
+  if (resolution) return String(Number(resolution));
+  return /\b4k\b/i.test(label) ? "2160" : undefined;
 }
 
 function addQuality(streams: Stream[], quality?: StreamQuality): Stream[] {
@@ -27,7 +22,7 @@ function addQuality(streams: Stream[], quality?: StreamQuality): Stream[] {
     quality ||
     streams.reduce<StreamQuality | undefined>(
       (result, stream) =>
-        result || getStreamQuality(decodeURIComponent(stream.link)),
+        result || stream.quality || getStreamQuality(stream.link),
       undefined,
     );
   return streams.map((stream) => ({
@@ -286,33 +281,24 @@ async function followDownloadLink(
     let data = "";
     let responseUrl = currentUrl;
 
-    try {
-      const response = await fetch(currentUrl, {
-        headers,
-        signal,
-        redirect: "manual",
-      });
-      location = response.headers.get("location");
-      if (!location) {
-        data = await response.text();
-        responseUrl = response.url || currentUrl;
-      }
-    } catch {
-      const res = await providerContext.axios.get(currentUrl, {
-        headers,
-        signal,
-        maxRedirects: 0,
-        validateStatus: (status: number) => status >= 200 && status < 400,
-      });
-      location = res.headers?.location || res.headers?.Location || null;
-      if (!location) {
-        data =
-          typeof res.data === "string" ? res.data : JSON.stringify(res.data);
-      }
+    const res = await providerContext.axios.get(currentUrl, {
+      headers,
+      signal,
+      timeout: 15000,
+      maxRedirects: 0,
+      validateStatus: (status: number) => status >= 200 && status < 400,
+    });
+    location = res.headers?.location || res.headers?.Location || null;
+    if (!location) {
+      data = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
+      responseUrl = res.request?.responseURL || res.request?.res?.responseUrl || currentUrl;
     }
 
     if (location) {
       currentUrl = new URL(location, currentUrl).href;
+      if (getDotflixSharingCode(currentUrl) || isHubcloudUrl(currentUrl)) {
+        return { data: "", url: currentUrl };
+      }
       continue;
     }
 
@@ -327,6 +313,38 @@ async function followDownloadLink(
   throw new Error("EonMovies download redirect chain exceeded the limit");
 }
 
+async function resolveDotflixShareUrl(
+  link: string,
+  signal: AbortSignal | undefined,
+  headers: Record<string, string>,
+  providerContext: ProviderContext,
+): Promise<string> {
+  const sharingCode = getDotflixSharingCode(link);
+  const visited = new Set<string>();
+  let currentUrl = link;
+  for (let hop = 0; hop < 5; hop++) {
+    if (visited.has(currentUrl)) throw new Error("Dotflix share redirect loop");
+    visited.add(currentUrl);
+    const response = await providerContext.axios.get(currentUrl, {
+      signal,
+      headers: { ...headers, Referer: currentUrl },
+      timeout: 15000,
+      maxRedirects: 0,
+      validateStatus: (status: number) => status >= 200 && status < 400,
+    });
+    const location = response.headers?.location || response.headers?.Location;
+    // Some app transports follow redirects internally despite maxRedirects.
+    const finalUrl = response.request?.responseURL || response.request?.res?.responseUrl;
+    const target = location ? new URL(location, currentUrl).href : finalUrl || currentUrl;
+    if (getDotflixSharingCode(target) !== sharingCode) {
+      throw new Error("Dotflix redirected away from the requested share");
+    }
+    if (!location) return target;
+    currentUrl = target;
+  }
+  throw new Error("Dotflix share redirect chain exceeded the limit");
+}
+
 async function extractDotflixStream(
   link: string,
   signal: AbortSignal | undefined,
@@ -337,6 +355,9 @@ async function extractDotflixStream(
   const sharingCode = getDotflixSharingCode(link);
   if (!sharingCode) return [];
 
+  // A 301/302 on an API POST can change its method to GET. Resolve the
+  // share's canonical host first, then send POSTs directly to that host.
+  link = await resolveDotflixShareUrl(link, signal, headers, providerContext);
   const origin = new URL(link).origin;
   const requestHeaders = { ...headers, Origin: origin, Referer: link };
 
@@ -348,6 +369,8 @@ async function extractDotflixStream(
 
   const streams: Stream[] = [];
   const seenLinks = new Set<string>();
+  let mediaType = "mkv";
+  let fileQuality: StreamQuality | undefined;
 
   const addStream = (server: string, streamUrl: string) => {
     if (!streamUrl || seenLinks.has(streamUrl)) return;
@@ -356,9 +379,44 @@ async function extractDotflixStream(
     streams.push({
       server,
       link: streamUrl,
-      type: isZip ? "zip" : "mkv",
+      type: isZip ? "zip" : mediaType,
+      quality: fileQuality,
     });
   };
+
+  const sortStreams = () => {
+    const priority = (stream: Stream) => {
+      if (isDownload) return /Quick Download|Proxy|Direct/.test(stream.server) ? 0 : 1;
+      return /Direct|Worker/.test(stream.server) ? 0 : 1;
+    };
+    return streams.sort((a, b) => priority(a) - priority(b));
+  };
+
+  // Current Dotflix builds expose JSON download APIs instead of the old
+  // deployment-specific Next.js server actions. Keep those as a fallback.
+  const [resumeRes, quickRes, statusRes] = await Promise.allSettled([
+    providerContext.axios.post(`${origin}/api/generate-direct-drive-download`, { sharingCode }, {
+      signal, headers: { ...requestHeaders, "Content-Type": "application/json" }, timeout: 15000,
+    }),
+    providerContext.axios.post(`${origin}/api/generate-quick-download`, { sharingCode }, {
+      signal, headers: { ...requestHeaders, "Content-Type": "application/json" }, timeout: 15000,
+    }),
+    providerContext.axios.get(`${origin}/api/share-status/${sharingCode}`, {
+      signal, headers: requestHeaders, timeout: 10000,
+    }),
+  ]);
+  if (statusRes.status === "fulfilled") {
+    const file = statusRes.value.data?.data;
+    fileQuality = getStreamQuality(String(file?.filename || ""));
+    const extension = String(file?.fileType || file?.filename?.split(".").pop() || "").toLowerCase();
+    if (["zip", "mp4", "mkv", "m3u8"].includes(extension)) mediaType = extension;
+  }
+  for (const [result, name] of [[resumeRes, "Dotflix Direct Resume"], [quickRes, "Dotflix Quick Download"]] as const) {
+    if (result.status === "fulfilled" && result.value.data?.success && typeof result.value.data.workerUrl === "string") {
+      addStream(name, result.value.data.workerUrl);
+    }
+  }
+  if (streams.length) return sortStreams();
 
   const [directRes, cfRes, proxyRes, driveRes] = await Promise.allSettled([
     providerContext.axios.post(
@@ -511,25 +569,7 @@ async function extractDotflixStream(
     throw new Error("Dotflix did not return a direct or proxy download URL");
   }
 
-  if (isDownload) {
-    streams.sort((a, b) => {
-      const aScore =
-        a.server.includes("Proxy") || a.server.includes("Direct") ? 0 : 1;
-      const bScore =
-        b.server.includes("Proxy") || b.server.includes("Direct") ? 0 : 1;
-      return aScore - bScore;
-    });
-  } else {
-    streams.sort((a, b) => {
-      const aScore =
-        a.server.includes("Worker") || a.server.includes("Direct") ? 0 : 1;
-      const bScore =
-        b.server.includes("Worker") || b.server.includes("Direct") ? 0 : 1;
-      return aScore - bScore;
-    });
-  }
-
-  return streams;
+  return sortStreams();
 }
 
 async function extractDownloadStreams(
@@ -565,7 +605,6 @@ async function extractDownloadStreams(
 
 export async function getStream({
   link,
-  type,
   signal,
   providerContext,
   isDownload,
@@ -577,68 +616,49 @@ export async function getStream({
   isDownload?: boolean;
 }): Promise<Stream[]> {
   const headers = { ...providerContext.commonHeaders };
-  const page = await followDownloadLink(link, signal, headers, providerContext);
-  if (getDotflixSharingCode(page.url) || isHubcloudUrl(page.url)) {
-    const streams = await extractDownloadStreams(
-      page.url,
-      signal,
-      headers,
-      providerContext,
-      isDownload,
-    );
-    return addQuality(streams);
-  }
+  const visited = new Set<string>();
 
-  const $ = providerContext.cheerio.load(page.data);
-  const downloadLinks = $(".dl-row a[href*='/dl/']")
-    .map((_, element) => {
-      const anchor = $(element);
-      const row = anchor.closest(".dl-row");
-      const label =
-        row.attr("data-dlname") ||
-        row.find(".dl-row-name").text().replace(/\s+/g, " ").trim();
-      return {
-        link: new URL(anchor.attr("href") || "", page.url).href,
-        quality: getStreamQuality(label),
-      };
-    })
-    .get();
-  if (!downloadLinks.length) {
-    throw new Error(
-      `EonMovies did not redirect to Dotflix or HubCloud: ${page.url}`,
-    );
-  }
-
-  const streams: Stream[] = [];
-  const seen = new Set<string>();
-  for (const downloadLink of downloadLinks) {
-    const downloadPage = await followDownloadLink(
-      downloadLink.link,
-      signal,
-      headers,
-      providerContext,
-    );
-    if (
-      !getDotflixSharingCode(downloadPage.url) &&
-      !isHubcloudUrl(downloadPage.url)
-    ) {
-      continue;
+  async function resolve(link: string, depth: number, quality?: StreamQuality): Promise<Stream[]> {
+    if (signal?.aborted) throw new Error("EonMovies request aborted");
+    if (depth > 5 || visited.has(link)) return [];
+    visited.add(link);
+    if (getDotflixSharingCode(link) || isHubcloudUrl(link)) {
+      return addQuality(await extractDownloadStreams(link, signal, headers, providerContext, isDownload), quality);
     }
 
-    const extracted = await extractDownloadStreams(
-      downloadPage.url,
-      signal,
-      headers,
-      providerContext,
-      isDownload,
-    );
-    addQuality(extracted, downloadLink.quality).forEach((stream) => {
-      if (!seen.has(stream.link)) {
-        seen.add(stream.link);
-        streams.push(stream);
+    const page = await followDownloadLink(link, signal, headers, providerContext);
+    if (getDotflixSharingCode(page.url) || isHubcloudUrl(page.url)) {
+      return addQuality(await extractDownloadStreams(page.url, signal, headers, providerContext, isDownload), quality);
+    }
+    if (page.url !== link && visited.has(page.url)) return [];
+    visited.add(page.url);
+    const $ = providerContext.cheerio.load(page.data);
+    const pageQuality = quality || getStreamQuality($("title").text());
+    const downloadLinks = $(".dl-row a[href*='/dl/'], a.dl-btn-host[href*='/dl/']")
+      .map((_, element) => {
+        const anchor = $(element);
+        const row = anchor.closest(".dl-row");
+        const label = row.attr("data-dlname") || row.find(".dl-row-name").text().trim();
+        return {link: new URL(anchor.attr("href") || "", page.url).href, quality: getStreamQuality(label) || pageQuality};
+      }).get();
+    if (!downloadLinks.length) {
+      throw new Error(`EonMovies has no supported download mirrors: ${page.url}`);
+    }
+
+    const streams: Stream[] = [];
+    let lastError: unknown;
+    for (const download of downloadLinks) {
+      try {
+        streams.push(...await resolve(download.link, depth + 1, download.quality));
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        lastError = error;
       }
-    });
+    }
+    if (!streams.length && lastError) throw lastError;
+    return streams;
   }
 
-  return streams;
+  const streams = await resolve(link, 0);
+  return streams.filter((stream, index, all) => all.findIndex(item => item.link === stream.link) === index);
 }

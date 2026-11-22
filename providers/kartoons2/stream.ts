@@ -1,5 +1,5 @@
 // stream.ts
-import { ProviderContext, Stream } from "../types";
+import { ProviderContext, Stream, TextTracks } from "../types";
 
 const BASE_URL = "https://cd2735efc006-orangestream.baby-beamup.club";
 
@@ -161,20 +161,20 @@ function extractQuality(s: any): string {
   return m ? m[1] : "";
 }
 
-function normaliseSubtitles(raw: any): any[] | undefined {
-  if (!Array.isArray(raw) || raw.length === 0) return undefined;
-  const out: any[] = [];
+function normaliseSubtitles(raw: unknown): TextTracks | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const tracks: TextTracks = [];
   for (const sub of raw) {
-    if (!sub || typeof sub !== "object") continue;
-    const url = sub.url || sub.uri;
-    if (typeof url !== "string" || url.length === 0) continue;
-    out.push({
-      headers: sub.headers ?? undefined,
-      ...sub,
-      id: sub.id ?? `${sub.lang ?? "und"}_${out.length}`,
-      url,
-      lang: sub.lang ?? sub.language ?? "und",
-    });
+    const uri = sub?.url || sub?.uri;
+    if (typeof uri !== "string" || !/^https?:\/\//i.test(uri)) continue;
+    const language = sub.lang || sub.language || "und";
+    const path = uri.split(/[?#]/, 1)[0].toLowerCase();
+    const type = sub.type === "text/vtt" || path.endsWith(".vtt")
+      ? "text/vtt"
+      : sub.type === "application/ttml+xml" || /\.(ttml|dfxp)$/.test(path)
+        ? "application/ttml+xml"
+        : "application/x-subrip";
+    tracks.push({ uri, language, title: sub.title || sub.label || language, type });
   }
-  return out.length > 0 ? out : undefined;
+  return tracks.length ? tracks : undefined;
 }

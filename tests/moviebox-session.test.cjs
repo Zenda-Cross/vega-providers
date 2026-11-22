@@ -62,3 +62,21 @@ test('normal playback keeps upstream source ordering despite download preference
  const streams=await load()({link:JSON.stringify(playback),providerContext:c.providerContext});
  assert.equal(streams[0].quality,'360');
 });
+
+test('downloads prefer the selected caption and playback preserves upstream order', async () => {
+ const c = context({status:200,data:{code:0,data:{streams:[{id:'file',format:'MP4',url:'https://cdn.example/video.mp4'}]}}});
+ const get = c.providerContext.axios.get;
+ c.providerContext.axios.get = async (url, config) => url.includes('/subject/caption?')
+   ? {status:200,data:{data:{captions:[
+       {lan:'es',lanName:'Spanish',url:'https://cdn.example/es.vtt'},
+       {lan:'en-US',lanName:'English',url:'https://cdn.example/en.vtt'},
+     ]}}}
+   : get(url, config);
+ const select = load();
+ for (const [language, isDownload, expected] of [['English',true,'en-US'],['en',true,'en-US'],['ja',true,'es'],['en',false,'es']]) {
+   c.providerContext.kvStore = {get:async key => key === 'downloadSubtitle' ? language : undefined};
+   const [stream] = await select({link:JSON.stringify(playback),providerContext:c.providerContext,isDownload});
+   assert.equal(stream.subtitles[0].language,expected);
+   assert.equal(stream.subtitles.length,2);
+ }
+});

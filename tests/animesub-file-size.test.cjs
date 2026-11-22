@@ -66,3 +66,41 @@ test('preserves movie size labels without performing episode enrichment',async()
   assert.ok(result[0].tags.includes('8.31 GB'));
   assert.equal(calls.length,1);
 });
+
+test('resolves numeric string file indexes and prefers the matched explicit file size', async () => {
+  const {result} = await run([source({fileIdx:'0'})], [
+    {infoHash:hash,fileIdx:'0'},
+    {infoHash:hash,fileIdx:0,fileSize:String(500*1024**2),behaviorHints:{videoSize:8.31*1024**3}},
+  ]);
+  assert.ok(result[0].tags.includes('500.0 MB'));
+});
+
+test('rejects a conflicting string file index even when filenames match', async () => {
+  const {result} = await run([source({fileIdx:'0'})], [
+    {infoHash:hash,fileIdx:'1',behaviorHints:{filename:name},title:'2.50 GB'},
+  ]);
+  assert.doesNotMatch(result[0].tag,/\b(?:GB|MB)\b/);
+});
+
+test('labels supplied subtitle languages separately from audio', async () => {
+  const {result} = await run([source({subtitles: [
+    {lang:'en',url:'https://example.com/en.vtt'},
+    {lang:'EN',url:'https://example.com/en2.vtt'},
+    {lang:'es',url:'https://example.com/es.vtt'},
+    {url:'https://example.com/unknown.vtt'},
+  ]})]);
+  assert.ok(result[0].tags.includes('Subs: EN, ES'));
+});
+
+test('reads the AniSub subtitle description line separately from audio', async () => {
+  const {result} = await run([source({description: '🎧 Japanese\n💬 ES, Chinese'})]);
+  assert.ok(result[0].tags.includes('JP'));
+  assert.ok(result[0].tags.includes('Subs: ES, ZH'));
+  assert.ok(!result[0].tags.includes('JP, ZH'));
+});
+
+test('reads flag subtitle fields moved to the stream name before audio', async () => {
+  const {result} = await run([source({name:'AnimeSub+ 1080p · 💬 🇪🇸 🇨🇳 · 🎧 🇯🇵'})]);
+  assert.ok(result[0].tags.includes('JP'));
+  assert.ok(result[0].tags.includes('Subs: ES, ZH'));
+});

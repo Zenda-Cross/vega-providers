@@ -1,4 +1,5 @@
 import { Stream, ProviderContext } from "../types";
+import { videoDetail } from "./page";
 
 const ENDPOINT_URL = "https://d3sgzbosmwirao.cloudfront.net/";
 const API_URL = "https://api.mxplayer.in/v1/web";
@@ -34,26 +35,8 @@ export const getStream = async function ({
   // ===============================
   else if (link.startsWith("http") && link.includes("mxplayer.in")) {
     try {
-      // ✔ Extract ID from URL
-      // https://www.mxplayer.in/detail/movie/<ID>
-      const idMatch = link.match(/movie\/([a-zA-Z0-9]+)/);
-      if (idMatch && idMatch[1]) {
-        const id = idMatch[1];
-
-        const apiUrl =
-          `${API_URL}/detail/tab/movierecommended?type=movie&id=${id}`;
-
-        const res = await axios.get(apiUrl, {
-          headers: {
-            Referer: "https://www.mxplayer.in/",
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-          },
-        });
-
-        // ✔ items[0].stream
-        streamObj = res.data?.items?.[0]?.stream || null;
-      }
+      // Resolve the selected movie itself, never the first recommended title.
+      streamObj = (await videoDetail(link, providerContext)).stream || null;
     } catch (e) {
       console.error("MX Movie API error", e);
     }

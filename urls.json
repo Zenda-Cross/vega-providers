@@ -1,27 +1,27 @@
 {
   "Moviesmod": {
     "name": "Moviesmod",
-    "url": "https://moviesmod.tw"
+    "url": "https://moviesmod.fi"
   },
   "Topmovies": {
     "name": "Topmovies",
-    "url": "https://moviesleech.club"
+    "url": "https://moviesleech.help"
   },
   "UhdMovies": {
     "name": "UhdMovies",
-    "url": "https://uhdmovies.beauty"
+    "url": "https://uhdmovies.ceo"
   },
   "Vega": {
     "name": "vegamovies",
-    "url": "https://vegamovies.lease"
+    "url": "https://vegamovies.latino"
   },
   "lux": {
     "name": "luxmovies",
-    "url": "https://rogmovies.asia"
+    "url": "https://rogmovies.beauty"
   },
   "drive": {
     "name": "moviesDrive",
-    "url": "https://new1.moviesdrive.cyou/"
+    "url": "https://new4.moviesdrive.cyou/"
   },
   "multi": {
     "name": "multimovies",
@@ -29,7 +29,7 @@
   },
   "w4u": {
     "name": "world4ufree",
-    "url": "https://world4ufree.vu"
+    "url": "https://world4ufree.men"
   },
   "extra": {
     "name": "extraMovies",
@@ -37,7 +37,7 @@
   },
   "hdhub": {
     "name": "hdhub4u",
-    "url": "https://new12.hdhub4u.cl"
+    "url": "https://new15.hdhub4u.cl"
   },
   "kat": {
     "name": "katmovieshd",
@@ -57,7 +57,7 @@
   },
   "gokuHD": {
     "name": "GokuHD",
-    "url": "https://gokuhd.cc"
+    "url": "https://gokuhd.nl"
   },
   "mkvDrama": {
     "name": "MKVDrama",
@@ -109,7 +109,7 @@
   },
   "moviezwap": {
     "name": "moviezwap",
-    "url": "https://www.moviezwap.moe/"
+    "url": "https://www.moviezwap.boo/"
   },
   "9xflix": {
     "name": "9xflix",
@@ -117,15 +117,15 @@
   },
   "cinevood": {
     "name": "Cinevood",
-    "url": "https://kmmovies.autos"
+    "url": "https://kmmovies.quest"
   },
   "kmmovies": {
     "name": "kmmovies",
-    "url": "https://kmmovies.autos"
+    "url": "https://kmmovies.quest"
   },
   "zeefliz": {
     "name": "zeefliz",
-    "url": "https://zeefliz1.lol"
+    "url": "https://zeefliz1.xyz"
   },
   "katmoviefix": {
     "name": "katmoviefix",
@@ -141,7 +141,7 @@
   },
   "skymovieshd": {
     "name": "skyMovesHd",
-    "url": "https://new4.skymovieshd.clinic"
+    "url": "https://new6.skymovieshd.clinic"
   },
   "1cinevood": {
     "name": "cinewood",
@@ -153,7 +153,7 @@
   },
   "anikoto": {
     "name": "anikoto",
-    "url": "https://anikototv.to"
+    "url": "https://anikototv.bz"
   },
   "kickAssAnime": {
     "name": "kickAssAnime",
@@ -193,6 +193,22 @@
   },
   "RareAnimes": {
     "name": "RareAnimes",
-    "url": "https://www.rareanimes.mov"
+    "url": "https://www.rareanimes.foo"
+  },
+  "durbinLive": {
+    "name": "DurbinLive",
+    "url": "https://durbinlive.live"
+  },
+  "liveTgTv": {
+    "name": "LiveTG TV",
+    "url": "https://livetgtv.lovable.app"
+  },
+  "aniDream": {
+    "name": "AniDream",
+    "url": "https://anidream.to"
+  },
+  "ExtraFlix": {
+    "name": "ExtraFlix",
+    "url": "https://e14.extraflix.mobi"
   }
 }

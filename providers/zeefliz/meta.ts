@@ -1,3 +1,4 @@
+import { getPage } from "./request";
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
 import {
@@ -40,9 +41,7 @@ export const getMeta = async function ({
   const url = new URL(link, `${baseUrl}/`).href;
 
   try {
-    const response = await axios.get(url, {
-      headers: { ...headers, Referer: baseUrl },
-    });
+    const response = await getPage(url, providerContext);
     const $ = cheerio.load(response.data);
     const content = $(".entry-content, .post-inner").length
       ? $(".entry-content, .post-inner")
@@ -172,7 +171,13 @@ export const getMeta = async function ({
         const h5Text = $(h5).text().trim();
         const qualityMatch = h5Text.match(/\d+p/)?.[0] || "";
 
-        const href = $(h5).next("p").find("a").attr("href");
+        const href = $(h5).next("p").find("a[href]").filter((_, a) => {
+          try {
+            return !/(?:^|\.)playdrive\./i.test(new URL($(a).attr("href")!, url).hostname);
+          } catch {
+            return false;
+          }
+        }).first().attr("href");
         if (href) {
           links.push({
             title: h5Text,

@@ -1,3 +1,4 @@
+import { getPage } from "./request";
 import { formatSeasonLinks } from "../formatSeasonLinks";
 import { Info, Link, ProviderContext } from "../types";
 import { getBaseUrl } from "../getBaseUrl";
@@ -14,7 +15,7 @@ export const getMeta = async function ({
     const { axios, cheerio } = providerContext;
     const baseUrl = await getBaseUrl("Moviesmod");
     const url = new URL(link, `${baseUrl}/`).href;
-    const res = await axios.get(url);
+    const res = await getPage(url, providerContext);
     const data = res.data;
     const $ = cheerio.load(data);
     const meta = {
@@ -71,9 +72,7 @@ export const getMeta = async function ({
         links.push({
           title: seriesTitle.replace("Download ", "").trim() || "Download",
           episodesLink: episodesLink || "",
-          directLinks: movieLink
-            ? [{ link: movieLink, title: "Movie", type: "movie" }]
-            : [],
+          ...(movieLink ? {directLinks: [{link: movieLink, title: "Movie", type: "movie" as const}]} : {}),
           quality: seriesTitle?.match(/\d+p\b/)?.[0] || "",
         });
       }

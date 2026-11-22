@@ -1,4 +1,5 @@
 import { Post, ProviderContext } from "../types";
+import { imageUrl, pageUrl } from "./page";
 
 const MAIN_URL = "https://www.mxplayer.in";
 const API_URL = "https://api.mxplayer.in/v1/web";
@@ -28,14 +29,14 @@ async function getUserID(axios: any): Promise<string> {
       }
     }
     // Fallback: MXPlayer sometimes works with just a random UUID or the cookie jar implicitly
-    return ""; 
+    return "";
   } catch (e) {
     return "";
   }
 }
 
 // Helper to construct end params
-const getEndParam = (userId: string) => 
+const getEndParam = (userId: string) =>
   `&device-density=2&userid=${userId}&platform=com.mxplay.desktop&content-languages=hi,en&kids-mode-enabled=false`;
 
 export async function getPosts({
@@ -48,13 +49,13 @@ export async function getPosts({
   providerContext: ProviderContext;
 }): Promise<Post[]> {
   const { axios } = providerContext;
-  
+
   const userId = await getUserID(axios);
   const endParam = getEndParam(userId);
-  
+
   // Default to Hindi Movies if no filter
   const queryParams = filter || "browseLangFilterIds=hi&type=1";
-  
+
   // Pagination logic from Kotlin: pageNum and pageSize
   const url = `${API_URL}/detail/browseItem?pageNum=${page}&pageSize=20&isCustomized=true&${queryParams}${endParam}`;
 
@@ -106,18 +107,18 @@ function mapItemToPost(item: any): Post {
   if (item.imageInfo) {
     const portrait = item.imageInfo.find((i: any) => i.type === "portrait_large");
     if (portrait && portrait.url) {
-      image = IMAGE_URL + portrait.url;
+      image = imageUrl(portrait.url);
     } else {
        // fallback
-       image = item.imageInfo[0]?.url ? IMAGE_URL + item.imageInfo[0].url : "";
+       image = item.imageInfo[0]?.url ? imageUrl(item.imageInfo[0].url) : "";
     }
   }
 
   return {
     title: item.title || "",
     image: image,
-    // We use the shareUrl as the link, or build a web link. 
+    // We use the shareUrl as the link, or build a web link.
     // Kotlin passes the whole JSON, but here we pass the URL to be scraped in meta.
-    link: item.shareUrl ? `${MAIN_URL}${item.shareUrl}` : "", 
+    link: pageUrl(item.shareUrl || item.webUrl || `/detail/${item.type === "tvshow" ? "tvshow" : "movie"}/${item.id}`),
   };
 }

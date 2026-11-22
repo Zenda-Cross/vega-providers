@@ -1,28 +1,11 @@
+import { getPage } from "./request";
 import { ProviderContext, Stream } from "../types";
 import { hubcloudExtractor } from "../extractors/hubcloud";
 import { zcloudExtractor } from "../extractors/zcloud";
 import { gdflixExtractor } from "../extractors/gdflix";
 import { throwProviderError } from "../providerErrors";
 
-const headers = {
-  Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-  "Cache-Control": "no-store",
-  "Accept-Language": "en-US,en;q=0.9",
-  DNT: "1",
-  "sec-ch-ua":
-    '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
-  "sec-ch-ua-mobile": "?0",
-  "sec-ch-ua-platform": '"Windows"',
-  "Sec-Fetch-Dest": "document",
-  "Sec-Fetch-Mode": "navigate",
-  "Sec-Fetch-Site": "none",
-  "Sec-Fetch-User": "?1",
-  Cookie:
-    "ext_name=ojplmecpdpgccookcobabopnaifgidhf; cf_clearance=nJQQ9ncb6m2Nc7HoxzuphPhnQgLzI6nBmzl2D.9oY4E-1759137994-1.2.1.1-pe7DiQHVsfZjnbHWTnaNbMiTYEuk.VvpPGaMeTtHOh7p9TKG5auBIDGDDW93devKuNcOlkhe6mk4v5OcsM0H_q3Te02eCPoTNgZsW8terjwvnQUebbbe8QKjMaVsVKgnbiAxS2ESM9aB3fbiQ9diuNT6ziY.2U4mPaJ0Y4vCu3404o5qBEw5c2psIuabKUTZviA2NJvN.lx5jAFQnB.HXeXJnUuCcbQac7G1BYBfdso",
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
-};
+const headers = {Accept: "text/html,application/xhtml+xml,*/*;q=0.8"};
 
 export async function getStream({
   link,
@@ -60,40 +43,7 @@ export async function getStream({
       link.includes("multicloud")
     ) {
       // vlink
-      let dotlinkText = "";
-      try {
-        const dotlinkRes = await axios(`${link}`, { headers, signal });
-        dotlinkText = dotlinkRes.data;
-      } catch (error: any) {
-        if (error.response?.status === 403 && openWebView) {
-          console.log(
-            `ZeeFliz: WAF detected (403) for ${link}, using solver...`,
-          );
-          const baseUrl = link.split("/").slice(0, 3).join("/");
-          const cleanHeaders = { ...headers, Referer: baseUrl };
-          delete cleanHeaders["User-Agent"];
-          delete cleanHeaders["sec-ch-ua"];
-          delete cleanHeaders["sec-ch-ua-mobile"];
-          delete cleanHeaders["sec-ch-ua-platform"];
-          delete cleanHeaders["Cookie"];
-
-          const wafResult = await openWebView(baseUrl, {
-            title: "Solve the captcha below and click done",
-            description: "Required to bypass anti-bot protection.",
-            headers: cleanHeaders,
-            waitForCookie: "cf_clearance",
-            force: true,
-          });
-          if (wafResult.userAgent) headers["User-Agent"] = wafResult.userAgent;
-          headers["Cookie"] =
-            (headers["Cookie"] ? headers["Cookie"] + "; " : "") +
-            wafResult.cookies;
-          const retryRes = await axios(`${link}`, { headers, signal });
-          dotlinkText = retryRes.data;
-        } else {
-          throw error;
-        }
-      }
+      const dotlinkText = (await getPage(link, providerContext, signal)).data;
 
       const vlink = dotlinkText.match(/<a\s+href="([^"]*cloud\.[^"]*)"/i) || [];
       console.log("vLink", vlink[1]);
@@ -149,11 +99,10 @@ export async function getStream({
             },
           );
           // console.log('filepressStreamLink', filepressStreamLink.data);
-          streamLinks.push({
-            server: "filepress",
-            link: filepressStreamLink.data?.data?.[0],
-            type: "mkv",
-          });
+          const fileUrl = filepressStreamLink.data?.data?.[0];
+          if (typeof fileUrl === "string" && /^https?:\/\//i.test(fileUrl)) {
+            streamLinks.push({ server: "filepress", link: fileUrl, type: "mkv" });
+          }
         }
       } catch (error) {
         console.log("filepress error: ");
@@ -162,26 +111,31 @@ export async function getStream({
     }
 
     let hubStreams;
-    if (link.includes("zcloud")) {
-      hubStreams = await zcloudExtractor(
-        link,
-        signal,
-        axios,
-        cheerio,
-        headers,
-        providerContext,
-      );
-    } else {
-      hubStreams = await hubcloudExtractor(
-        link,
-        signal,
-        axios,
-        cheerio,
-        headers,
-        providerContext,
-        isDownload,
-        "zeefliz",
-      );
+    try {
+      if (link.includes("zcloud")) {
+        hubStreams = await zcloudExtractor(
+          link,
+          signal,
+          axios,
+          cheerio,
+          headers,
+          providerContext,
+        );
+      } else {
+        hubStreams = await hubcloudExtractor(
+          link,
+          signal,
+          axios,
+          cheerio,
+          headers,
+          providerContext,
+          isDownload,
+          "zeefliz",
+        );
+      }
+    } catch (error) {
+      if (signal?.aborted || streamLinks.length === 0) throw error;
+      return streamLinks;
     }
 
     if (Array.isArray(hubStreams) && hubStreams.length > 0) {

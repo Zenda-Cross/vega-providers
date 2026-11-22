@@ -1,12 +1,16 @@
 import { Info, Link, ProviderContext } from "../types";
 import {
+  ArchiveFile,
+  IA_BASE,
   fetchItem,
   firstValue,
+  formatRuntime,
   groupVideos,
   imageUrl,
   isEpisodeList,
+  listValues,
+  parseDuration,
   parseLink,
-  IA_BASE,
 } from "./api";
 
 const toPlainText = (html: string, providerContext: ProviderContext): string => {
@@ -15,7 +19,6 @@ const toPlainText = (html: string, providerContext: ProviderContext): string => 
   return $("div").text().replace(/\n{3,}/g, "\n\n").trim();
 };
 
-// Turns "Bonanza s01e19.mp4" into "Bonanza s01e19".
 const episodeTitle = (fileName: string): string =>
   fileName.replace(/^.*\//, "").replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").trim();
 
@@ -26,6 +29,12 @@ const episodeNumbers = (fileName: string): { season: number; episode: number } =
   const episode = name.match(/\bep(?:isode)?[\s._-]*(\d+)/i);
   return { season: 1, episode: episode ? Number(episode[1]) : Number.MAX_SAFE_INTEGER };
 };
+
+const longestRuntime = (groups: Map<string, ArchiveFile[]>): number =>
+  Math.max(
+    0,
+    ...[...groups.values()].flat().map((file) => parseDuration(file.length)),
+  );
 
 export const getMeta = async function ({
   link,
@@ -40,16 +49,12 @@ export const getMeta = async function ({
 
   const title = firstValue(metadata.title) || identifier;
   const year = firstValue(metadata.year) || firstValue(metadata.date).slice(0, 4);
-  const subjects: string[] = (
-    Array.isArray(metadata.subject) ? metadata.subject : [firstValue(metadata.subject)]
-  )
-    .flatMap((s: string) => String(s).split(";"))
-    .map((s: string) => s.trim())
-    .filter(Boolean);
+  const subjects = listValues(metadata.subject);
   const imdbId =
     JSON.stringify([metadata["external-identifier"], metadata.imdb]).match(/tt\d{7,}/)?.[0] || "";
 
-  const groups = [...groupVideos(files).keys()];
+  const videoGroups = groupVideos(files);
+  const groups = [...videoGroups.keys()];
   const isSeries = isEpisodeList(groups, metadata);
 
   const linkList: Link[] = [];
@@ -77,13 +82,15 @@ export const getMeta = async function ({
     linkList.push({ title: "Movie", directLinks: [{ title: "Movie", link: encodeURIComponent(identifier), type: "movie" }] });
   }
 
+  const runtime = isSeries ? "" : formatRuntime(longestRuntime(videoGroups));
+
   return {
     title,
     synopsis: toPlainText(firstValue(metadata.description), providerContext),
     image: imageUrl(identifier),
     imdbId,
     type: isSeries ? "series" : "movie",
-    tags: [year, ...subjects].filter(Boolean).slice(0, 6),
+    tags: [year, runtime, ...subjects].filter(Boolean).slice(0, 6),
     linkList,
     webUrl: `${IA_BASE}/details/${encodeURIComponent(identifier)}`,
   };

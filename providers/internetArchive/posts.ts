@@ -1,11 +1,12 @@
 import { Post, ProviderContext } from "../types";
 import {
+  buildSearchQuery,
   buildSearchUrl,
   firstValue,
   getLicenseFilter,
   getSortOrder,
+  getWithRetry,
   imageUrl,
-  sanitizeQuery,
 } from "./api";
 
 const searchItems = async (
@@ -19,23 +20,22 @@ const searchItems = async (
     getSortOrder(providerContext),
   ]);
   const url = buildSearchUrl(`(${query}) AND mediatype:movies AND ${license}`, page, 24, sort);
-  const res = await providerContext.axios.get(url, {
-    headers: providerContext.commonHeaders,
-    signal,
-  });
+  const res = await getWithRetry(url, providerContext, signal);
   const docs: any[] = res.data?.response?.docs || [];
-  return docs
-    .filter((doc) => doc.identifier)
-    .map((doc) => {
-      const title = firstValue(doc.title) || doc.identifier;
-      const year = firstValue(doc.year);
-      return {
-        title,
-        link: doc.identifier,
-        image: imageUrl(doc.identifier),
-        cornerTag: year || undefined,
-      };
+  const seen = new Set<string>();
+  const posts: Post[] = [];
+  for (const doc of docs) {
+    if (!doc.identifier || seen.has(doc.identifier)) continue;
+    seen.add(doc.identifier);
+    const year = firstValue(doc.year);
+    posts.push({
+      title: firstValue(doc.title) || doc.identifier,
+      link: doc.identifier,
+      image: imageUrl(doc.identifier),
+      cornerTag: year || undefined,
     });
+  }
+  return posts;
 };
 
 export const getPosts = async function ({
@@ -65,7 +65,7 @@ export const getSearchPosts = async function ({
   signal: AbortSignal;
   providerContext: ProviderContext;
 }): Promise<Post[]> {
-  const words = sanitizeQuery(searchQuery);
-  if (!words) return [];
-  return searchItems(`title:(${words})`, page, providerContext, signal);
+  const query = buildSearchQuery(searchQuery);
+  if (!query) return [];
+  return searchItems(query, page, providerContext, signal);
 };
