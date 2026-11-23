@@ -66,7 +66,7 @@ async function fetchPosts({
     const baseUrl =
       ((await getBaseUrl("movielinkbd").catch(() => "")) ||
       (await getBaseUrl("movielinkdb").catch(() => "")) ||
-      "https://ex5wfv.movielinkbd.li").replace(/\/+$/, "");
+      "https://movielinkbd.at").replace(/\/+$/, "");
 
     let url: string;
 

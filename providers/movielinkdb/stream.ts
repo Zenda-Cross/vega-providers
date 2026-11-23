@@ -42,6 +42,16 @@ function resolveRelative(href: string, base: string): string {
   }
 }
 
+function isMediaTarget(url: string, page: string): boolean {
+  try {
+    const target = new URL(url);
+    if (!/^https?:$/.test(target.protocol)) return false;
+    if (/(^|\.)(t\.me|telegram\.me)$/.test(target.hostname)) return false;
+    if (/\/(?:how2download|file)(?:\/|$)/i.test(target.pathname) && target.origin === new URL(page).origin) return false;
+    return !/\.(?:html?|php)(?:$|\?)/i.test(target.pathname);
+  } catch { return false; }
+}
+
 function ensureAbsolute(link: string): string {
   if (isHttpUrl(link)) return link;
   return link;
@@ -110,6 +120,7 @@ async function extractFsl(
     }
 
     const full = resolveRelative(href, link);
+    if (!isMediaTarget(full, link)) return null;
     console.log(`[getStream] FSL direct link: ${full}`);
     return { server: "fsl", link: full, type: "mp4" };
   } catch (e) {
@@ -168,6 +179,7 @@ async function extractGp(
     }
 
     const full = resolveRelative(href, link);
+    if (!isMediaTarget(full, link)) return null;
     console.log(`[getStream] GP direct link: ${full}`);
     return { server: "gp", link: full, type: "mp4" };
   } catch (e) {
@@ -191,8 +203,6 @@ async function extractGeneric(
     const href =
       $("a[href*='.mkv']").first().attr("href") ||
       $("a[href*='.mp4']").first().attr("href") ||
-      $("a[href*='download']").first().attr("href") ||
-      $("a.btn-primary").first().attr("href") ||
       $("a.dlh-cta").first().attr("href") ||
       $("a.fsl-download").first().attr("href");
     if (!href) {
@@ -200,6 +210,7 @@ async function extractGeneric(
       return null;
     }
     const full = resolveRelative(href, link);
+    if (!isMediaTarget(full, link)) return null;
     console.log(`[getStream] ${server} direct link: ${full}`);
     return { server, link: full, type: "mp4" };
   } catch (e) {
