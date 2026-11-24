@@ -1,5 +1,9 @@
 My personal providers for the Vega app
 
+## 18+ provider labels
+
+Set `"adult": true` on the provider's entry in `manifest.json` to display an **18+** badge in compatible Vega Mobile builds. **Hide 18+ providers** in Preferences removes flagged providers from browsing and Provider Manager. Existing installations are retained.
+
 ## Hold to preview
 
 Providers can return an optional video or animated image on Home and Search posts. See [the provider preview contract](docs/hold-to-preview.md).
