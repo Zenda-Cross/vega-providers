@@ -241,11 +241,34 @@ async function testProvider(providerName, functionName) {
 }
 
 // Zod schemas for response validation
+const PreviewUrlSchema = z.string().trim().url().refine((value) => {
+  try {
+    const url = new URL(value);
+    return /^https?:\/\//i.test(value) && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}, "Preview must be an HTTP(S) media URL without embedded credentials");
+const PreviewHeadersSchema = z.record(
+  z.string().trim().min(1).regex(/^[^\r\n]+$/),
+  z.string().regex(/^[^\r\n]*$/),
+);
 const PostSchema = z.object({
   title: z.string().min(1, "Title cannot be empty"),
   link: z.string().min(1, "Link cannot be empty"),
   image: z.string().url("Image must be a valid URL"),
   provider: z.string().optional(),
+  preview: z.union([
+    PreviewUrlSchema,
+    z.object({
+      url: PreviewUrlSchema,
+      type: z.enum(["video", "gif", "image"]).optional(),
+      headers: PreviewHeadersSchema.optional(),
+    }),
+  ]).optional(),
+  previewVideo: PreviewUrlSchema.optional(),
+  previewGif: PreviewUrlSchema.optional(),
+  previewHeaders: PreviewHeadersSchema.optional(),
 });
 
 const StreamSchema = z.object({

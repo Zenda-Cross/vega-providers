@@ -28,6 +28,7 @@ export const catalog = [
 
 ### `posts.ts`
 Export `getPosts` and `getSearchPosts`.
+Posts can include an optional direct video or GIF preview. See [Hold to preview](docs/hold-to-preview.md) for the supported fields.
 ```ts
 import { Post, ProviderContext } from "../types";
 

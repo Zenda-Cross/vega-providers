@@ -121,7 +121,7 @@
   {
     "display_name": "MovieBox Web",
     "value": "movieBoxWeb",
-    "version": "2.9",
+    "version": "2.10",
     "hasSettings": true,
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/movieBoxWeb.png",
     "type": "global",
@@ -455,7 +455,7 @@
     "version": "1.5",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/everything.png",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "Castle TV",

@@ -7,7 +7,13 @@ export interface Content {
   [key: string]: any;
 }
 
-// getPosts
+export interface PostPreview {
+  url: string;
+  type?: "video" | "gif" | "image";
+  headers?: Record<string, string>;
+}
+
+// getPosts and getSearchPosts
 export interface Post {
   title: string;
   link: string;
@@ -17,6 +23,10 @@ export interface Post {
   borderRadius?: number;
   tag?: string;
   cornerTag?: string;
+  preview?: string | PostPreview;
+  previewVideo?: string;
+  previewGif?: string;
+  previewHeaders?: Record<string, string>;
 }
 
 export type TextTracks = {

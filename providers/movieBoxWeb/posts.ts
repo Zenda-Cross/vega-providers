@@ -1,4 +1,4 @@
-import { Post, ProviderContext } from "../types";
+import { Post, PostPreview, ProviderContext } from "../types";
 import { absoluteUrl, getProviderBaseUrl, parseNuxtData, posterUrl } from "./utils";
 
 type SubjectPreview = {
@@ -6,6 +6,7 @@ type SubjectPreview = {
   title?: string;
   coverUrl?: string;
   hasResource?: boolean;
+  preview?: PostPreview;
 };
 
 type SubjectListResponse = {
@@ -17,6 +18,7 @@ type SubjectListResponse = {
       title?: string;
       cover?: { url?: string };
       hasResource?: boolean;
+      trailer?: { videoAddress?: { url?: string } };
     }>;
   };
 };
@@ -27,6 +29,18 @@ const requestHeaders = {
   "x-client-info": JSON.stringify({ timezone: "Asia/Colombo" }),
   "x-source": "",
 };
+
+function trailerPreview(trailer: unknown): PostPreview | undefined {
+  const url = (trailer as { videoAddress?: { url?: unknown } } | null)
+    ?.videoAddress?.url;
+  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
+  try {
+    const parsed = new URL(url);
+    if (!parsed.username && !parsed.password) return { url, type: "video" };
+  } catch {
+    // Some titles have incomplete trailer metadata.
+  }
+}
 
 function collectSubjectPreviews(value: unknown): Map<string, SubjectPreview> {
   const subjects = new Map<string, SubjectPreview>();
@@ -39,6 +53,7 @@ function collectSubjectPreviews(value: unknown): Map<string, SubjectPreview> {
     if ("detailPath" in current && typeof current.detailPath === "string") {
       const cover = "cover" in current ? current.cover : undefined;
       subjects.set(current.detailPath, {
+        preview: trailerPreview("trailer" in current ? current.trailer : undefined),
         title:
           "title" in current && typeof current.title === "string"
             ? current.title
@@ -107,6 +122,7 @@ async function fetchPosts(
       link: href,
       image:
         posterUrl(image.attr("data-src") || subject?.coverUrl || image.attr("src")),
+      ...(subject?.preview && { preview: subject.preview }),
     });
   });
   return posts;
@@ -123,6 +139,7 @@ function mapSubjects(subjects: SubjectPreview[]): Post[] {
       title: subject.title || "",
       link: `/moviesDetail/${subject.detailPath}`,
       image: posterUrl(subject.coverUrl),
+      ...(subject.preview && { preview: subject.preview }),
     }));
 }
 
@@ -159,6 +176,7 @@ async function fetchCatalogPage(
       title: subject.title,
       coverUrl: subject.cover?.url,
       hasResource: subject.hasResource,
+      preview: trailerPreview(subject.trailer),
     })),
   );
 }
