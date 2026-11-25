@@ -1,13 +1,5 @@
 My personal providers for the Vega app
 
-## 18+ provider labels
-
-Set `"adult": true` on the provider's entry in `manifest.json` to display an **18+** badge in compatible Vega Mobile builds. **Hide 18+ providers** in Preferences removes flagged providers from browsing and Provider Manager. Existing installations are retained.
-
-## Hold to preview
-
-Providers can return an optional video or animated image on Home and Search posts. See [the provider preview contract](docs/hold-to-preview.md).
-
 ## DMCA Notice
 We issue this notice to clarify that this repository operate like standard web browsers by retrieving video files from the Internet and do not, by themselves, contravene the Digital Millennium Copyright Act (17 U.S.C. §§ 1201–1205, 17 U.S.C. § 512) or other applicable law. Any content accessed through this addon is provided by third-party websites or file hosts and is not hosted, controlled, or maintained on this repository. Pursuant to the DMCA, copyright owners seeking removal of infringing material should follow the notice-and-takedown procedures set forth in 17 U.S.C. §§ 1201–1205, 17 U.S.C. § 512. If you believe any content accessed via the addon infringed intellectual property rights, please direct your complaints to the hosting websites or file hosts rather than to this repository.
 
