@@ -523,7 +523,7 @@
     "version": "1.0.6",
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/1flex.png",
     "type": "global",
-    "disabled": false
+    "disabled": true
   },
   {
     "display_name": "Internet Archive",
