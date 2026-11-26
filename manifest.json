@@ -587,5 +587,14 @@
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/kartoons.png",
     "type": "anime",
     "disabled": false
+  },
+  {
+    "display_name": "CNCVerse Bridge",
+    "value": "cncverse",
+    "version": "1.0",
+    "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/cncverse.png",
+    "type": "global",
+    "disabled": false,
+    "hasSettings": true
   }
 ]
