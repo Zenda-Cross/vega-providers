@@ -1,6 +1,6 @@
 import { Post, ProviderContext } from "../types";
 
-const BASE_URL = "https://anikototv.to";
+const BASE_URL = "https://anikototv.bz";
 
 // The site can serve links for any of its mirrors, so keep post links on the
 // canonical host the provider scrapes and streams from.

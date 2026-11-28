@@ -1,7 +1,26 @@
 import { ProviderContext, SkipInterval, Stream, TextTracks } from "../types";
 import { throwProviderError } from "../providerErrors";
 
-const BASE_URL = "https://anikototv.to";
+const BASE_URL = "https://anikototv.bz";
+const ALT_BASE_URL = "https://anikototv.to";
+
+function resolveResponseOrigin(
+  res: any,
+  htmlDataUrl?: string,
+  fallback: string = BASE_URL
+): string {
+  try {
+    const rawUrl =
+      (typeof res?.request === "string" && res.request) ||
+      res?.request?.responseURL ||
+      res?.request?.res?.responseUrl ||
+      htmlDataUrl ||
+      fallback;
+    return new URL(rawUrl).origin;
+  } catch {
+    return fallback;
+  }
+}
 
 const defaultHeaders = {
   "User-Agent":
@@ -356,17 +375,29 @@ export const getStream = async function ({
 
     if (!slug) return [];
 
-    const watchUrl = `${BASE_URL}/watch/${slug}/ep-${epNum || 1}`;
+    let origin =
+      typeof payload.origin === "string" &&
+      /^https?:\/\/(?:www\.)?anikototv\.[a-z]+$/i.test(payload.origin)
+        ? payload.origin
+        : BASE_URL;
 
-    const headers = {
+    const watchUrlFor = (hostOrigin: string) =>
+      `${hostOrigin}/watch/${slug}/ep-${epNum || 1}`;
+    const headersFor = (hostOrigin: string) => ({
       ...defaultHeaders,
-      Referer: `${BASE_URL}/`,
-    };
+      Referer: `${hostOrigin}/`,
+    });
 
     // If dataIds is missing, fetch fresh episode list
     if (!dataIds) {
-      const detailRes = await axios.get(watchUrl, { headers });
+      const detailRes = await axios.get(watchUrlFor(origin), {
+        headers: headersFor(origin),
+      });
       const $d = cheerio.load(detailRes.data);
+      const htmlDataUrl = $d("#watch-page, #watch-main, .watch-wrap, [data-url]")
+        .first()
+        .attr("data-url");
+      origin = resolveResponseOrigin(detailRes, htmlDataUrl, origin);
       const animeId = $d(
         "#watch-page, #watch-main, .watch-wrap, [data-id]"
       )
@@ -375,17 +406,35 @@ export const getStream = async function ({
 
       if (animeId) {
         const vrf = encodeURIComponent(encodeVrf(animeId));
-        const epRes = await axios.get(
-          `${BASE_URL}/ajax/episode/list/${animeId}?vrf=${vrf}&style=default`,
-          {
-            headers: {
-              ...headers,
-              "X-Requested-With": "XMLHttpRequest",
-              Referer: watchUrl,
-            },
+        const fetchEpisodeList = (hostOrigin: string) =>
+          axios.get(
+            `${hostOrigin}/ajax/episode/list/${animeId}?vrf=${vrf}&style=default`,
+            {
+              headers: {
+                ...headersFor(hostOrigin),
+                "X-Requested-With": "XMLHttpRequest",
+                Referer: watchUrlFor(hostOrigin),
+              },
+            }
+          );
+        let epRes: any;
+        try {
+          epRes = await fetchEpisodeList(origin);
+        } catch {
+          epRes = undefined;
+        }
+        if (epRes?.data?.status !== 200) {
+          const retryOrigin = origin === BASE_URL ? ALT_BASE_URL : BASE_URL;
+          try {
+            epRes = await fetchEpisodeList(retryOrigin);
+            if (epRes?.data?.status === 200) {
+              origin = resolveResponseOrigin(epRes, htmlDataUrl, retryOrigin);
+            }
+          } catch {
+            // ignore fallback error
           }
-        );
-        if (epRes.data?.result) {
+        }
+        if (epRes?.data?.status === 200 && epRes?.data?.result) {
           const $ep = cheerio.load(epRes.data.result);
           const epEl = $ep(
             `ul.ep-range a[data-num="${epNum}"], .ep-range a[data-num="${epNum}"], a[data-ids]`
@@ -399,14 +448,44 @@ export const getStream = async function ({
       return [];
     }
 
-    const serverListUrl = `${BASE_URL}/ajax/server/list?servers=${encodeURIComponent(dataIds)}`;
-    const srvRes = await axios.get(serverListUrl, {
-      headers: {
-        ...headers,
-        "X-Requested-With": "XMLHttpRequest",
-        Referer: watchUrl,
-      },
-    });
+    const fetchServerList = (hostOrigin: string) =>
+      axios.get(
+        `${hostOrigin}/ajax/server/list?servers=${encodeURIComponent(dataIds)}`,
+        {
+          headers: {
+            ...headersFor(hostOrigin),
+            "X-Requested-With": "XMLHttpRequest",
+            Referer: watchUrlFor(hostOrigin),
+          },
+        }
+      );
+
+    let srvRes: any;
+    try {
+      srvRes = await fetchServerList(origin);
+    } catch {
+      srvRes = undefined;
+    }
+
+    if (srvRes?.data?.status !== 200) {
+      const retryOrigin = origin === BASE_URL ? ALT_BASE_URL : BASE_URL;
+      try {
+        const detailRes = await axios.get(watchUrlFor(retryOrigin), {
+          headers: headersFor(retryOrigin),
+        });
+        const $r = cheerio.load(detailRes.data);
+        const retryHtmlUrl = $r("#watch-page, #watch-main, .watch-wrap, [data-url]")
+          .first()
+          .attr("data-url");
+        const nextOrigin = resolveResponseOrigin(detailRes, retryHtmlUrl, retryOrigin);
+        srvRes = await fetchServerList(nextOrigin);
+        if (srvRes?.data?.status === 200) {
+          origin = nextOrigin;
+        }
+      } catch {
+        // ignore fallback error
+      }
+    }
 
     if (!srvRes.data || srvRes.data.status !== 200 || !srvRes.data.result) {
       return [];
@@ -446,14 +525,14 @@ export const getStream = async function ({
     await Promise.all(
       tasks.map(async (task) => {
         try {
-          const getUrl = `${BASE_URL}/ajax/server?get=${encodeURIComponent(
+          const getUrl = `${origin}/ajax/server?get=${encodeURIComponent(
             task.linkId
           )}`;
           const getRes = await axios.get(getUrl, {
             headers: {
-              ...headers,
+              ...headersFor(origin),
               "X-Requested-With": "XMLHttpRequest",
-              Referer: watchUrl,
+              Referer: watchUrlFor(origin),
             },
             timeout: 8000,
           });
@@ -559,7 +638,7 @@ export const getStream = async function ({
           try {
             const pageRes = await axios.get(iframeUrl, {
               headers: {
-                ...headers,
+                ...defaultHeaders,
                 Referer: `https://${host}/`,
                 Origin: `https://${host}`,
               },
@@ -595,7 +674,7 @@ export const getStream = async function ({
                 .filter((v, idx, arr) => arr.indexOf(v) === idx);
 
               const apiHeaders = {
-                ...headers,
+                ...defaultHeaders,
                 "X-Requested-With": "XMLHttpRequest",
                 Referer: iframeUrl,
                 Origin: `https://${host}`,

@@ -1,7 +1,26 @@
 import { EpisodeLink, Info, Link, ProviderContext } from "../types";
 import { throwProviderError } from "../providerErrors";
 
-const BASE_URL = "https://anikototv.to";
+const BASE_URL = "https://anikototv.bz";
+const ALT_BASE_URL = "https://anikototv.to";
+
+function resolveResponseOrigin(
+  res: any,
+  htmlDataUrl?: string,
+  fallback: string = BASE_URL
+): string {
+  try {
+    const rawUrl =
+      (typeof res?.request === "string" && res.request) ||
+      res?.request?.responseURL ||
+      res?.request?.res?.responseUrl ||
+      htmlDataUrl ||
+      fallback;
+    return new URL(rawUrl).origin;
+  } catch {
+    return fallback;
+  }
+}
 
 function rc4(key: string, input: string): string {
   const s = Array.from({ length: 256 }, (_, i) => i);
@@ -63,6 +82,8 @@ export const getMeta = async function ({
     let watchUrl = link;
     if (!watchUrl.startsWith("http")) {
       watchUrl = `${BASE_URL}${watchUrl.startsWith("/") ? "" : "/"}${watchUrl}`;
+    } else {
+      watchUrl = watchUrl.replace(/^https?:\/\/(?:www\.)?anikototv\.[a-z]+/i, BASE_URL);
     }
     if (!watchUrl.includes("/ep-")) {
       watchUrl = `${watchUrl.replace(/\/+$/, "")}/ep-1`;
@@ -87,6 +108,10 @@ export const getMeta = async function ({
     });
 
     const $ = cheerio.load(res.data);
+    const htmlDataUrl = $("#watch-page, #watch-main, .watch-wrap, [data-url]")
+      .first()
+      .attr("data-url");
+    const origin = resolveResponseOrigin(res, htmlDataUrl);
     const title =
       $("h1.title").text().trim() ||
       $(".binfo h1").text().trim() ||
@@ -132,17 +157,38 @@ export const getMeta = async function ({
 
     if (animeId) {
       const vrf = encodeURIComponent(encodeVrf(animeId));
-      const epAjaxUrl = `${BASE_URL}/ajax/episode/list/${animeId}?vrf=${vrf}&style=default`;
+      const fetchEpisodeList = (hostOrigin: string) =>
+        axios.get(
+          `${hostOrigin}/ajax/episode/list/${animeId}?vrf=${vrf}&style=default`,
+          {
+            headers: {
+              ...providerContext.commonHeaders,
+              "X-Requested-With": "XMLHttpRequest",
+              Referer: `${hostOrigin}/watch/${slug}/ep-1`,
+            },
+          }
+        );
 
-      const epRes = await axios.get(epAjaxUrl, {
-        headers: {
-          ...providerContext.commonHeaders,
-          "X-Requested-With": "XMLHttpRequest",
-          Referer: watchUrl,
-        },
-      });
+      let activeOrigin = origin;
+      let epRes: any;
+      try {
+        epRes = await fetchEpisodeList(activeOrigin);
+      } catch {
+        epRes = undefined;
+      }
+      if (epRes?.data?.status !== 200) {
+        const retryOrigin = activeOrigin === BASE_URL ? ALT_BASE_URL : BASE_URL;
+        try {
+          epRes = await fetchEpisodeList(retryOrigin);
+          if (epRes?.data?.status === 200) {
+            activeOrigin = resolveResponseOrigin(epRes, htmlDataUrl, retryOrigin);
+          }
+        } catch {
+          // ignore fallback error
+        }
+      }
 
-      if (epRes.data && epRes.data.status === 200 && epRes.data.result) {
+      if (epRes?.data?.status === 200 && epRes?.data?.result) {
         const $ep = cheerio.load(epRes.data.result);
         const epElements = $ep(
           "ul.ep-range a, .ep-range a, .range a, a[data-ids]"
@@ -172,6 +218,7 @@ export const getMeta = async function ({
               hasSub,
               hasDub,
               title: epTitle,
+              origin: activeOrigin,
             }),
           });
         });
@@ -186,6 +233,14 @@ export const getMeta = async function ({
     }
 
     if (linkList.length === 0) {
+      if (animeId && type !== "movie") {
+        throwProviderError(
+          "Anikoto",
+          "episode list",
+          new Error("episode list unavailable")
+        );
+      }
+
       linkList.push({
         title: title,
         directLinks: [

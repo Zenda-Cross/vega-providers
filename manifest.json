@@ -428,7 +428,7 @@
     "icon": "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/anikoto.png",
     "display_name": "Anikoto",
     "value": "anikoto",
-    "version": "2.2",
+    "version": "2.3",
     "type": "anime",
     "disabled": false
   },
