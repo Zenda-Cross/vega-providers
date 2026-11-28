@@ -2,6 +2,15 @@ import { Post, ProviderContext } from "../types";
 
 const BASE_URL = "https://anikototv.to";
 
+// The site can serve links for any of its mirrors, so keep post links on the
+// canonical host the provider scrapes and streams from.
+const canonicalLink = (href: string) => {
+  const absolute = href.startsWith("http")
+    ? href
+    : `${BASE_URL}${href.startsWith("/") ? "" : "/"}${href}`;
+  return absolute.replace(/^https?:\/\/(?:www\.)?anikototv\.[a-z]+/i, BASE_URL);
+};
+
 export const getPosts = async function ({
   filter,
   page,
@@ -40,13 +49,10 @@ export const getPosts = async function ({
 
       // Find the watch link
       const linkEl = $(el).find(".info a.name, .info a.d-title, .poster a, a[href*='/watch/']").first();
-      let href = linkEl.attr("href") || "";
-      if (!href) return;
+      const rawHref = linkEl.attr("href") || "";
+      if (!rawHref) return;
 
-      if (!href.startsWith("http")) {
-        href = `${BASE_URL}${href.startsWith("/") ? "" : "/"}${href}`;
-      }
-
+      const href = canonicalLink(rawHref);
       const image = $(el).find("img").attr("src") || "";
 
       if (title && href) {
@@ -102,13 +108,10 @@ export const getSearchPosts = async function ({
         "";
 
       const linkEl = $(el).find(".info a.name, .info a.d-title, .poster a, a[href*='/watch/']").first();
-      let href = linkEl.attr("href") || "";
-      if (!href) return;
+      const rawHref = linkEl.attr("href") || "";
+      if (!rawHref) return;
 
-      if (!href.startsWith("http")) {
-        href = `${BASE_URL}${href.startsWith("/") ? "" : "/"}${href}`;
-      }
-
+      const href = canonicalLink(rawHref);
       const image = $(el).find("img").attr("src") || "";
 
       if (title && href) {

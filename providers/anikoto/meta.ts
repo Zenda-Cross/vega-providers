@@ -68,10 +68,16 @@ export const getMeta = async function ({
       watchUrl = `${watchUrl.replace(/\/+$/, "")}/ep-1`;
     }
 
-    const slug = watchUrl
-      .replace(BASE_URL, "")
-      .replace(/^\/watch\//, "")
-      .split("/")[0];
+    // Post links can point at any Anikoto mirror (for example anikototv.bz),
+    // so read the slug from the path instead of stripping the hardcoded host.
+    const slug =
+      watchUrl.match(/\/watch\/([^/?#]+)/)?.[1] ||
+      watchUrl
+        .replace(/[?#].*$/, "")
+        .replace(/\/+$/, "")
+        .split("/")
+        .pop() ||
+      "";
 
     const res = await axios.get(watchUrl, {
       headers: {
